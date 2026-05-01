@@ -95,6 +95,12 @@ if (!empty($row['recommendations']) && empty($row['ai_report']['recommendations'
 $row['url']       = $row['website_url'] ?: $row['facebook_url'] ?: $row['instagram_url'] ?: $row['tiktok_url'] ?: $row['twitter_url'] ?: '';
 $row['full_name'] = $row['full_name']   ?: $row['company_name'] ?: '';
 
+// ── package_tier: مجاني (3 توصيات) أم مدفوع (القائمة الكاملة) ──
+// المصدر: assessments.is_unlocked (TINYINT(1)) — يُضبط على 1 من قِبل الإدارة
+// عند فتح التقرير للعميل بعد دفع باقة. يُستهلك في الواجهة (report-connect.js)
+// لتطبيق slice(0, 3) على قسم التوصيات في الباقة المجانية.
+$row['package_tier'] = !empty($row['is_unlocked']) ? 'paid' : 'free';
+
 // ── DEBUG: أضف مؤشر المصدر لتسهيل التشخيص ──────────────────
 $row['_debug'] = [
     'ai_report_source'        => !empty($row['ai_report']) ? 'DB:ai_report' : 'EMPTY',

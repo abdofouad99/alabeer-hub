@@ -486,7 +486,7 @@ document.addEventListener("DOMContentLoaded", () => {
         else if (igFol > 0)     set('wkCheckEng','wkCheckEngVal','❌','تفاعل منخفض — يضر بالظهور العضوي','var(--red)');
         else                    set('wkCheckEng','wkCheckEngVal','⚠️','لا توجد بيانات تفاعل كافية للتحليل','var(--yellow)');
 
-        // ── 7. Top Recommendations Preview ──
+        // ── 7. Top Recommendations Preview (الباقة المجانية: 3 توصيات بالضبط) ──
         const resultRecsList = document.getElementById('resultRecsList');
         const recs = data.recommendations || [];
         const recViewAllEl = document.getElementById('recViewAll');
@@ -495,7 +495,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (resultRecsList && recs.length > 0) {
           const highRecs = recs.filter(r => r.priority === 'high');
-          const preview  = (highRecs.length >= 2 ? highRecs : recs).slice(0, 2);
+          const preview  = (highRecs.length >= 3 ? highRecs : recs).slice(0, 3);
           const priColor = p => p === 'high' ? 'var(--red)' : p === 'low' ? 'var(--green)' : 'var(--yellow)';
           const priRgb   = p => p === 'high' ? '239,68,68' : p === 'low' ? '16,185,129' : '234,179,8';
           const priLabel = p => p === 'high' ? 'عاجل' : p === 'low' ? 'مستقبلي' : 'متوسط';
@@ -834,11 +834,24 @@ document.addEventListener("DOMContentLoaded", () => {
         if (recLowList)  recLowList.innerHTML  = '<div style="padding:20px;color:var(--text-gray);">جاري التحميل...</div>';
 
         if (data.recommendations && data.recommendations.length > 0) {
-          if (recTotalCount) recTotalCount.textContent = data.recommendations.length + ' إجراء';
+          // ── Free tier: عرض 3 توصيات بالضبط (slice(0, 3)). Paid: القائمة كاملة. ──
+          // المصدر: data.package_tier (يأتي من api/result.php مبنياً على
+          // assessments.is_unlocked). الترتيب من الـ AI prompt يضمن أن أول
+          // 3 عناصر هي الأعلى أولوية (recommendations[0..1] = high،
+          // recommendations[2] = medium) — وهذا ما يحدده عرض الباقة المجانية.
+          const isPaidTier  = data.package_tier === 'paid';
+          const visibleRecs = isPaidTier ? data.recommendations : data.recommendations.slice(0, 3);
+          const totalCount  = data.recommendations.length;
+
+          if (recTotalCount) {
+            recTotalCount.textContent = isPaidTier
+              ? totalCount + ' إجراء'
+              : visibleRecs.length + ' من ' + totalCount + ' إجراء (الباقة المجانية)';
+          }
 
           let highHtml = '', medHtml = '', lowHtml = '';
 
-          data.recommendations.forEach((rec, idx) => {
+          visibleRecs.forEach((rec, idx) => {
             const priority   = rec.priority || 'medium';
             const iconMap    = { high: '🛡️', medium: '✍️', low: '🤝' };
             const icon       = rec.icon || iconMap[priority] || '💡';
