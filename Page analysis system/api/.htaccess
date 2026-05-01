@@ -1,97 +1,86 @@
-# حماية ملفات API من الوصول المباشر
-<Files "*.php">
-    Order Deny,Allow
-    Deny from all
-    Allow from 127.0.0.1
-    Allow from ::1
-    Allow from localhost
-</Files>
+# ============================================================
+# api/.htaccess — حماية شاملة بصياغة Apache 2.2/2.4 معاً
+# المنطق: deny-by-default ثم whitelist للـ public endpoints فقط.
+# ============================================================
 
-# السماح بالوصول للملفات العامة
-<Files "submit.php">
-    Order Allow,Deny
-    Allow from all
-</Files>
+# ── 1) عزل WordPress (لو مرفوع تحت WP) ──────────────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
 
-<Files "analyze.php">
-    Order Allow,Deny
-    Allow from all
-</Files>
+# ── 2) Default DENY على جميع .php (Apache 2.2 + 2.4) ────────
+<FilesMatch "\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
-<Files "status.php">
-    Order Allow,Deny
-    Allow from all
-</Files>
+# ── 3) WHITELIST: Public endpoints (يُستدعون من JS) ─────────
+<FilesMatch "^(submit|analyze|status|result|page-scan|get-assessment|scan|health|run|ads-fetch)\.php$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Allow from all
+    </IfModule>
+</FilesMatch>
 
-<Files "result.php">
-    Order Allow,Deny
-    Allow from all
-</Files>
+# ── 4) DEBUG / ADMIN endpoints: localhost only ──────────────
+<FilesMatch "^(clear-cache|debug-data|debug-pipeline|maintenance|rerun-ai|migrate|db-migrate|db-test|init|fix_corrupted|check_braces|admin_dashboard|dump|dump-latest)\.php$">
+    <IfModule mod_authz_core.c>
+        Require local
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+        Allow from 127.0.0.1
+        Allow from ::1
+        Allow from localhost
+    </IfModule>
+</FilesMatch>
 
-<Files "clear-cache.php">
-    Order Deny,Allow
-    Deny from all
-    Allow from 127.0.0.1
-    Allow from ::1
-    Allow from localhost
-</Files>
+# ── 5) منع امتدادات حساسة + النسخ الاحتياطية ────────────────
+<FilesMatch "\.(env|ini|log|sh|sql|bak|backup|swp|orig)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
-<Files "debug-data.php">
-    Order Deny,Allow
-    Deny from all
-    Allow from 127.0.0.1
-    Allow from ::1
-    Allow from localhost
-</Files>
+# ── 6) منع ملفات النسخ الاحتياطية وphp _backup ──────────────
+<FilesMatch "(_backup|\.backup-[0-9-]+|backup_temp)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
-<Files "maintenance.php">
-    Order Deny,Allow
-    Deny from all
-    Allow from 127.0.0.1
-    Allow from ::1
-    Allow from localhost
-</Files>
-
-<Files "rerun-ai.php">
-    Order Deny,Allow
-    Deny from all
-    Allow from 127.0.0.1
-    Allow from ::1
-    Allow from localhost
-</Files>
-
-# حماية مجلدات حساسة
-<Directory "admin/">
-    Order Deny,Allow
-    Deny from all
-</Directory>
-
-# إعدادات الأمان العامة
+# ── 7) Listing + Server signature off ───────────────────────
 Options -Indexes
 ServerSignature Off
 FileETag None
 
-# ضغط المحتوى
+# ── 8) ضغط GZIP ────────────────────────────────────────────
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/plain
     AddOutputFilterByType DEFLATE text/html
-    AddOutputFilterByType DEFLATE text/xml
-    AddOutputFilterByType DEFLATE text/css
-    AddOutputFilterByType DEFLATE application/xml
-    AddOutputFilterByType DEFLATE application/xhtml+xml
-    AddOutputFilterByType DEFLATE application/rss+xml
-    AddOutputFilterByType DEFLATE application/javascript
-    AddOutputFilterByType DEFLATE application/x-javascript
     AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE application/javascript
 </IfModule>
 
-# Cache headers للأداء
+# ── 9) Cache للأصول ────────────────────────────────────────
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresByType text/css "access plus 1 month"
-    ExpiresByType application/javascript "access plus 1 month"
-    ExpiresByType image/png "access plus 1 month"
-    ExpiresByType image/jpg "access plus 1 month"
-    ExpiresByType image/jpeg "access plus 1 month"
-    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType application/json "access plus 0 seconds"
 </IfModule>
