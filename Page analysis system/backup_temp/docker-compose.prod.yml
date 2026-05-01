@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: alabeer_mysql_prod
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_prod_data:/var/lib/mysql
+      - ./database/schema_mysql.sql:/docker-entrypoint-initdb.d/schema.sql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    networks:
+      - alabeer_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: alabeer_redis_prod
+    restart: unless-stopped
+    networks:
+      - alabeer_network
+
+  app:
+    build: .
+    container_name: alabeer_app_prod
+    ports:
+      - "80:80"
+    volumes:
+      - ./logs:/var/www/html/logs
+      - ./cache:/var/www/html/cache
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+    depends_on:
+      - mysql
+      - redis
+    restart: unless-stopped
+    networks:
+      - alabeer_network
+
+volumes:
+  mysql_prod_data:
+
+networks:
+  alabeer_network:
+    driver: bridge

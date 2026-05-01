@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدقق الحملة الإعلانية — Campaign Auditor | العبير للتسويق</title>
+    <meta name="description" content="اكتشف أين تنزف ميزانيتك الإعلانية. فحص طبي شامل لحملتك يكشف المشاكل الخفية ويعطيك خطة العلاج.">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+    <!-- ═══════ STEP 1: Platform Select ═══════ -->
+    <div class="step-container active" id="step-platform">
+        <div class="sys-header">
+            <div class="badge-icon">🩺</div>
+            <h1>مدقق الحملة الإعلانية</h1>
+            <p>فحص طبي شامل لحملتك الإعلانية — سنكشف أين تنزف ميزانيتك ونعطيك خطة العلاج</p>
+        </div>
+        <div class="glass-card">
+            <div style="text-align:center; font-weight:800; font-size:16px; margin-bottom:15px; color:var(--neon-green);">على أي منصة تُعلن حالياً؟</div>
+            <div class="platform-grid">
+                <button class="platform-btn" data-platform="Meta"><span class="p-icon">📘</span> Meta (فيسبوك/إنستجرام)</button>
+                <button class="platform-btn" data-platform="TikTok"><span class="p-icon">🎵</span> TikTok</button>
+                <button class="platform-btn" data-platform="Snapchat"><span class="p-icon">👻</span> Snapchat</button>
+                <button class="platform-btn" data-platform="Google"><span class="p-icon">🔍</span> Google Ads</button>
+                <button class="platform-btn full-width" data-platform="متعدد"><span class="p-icon">🌐</span> أُعلن على أكثر من منصة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ STEP 2: Heartbeat Scanner ═══════ -->
+    <div class="step-container" id="step-scanner">
+        <div class="scanner-box">
+            <div class="heartbeat-line">
+                <svg viewBox="0 0 600 80" preserveAspectRatio="none">
+                    <path id="heartPath" d="M0,40 L100,40 L120,40 L140,10 L160,70 L180,25 L200,55 L220,40 L320,40 L340,40 L360,10 L380,70 L400,25 L420,55 L440,40 L600,40">
+                        <animate attributeName="d"
+                            values="M0,40 L100,40 L120,40 L140,10 L160,70 L180,25 L200,55 L220,40 L320,40 L340,40 L360,10 L380,70 L400,25 L420,55 L440,40 L600,40;
+                                    M0,40 L80,40 L100,40 L120,15 L140,65 L160,30 L180,50 L200,40 L300,40 L320,40 L340,15 L360,65 L380,30 L400,50 L420,40 L600,40;
+                                    M0,40 L100,40 L120,40 L140,10 L160,70 L180,25 L200,55 L220,40 L320,40 L340,40 L360,10 L380,70 L400,25 L420,55 L440,40 L600,40"
+                            dur="1.2s" repeatCount="indefinite"/>
+                    </path>
+                </svg>
+            </div>
+            <div class="scanner-status" id="scanStatus">جاري فحص نبض الحملة...</div>
+            <div class="scanner-sub">يرجى الانتظار حتى استكمال الفحص الطبي</div>
+            <div class="scanner-bar-wrap">
+                <div class="scanner-bar-fill" id="scanBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ STEP 3: Quiz ═══════ -->
+    <div class="step-container" id="step-quiz">
+        <div class="glass-card">
+            <div class="quiz-progress" id="quizProgress"></div>
+            <div class="quiz-header">
+                <div class="q-num" id="qNum">السؤال 1 من 10</div>
+                <div class="q-axis" id="qAxis">المحور: إعداد الحملة</div>
+            </div>
+            <div class="quiz-question" id="qText"></div>
+            <div class="quiz-options" id="qOptions"></div>
+        </div>
+    </div>
+
+    <!-- ═══════ STEP 4: Diagnosis Animation ═══════ -->
+    <div class="step-container" id="step-diagnosis">
+        <div class="scanner-box">
+            <div class="heartbeat-line">
+                <svg viewBox="0 0 600 80" preserveAspectRatio="none">
+                    <path d="M0,40 L100,40 L120,40 L140,10 L160,70 L180,25 L200,55 L220,40 L320,40 L340,40 L360,10 L380,70 L400,25 L420,55 L440,40 L600,40">
+                        <animate attributeName="d"
+                            values="M0,40 L100,40 L120,40 L140,10 L160,70 L180,25 L200,55 L220,40 L320,40 L340,40 L360,10 L380,70 L400,25 L420,55 L440,40 L600,40;
+                                    M0,40 L80,40 L100,40 L120,15 L140,65 L160,30 L180,50 L200,40 L300,40 L320,40 L340,15 L360,65 L380,30 L400,50 L420,40 L600,40;
+                                    M0,40 L100,40 L120,40 L140,10 L160,70 L180,25 L200,55 L220,40 L320,40 L340,40 L360,10 L380,70 L400,25 L420,55 L440,40 L600,40"
+                            dur="1s" repeatCount="indefinite"/>
+                    </path>
+                </svg>
+            </div>
+            <div class="scanner-status" id="diagStatus">جاري تحليل نتائج الفحص...</div>
+            <div class="scanner-sub">نبني لك التقرير التشخيصي الكامل</div>
+            <div class="scanner-bar-wrap">
+                <div class="scanner-bar-fill" id="diagBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ STEP 5: Results ═══════ -->
+    <div class="step-container" id="step-results">
+        <div class="print-hdr" id="printHdr">
+            <h2>🩺 تقرير فحص الحملة الإعلانية — العبير للتسويق</h2>
+            <p>تقرير تشخيصي سرّي — <span id="pdfDate"></span></p>
+        </div>
+
+        <div class="score-display">
+            <div class="score-circle" id="scoreCircle">
+                <span class="score-num" id="scoreNum">0</span>
+                <span class="score-label">/ 100</span>
+            </div>
+            <div class="score-verdict" id="scoreVerdict"></div>
+        </div>
+
+        <div class="shock-box" id="shockBox">
+            <h3 id="shockTitle"></h3>
+            <p id="shockBody"></p>
+        </div>
+
+        <div class="axis-section" id="axisSection"></div>
+
+        <div class="glass-card">
+            <div style="font-weight:800; font-size:15px; color:var(--danger); margin-bottom:12px;">🔴 المشاكل المكتشفة في حملتك:</div>
+            <div class="problems-list" id="problemsList"></div>
+        </div>
+
+        <div class="lead-box" id="leadBox">
+            <h3>📋 حمّل تقرير التشخيص الكامل</h3>
+            <p>أدخل بياناتك لتحميل ملف PDF بخطة العلاج المفصلة لحملتك</p>
+            <div class="lead-row">
+                <input type="text" id="leadName" placeholder="اسمك الكريم">
+                <input type="tel" id="leadPhone" placeholder="رقم الواتساب" dir="ltr">
+            </div>
+            <button class="btn-health" id="downloadBtn"><i class="fa-solid fa-file-medical"></i> &nbsp; استخراج التقرير التشخيصي (PDF)</button>
+        </div>
+    </div>
+
+    <!-- ═══════ STEP 6: Thank You ═══════ -->
+    <div class="step-container" id="step-thankyou">
+        <div class="thankyou-box">
+            <div class="done-icon">✅</div>
+            <h2>تم بنجاح!</h2>
+            <p>تم استخراج التقرير التشخيصي في جهازك وحفظ بياناتك.<br>سيتواصل معك فريقنا خلال 24 ساعة بخطة العلاج الكاملة لحملتك.</p>
+            <a href="https://wa.me/967739537053?text=مرحباً، أريد خطة لعلاج حملتي الإعلانية بعد تقرير مدقق الحملات!" class="btn-wa" target="_blank">
+                <i class="fa-brands fa-whatsapp"></i> تواصل معنا الآن
+            </a>
+        </div>
+    </div>
+
+    <script src="js/auditor.js"></script>
+</body>
+</html>

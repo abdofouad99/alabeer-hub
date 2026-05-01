@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بصمة النمو — فحص تسويقي ذكي | العبير للتسويق</title>
+  <meta name="description" content="أدخل رابط صفحتك وسيفحص النظام تلقائياً 47 مؤشراً تسويقياً — مجاني 100%." />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .form-field { margin-bottom: 18px; }
+    .form-field label { display: block; font-size: 13px; color: var(--subtle); margin-bottom: 6px; font-weight: 600; }
+    .form-field input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 13px 16px; font-size: 15px; font-family: inherit; transition: border .2s; }
+    .form-field input:focus { outline: none; border-color: var(--blue); background: rgba(59,130,246,.07); }
+    .form-field input.err { border-color: var(--red); }
+    .form-field input::placeholder { color: var(--muted); }
+    .url-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 5px; height: 18px; }
+    .url-status.ok  { color: var(--green); }
+    .url-status.bad { color: var(--red); }
+    .url-status.checking { color: var(--gold); }
+    .page-preview { display: none; background: rgba(59,130,246,.06); border: 1px solid rgba(59,130,246,.2); border-radius: 10px; padding: 12px 14px; margin-top: 8px; align-items: center; gap: 12px; }
+    .page-preview.show { display: flex; }
+    .preview-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: rgba(255,255,255,.08); flex-shrink: 0; }
+    .preview-name { font-weight: 700; font-size: 14px; }
+    .preview-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .scan-steps { display: none; }
+    .scan-steps.show { display: block; }
+    .step-list { list-style: none; padding: 0; margin: 0; }
+    .step-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; color: var(--subtle); border-bottom: 1px solid rgba(255,255,255,.04); }
+    .step-list li:last-child { border: none; }
+    .step-list li .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; transition: background .4s; }
+    .step-list li.active .dot { background: var(--gold); box-shadow: 0 0 8px var(--gold); animation: pulse 1s infinite; }
+    .step-list li.done .dot { background: var(--green); }
+    .step-list li.done { color: var(--text); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media(max-width:520px){ .form-row { grid-template-columns: 1fr; } }
+    .detect-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .detect-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: var(--muted); }
+    .hero-features { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin: 24px 0 0; }
+    @media(max-width:500px){ .hero-features { grid-template-columns: 1fr 1fr; } }
+    .feat-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 14px; text-align: center; }
+    .feat-icon { font-size: 24px; margin-bottom: 6px; }
+    .feat-title { font-size: 12px; font-weight: 700; color: var(--text); }
+    .feat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🚀</div>
+      <div>
+        <div class="brand-name">بصمة النمو</div>
+        <div class="brand-sub">العبير للتسويق الإلكتروني</div>
+      </div>
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:nowrap">
+      <span class="badge badge-blue">🤖 AI — 47 مؤشراً</span>
+      <a href="admin/login.html" class="btn2" style="padding:9px 16px;font-size:13px">🛡️ الأدمن</a>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <div class="glass-card animate" style="text-align:center;padding:40px 24px 32px;margin-bottom:24px;background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(139,92,246,.06))">
+    <div style="font-size:64px;margin-bottom:16px;filter:drop-shadow(0 0 40px rgba(59,130,246,.5))">🤖</div>
+    <h1 class="h1" style="font-size:34px;margin-bottom:12px">فحص تسويقي ذكي — تلقائي 100%</h1>
+    <p class="muted" style="font-size:16px;max-width:580px;margin:0 auto;line-height:1.9">
+      أدخل رابط صفحتك فقط — والنظام سيفحص تلقائياً
+      <strong style="color:var(--gold)">47 مؤشراً تسويقياً</strong>
+      من فيسبوك وانستقرام ومكتبة الإعلانات وموقعك الإلكتروني
+    </p>
+    <div class="row" style="justify-content:center;margin-top:18px;gap:8px;flex-wrap:wrap">
+      <span class="badge badge-green">✅ مجاني 100%</span>
+      <span class="badge badge-blue">⚡ 60 ثانية</span>
+      <span class="badge badge-gold">🎯 بيانات حقيقية</span>
+      <span class="badge badge-purple">🤖 Apify + AI</span>
+    </div>
+
+    <!-- What we detect -->
+    <div class="hero-features">
+      <div class="feat-card">
+        <div class="feat-icon">👥</div>
+        <div class="feat-title">إحصائيات الصفحة</div>
+        <div class="feat-sub">متابعون · تفاعل · منشورات</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📢</div>
+        <div class="feat-title">مكتبة الإعلانات</div>
+        <div class="feat-sub">إعلانات نشطة · إنفاق · منصات</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🔍</div>
+        <div class="feat-title">فحص الموقع</div>
+        <div class="feat-sub">Pixel · GA4 · SSL · سرعة</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">⭐</div>
+        <div class="feat-title">التقييمات</div>
+        <div class="feat-sub">تقييم الصفحة · السمعة</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🤖</div>
+        <div class="feat-title">ذكاء اصطناعي</div>
+        <div class="feat-sub">توصيات مخصصة · خطة عمل</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📄</div>
+        <div class="feat-title">تقرير PDF</div>
+        <div class="feat-sub">قابل للتحميل والمشاركة</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Form -->
+  <div class="glass-card animate" id="mainCard">
+
+    <div style="margin-bottom:24px">
+      <h2 class="h2" style="margin-bottom:6px">ابدأ الفحص الآن</h2>
+      <p class="muted" style="font-size:13px">3 حقول فقط — والباقي نكتشفه تلقائياً من مصادر حقيقية 🔍</p>
+    </div>
+
+    <!-- URL Field (الأهم) -->
+    <div class="form-field">
+      <label for="page_url">🔗 رابط الصفحة أو الموقع <span style="color:var(--red)">*</span></label>
+      <input type="url" id="page_url" placeholder="https://www.facebook.com/yourbusiness أو https://yoursite.com" autocomplete="off" />
+      <div id="urlStatus" class="url-status"></div>
+      <div id="pagePreview" class="page-preview">
+        <img id="previewImg" class="preview-thumb" src="" alt="" onerror="this.style.display='none'" />
+        <div>
+          <div class="preview-name" id="previewName"></div>
+          <div class="preview-meta" id="previewMeta"></div>
+        </div>
+      </div>
+      <div id="err_page_url" style="color:var(--red);font-size:12px;margin-top:4px"></div>
+    </div>
+
+    <!-- What will be auto-detected badge -->
+    <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:12px 14px;margin-bottom:20px">
+      <div style="font-size:12px;color:var(--green);font-weight:700;margin-bottom:8px">🤖 سيُكشف تلقائياً من هذا الرابط:</div>
+      <div class="detect-badges">
+        <span class="detect-badge">👥 المتابعون</span>
+        <span class="detect-badge">📢 الإعلانات النشطة</span>
+        <span class="detect-badge">📊 معدل التفاعل</span>
+        <span class="detect-badge">✅ التحقق</span>
+        <span class="detect-badge">📱 المنشورات</span>
+        <span class="detect-badge">💰 الإنفاق الإعلاني</span>
+        <span class="detect-badge">🔍 Meta Pixel</span>
+        <span class="detect-badge">📈 Google Analytics</span>
+        <span class="detect-badge">🔒 SSL</span>
+        <span class="detect-badge">⚡ سرعة الموقع</span>
+        <span class="detect-badge">📞 بيانات الاتصال</span>
+        <span class="detect-badge">⭐ التقييم</span>
+      </div>
+    </div>
+
+    <!-- Contact Info -->
+    <div class="form-row">
+      <div class="form-field" style="margin-bottom:0">
+        <label for="full_name">👤 الاسم الكامل <span style="color:var(--red)">*</span></label>
+        <input type="text" id="full_name" placeholder="محمد العبير" />
+        <div id="err_full_name" style="color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+      <div class="form-field" style="margin-bottom:0">
+        <label for="phone">📱 رقم الجوال <span style="color:var(--red)">*</span></label>
+        <input type="tel" id="phone" placeholder="+966 5xxxxxxxx" />
+        <div id="err_phone" style="color:var(--red);font-size:12px;margin-top:4px"></div>
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:16px">
+      <div class="form-field" style="margin-bottom:0">
+        <label for="company_name">🏢 اسم النشاط التجاري</label>
+        <input type="text" id="company_name" placeholder="شركة أو متجر أو خدمة..." />
+      </div>
+      <div class="form-field" style="margin-bottom:0">
+        <label for="email">✉️ البريد الإلكتروني</label>
+        <input type="email" id="email" placeholder="name@example.com" />
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="submitError" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:12px 16px;color:var(--red);font-size:14px;margin-top:16px"></div>
+
+    <!-- Scan progress (hidden until submit) -->
+    <div id="scanProgress" class="scan-steps" style="margin-top:20px">
+      <div style="color:var(--gold);font-weight:800;font-size:15px;margin-bottom:14px;text-align:center">
+        🔍 جاري الفحص الشامل...
+      </div>
+      <ul class="step-list" id="stepList">
+        <li id="step1" class="active"><span class="dot"></span> جلب بيانات الصفحة من Apify</li>
+        <li id="step2"><span class="dot"></span> فحص مكتبة الإعلانات</li>
+        <li id="step3"><span class="dot"></span> فحص الموقع الإلكتروني</li>
+        <li id="step4"><span class="dot"></span> تحليل البيانات بالذكاء الاصطناعي</li>
+        <li id="step5"><span class="dot"></span> إعداد التقرير التسويقي</li>
+      </ul>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--muted)">
+        ⏳ يستغرق الفحص من 30 إلى 90 ثانية — يُرجى الانتظار
+      </div>
+    </div>
+
+    <!-- Submit button -->
+    <button id="submitBtn" class="btn btn-green" style="width:100%;margin-top:20px;padding:16px;font-size:16px;font-weight:800" onclick="submitForm()">
+      🔍 ابدأ الفحص التلقائي الشامل
+    </button>
+
+    <p class="muted" style="text-align:center;font-size:11px;margin-top:12px">
+      🔒 بياناتك آمنة ولن تُشارك مع أي طرف ثالث
+    </p>
+
+  </div>
+
+  <!-- Trust footer -->
+  <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:12px">
+    <div style="margin-bottom:8px">⚡ يعمل بـ Apify + Google PageSpeed + Meta Ads Library + Gemini AI</div>
+    <div>© 2026 العبير للتسويق الإلكتروني — نظام بصمة النمو v3.0</div>
+  </div>
+
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────
+const STEPS = ['step1','step2','step3','step4','step5'];
+let stepInterval, currentStep = 0;
+
+// ── URL Detection ─────────────────────────────────────────────
+function detectUrlType(url) {
+  if (/facebook\.com/i.test(url)) return 'facebook';
+  if (/instagram\.com/i.test(url)) return 'instagram';
+  if (/tiktok\.com/i.test(url))    return 'tiktok';
+  return 'website';
+}
+
+function isValidUrl(url) {
+  try { new URL(url); return true; } catch { return false; }
+}
+
+let urlTimer;
+const urlInput = document.getElementById('page_url');
+urlInput.addEventListener('input', () => {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => checkUrl(urlInput.value.trim()), 1000);
+});
+urlInput.addEventListener('blur', () => checkUrl(urlInput.value.trim()));
+
+async function checkUrl(raw) {
+  const status  = document.getElementById('urlStatus');
+  const preview = document.getElementById('pagePreview');
+  const errEl   = document.getElementById('err_page_url');
+
+  if (!raw) { status.className = 'url-status'; preview.classList.remove('show'); return; }
+
+  // normalize
+  raw = raw.replace(/^(https?:\/\/)+/i, '');
+  let url = 'https://' + raw;
+  if (urlInput.value !== url) urlInput.value = url;
+
+  if (!isValidUrl(url)) {
+    status.className = 'url-status bad'; status.textContent = '❌ رابط غير صالح';
+    errEl.textContent = 'تأكد من صحة الرابط'; preview.classList.remove('show'); return;
+  }
+
+  const type = detectUrlType(url);
+  status.className = 'url-status checking'; status.textContent = '⏳ جاري الفحص...';
+  errEl.textContent = '';
+
+  try {
+    const r = await fetch(`api/scan.php?url=${encodeURIComponent(url)}`);
+    const d = await r.json();
+    if (d.success) {
+      status.className = 'url-status ok';
+      status.textContent = '✅ ' + (type === 'facebook' ? 'صفحة فيسبوك' : type === 'instagram' ? 'حساب انستقرام' : 'موقع إلكتروني') + ' — جاهز للفحص';
+      const og = d.og || {};
+      const name = og.title || og.site_name || url.replace(/^https?:\/\//,'').split('/')[0];
+      document.getElementById('previewName').textContent = name;
+      document.getElementById('previewMeta').textContent = (d.social?.followers ? `👥 ${Number(d.social.followers).toLocaleString('ar')} متابع` : '') + (og.description ? ' • ' + og.description.substring(0,80) : '');
+      document.getElementById('previewImg').src = og.image || '';
+      preview.classList.add('show');
+    } else {
+      status.className = 'url-status ok'; status.textContent = '✅ رابط صالح';
+      preview.classList.remove('show');
+    }
+  } catch {
+    status.className = 'url-status ok'; status.textContent = '✅ رابط صالح';
+  }
+}
+
+// ── Scan Animation ────────────────────────────────────────────
+function startScan() {
+  const progress = document.getElementById('scanProgress');
+  progress.classList.add('show');
+  document.getElementById('submitBtn').style.display = 'none';
+  currentStep = 0;
+
+  STEPS.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+  });
+  document.getElementById(STEPS[0]).classList.add('active');
+
+  stepInterval = setInterval(() => {
+    const cur = document.getElementById(STEPS[currentStep]);
+    cur.classList.remove('active'); cur.classList.add('done');
+    currentStep++;
+    if (currentStep < STEPS.length) {
+      document.getElementById(STEPS[currentStep]).classList.add('active');
+    } else {
+      clearInterval(stepInterval);
+    }
+  }, 18000); // كل 18 ثانية لكل خطوة (90ث إجمالي)
+}
+
+function stopScan() { clearInterval(stepInterval); }
+
+// ── Validate ──────────────────────────────────────────────────
+function validate() {
+  let ok = true;
+  const url  = document.getElementById('page_url').value.trim();
+  const name = document.getElementById('full_name').value.trim();
+  const phone= document.getElementById('phone').value.trim();
+
+  document.getElementById('err_page_url').textContent  = '';
+  document.getElementById('err_full_name').textContent = '';
+  document.getElementById('err_phone').textContent     = '';
+
+  if (!url || !isValidUrl(url)) {
+    document.getElementById('err_page_url').textContent = '⚠️ أدخل رابط صفحتك أو موقعك';
+    document.getElementById('page_url').classList.add('err');
+    ok = false;
+  }
+  if (!name) {
+    document.getElementById('err_full_name').textContent = '⚠️ الاسم مطلوب';
+    ok = false;
+  }
+  if (!phone) {
+    document.getElementById('err_phone').textContent = '⚠️ الجوال مطلوب';
+    ok = false;
+  }
+  return ok;
+}
+
+// ── Submit ────────────────────────────────────────────────────
+async function submitForm() {
+  if (!validate()) return;
+
+  const rawUrl = document.getElementById('page_url').value.trim();
+  const cleanUrl = rawUrl.replace(/^(https?:\/\/)+/i, '');
+  const url  = 'https://' + cleanUrl;
+  const type = detectUrlType(url);
+
+  const lead = {
+    full_name:    document.getElementById('full_name').value.trim(),
+    phone:        document.getElementById('phone').value.trim(),
+    email:        document.getElementById('email').value.trim(),
+    company_name: document.getElementById('company_name').value.trim(),
+    website_url:  type === 'website'   ? url : '',
+    facebook_url: type === 'facebook'  ? url : '',
+    instagram_url:type === 'instagram' ? url : '',
+  };
+
+  document.getElementById('submitError').style.display = 'none';
+  startScan();
+
+  try {
+    const res  = await fetch('api/submit.php', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ lead, answers: {} }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'خطأ غير معروف');
+
+    stopScan();
+    // Mark all steps done
+    STEPS.forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('active'); el.classList.add('done');
+    });
+    setTimeout(() => {
+      window.location.href = `result.html?id=${data.assessment_id}`;
+    }, 600);
+
+  } catch (e) {
+    stopScan();
+    document.getElementById('scanProgress').classList.remove('show');
+    document.getElementById('submitBtn').style.display = 'block';
+    const errBox = document.getElementById('submitError');
+    errBox.textContent = '⚠️ ' + (e.message || 'حدث خطأ — حاول مرة أخرى');
+    errBox.style.display = 'block';
+  }
+}
+</script>
+</body>
+</html>

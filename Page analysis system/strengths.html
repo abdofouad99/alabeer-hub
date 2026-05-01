@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نقاط القوة — العبير للتسويق</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #09090b;
+      --sidebar-bg: rgba(15, 23, 42, 0.6);
+      --sidebar-border: rgba(255, 255, 255, 0.05);
+      
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(24px) saturate(180%);
+      
+      --text-dark: #f8fafc;
+      --text-gray: #94a3b8;
+      
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --purple: #8b5cf6;
+      
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --shadow-hover: 0 20px 40px -10px rgba(245, 142, 26, 0.15);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-dark); 
+      display: flex; 
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.3; transition: transform 0.1s ease-out; }
+    .orb-1 { top: -100px; right: -100px; width: 500px; height: 500px; background: var(--primary); }
+    .orb-2 { bottom: -100px; left: -100px; width: 600px; height: 600px; background: var(--purple); opacity: 0.15; }
+    .orb-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: var(--green); opacity: 0.1; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+    .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; } 
+    .delay-3 { animation-delay: 0.3s; } .delay-4 { animation-delay: 0.4s; }
+
+    .sidebar {
+      width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-left: 1px solid var(--sidebar-border);
+      display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100;
+    }
+    .brand { 
+      padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px; 
+      border-bottom: 1px solid var(--sidebar-border); background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+    }
+    .brand span { color: var(--primary); text-shadow: 0 0 20px var(--primary-glow); }
+    
+    .nav-menu { flex: 1; padding: 24px 0; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: 14px; padding: 14px 32px;
+      color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 15px;
+      transition: all 0.3s ease; border-right: 4px solid transparent; position: relative;
+    }
+    .nav-item:hover { color: var(--text-dark); background: rgba(255,255,255,0.05); transform: translateX(-5px); }
+    .nav-item.active {
+      color: var(--text-dark); background: linear-gradient(90deg, rgba(245, 142, 26, 0.1) 0%, transparent 100%);
+      border-right-color: var(--primary);
+    }
+    .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+
+    .sidebar-bottom { padding: 32px 24px; border-top: 1px solid var(--sidebar-border); }
+    .upgrade-box {
+      background: linear-gradient(135deg, rgba(245, 142, 26, 0.2), rgba(245, 142, 26, 0.05)); border-radius: 16px; padding: 24px; text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); border: 1px solid rgba(245, 142, 26, 0.3);
+      position: relative; overflow: hidden;
+    }
+    .upgrade-box::before { content:''; position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent); transform:skewX(-20deg); transition:0.5s; }
+    .upgrade-box:hover::before { left:200%; }
+    .upgrade-box h4 { font-size: 18px; margin-bottom: 8px; font-weight: 900; color: var(--text-dark); }
+    .upgrade-box p { font-size: 13px; color: var(--text-gray); margin-bottom: 20px; line-height: 1.6; font-weight: 600; }
+    .btn-upgrade {
+      display: block; width: 100%; background: var(--primary); color: #fff;
+      padding: 12px; border-radius: 10px; font-weight: 900; text-decoration: none; font-size: 15px;
+      transition: 0.3s; box-shadow: 0 4px 15px var(--primary-glow);
+    }
+    .btn-upgrade:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--primary-glow); background: #f08310; }
+
+    .main-content { flex: 1; margin-right: 280px; padding: 0 48px 60px; display: flex; flex-direction: column; perspective: 1000px; }
+
+    .topbar { display: flex; justify-content: flex-end; align-items: center; padding: 32px 0; gap: 16px; margin-bottom: 10px; }
+    .btn-outline {
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border);
+      color: var(--text-dark); padding: 12px 24px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.3s; box-shadow: var(--shadow-soft);
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .btn-primary {
+      background: var(--primary); color: #fff; border: none; box-shadow: 0 10px 25px var(--primary-glow);
+      padding: 12px 28px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.3s; text-decoration: none; display: flex; align-items: center; gap: 8px;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 15px 35px var(--primary-glow); background: #f08310; }
+
+    .card { 
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-soft); 
+      border: 1px solid var(--glass-border); transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+      transform-style: preserve-3d;
+    }
+    .card-title { font-size: 20px; font-weight: 900; margin-bottom: 24px; color: var(--text-dark); display: flex; align-items: center; gap: 10px; transform: translateZ(20px); }
+
+    .check-icon { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: var(--green); color: white; border-radius: 50%; font-size: 24px; box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3); }
+
+    /* =======================================
+       INNER PAGES STYLES (Strengths etc.)
+       ======================================= */
+    .profile-header { display: grid; grid-template-columns: 2fr 1.2fr; gap: 24px; margin-bottom: 32px; }
+    .profile-card { display: flex; align-items: center; gap: 24px; padding: 24px 32px; }
+    .profile-img { width: 90px; height: 90px; border-radius: 20px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 40px; box-shadow: inset 0 5px 15px rgba(0,0,0,0.5); }
+    .profile-info h2 { font-size: 26px; font-weight: 900; color: var(--text-dark); margin-bottom: 6px; letter-spacing:-0.5px;}
+    .profile-info p { color: var(--text-gray); font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .profile-tags { display: flex; gap: 12px; }
+    .ptag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 800; color: var(--text-dark); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    
+    .score-box-mini { display: flex; align-items: center; justify-content: center; gap: 32px; padding: 24px 32px; }
+    
+    .score-circle-wrap { position: relative; flex-shrink: 0; filter: drop-shadow(0 15px 25px rgba(0,0,0,0.3)); transform: translateZ(30px); }
+    .score-circle {
+      width: 100%; height: 100%; border-radius: 50%;
+      background: conic-gradient(rgba(255,255,255,0.1) 100%, rgba(255,255,255,0.1) 0);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+    }
+    .score-inner {
+      border-radius: 50%; background: #13141a;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    
+    .details-list { display: flex; flex-direction: column; gap: 16px; }
+    .detail-item { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 24px 32px; transition: 0.3s; transform-style: preserve-3d; }
+    .detail-item:hover { background: rgba(255,255,255,0.05); transform: translateY(-5px) translateZ(10px); box-shadow: 0 15px 30px rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.15); }
+    .d-icon { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; box-shadow: inset 0 2px 10px rgba(0,0,0,0.2); }
+    .d-content { flex: 1; padding: 0 24px; }
+    .d-content h4 { font-size: 18px; font-weight: 900; color: var(--text-dark); margin-bottom: 8px; }
+    .d-content p { font-size: 15px; color: var(--text-gray); font-weight: 600; line-height: 1.6; }
+    .d-score { display: flex; align-items: center; gap: 20px; min-width: 140px; justify-content: flex-end; }
+    .d-score-text { font-size: 15px; font-weight: 800; }
+    .d-score-num { font-size: 32px; font-weight: 900; color: var(--text-dark); background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
+
+    /* Colors for specific detail items */
+    .d-excellent .d-icon { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--green); }
+    .d-excellent .d-score-text { color: var(--green); }
+    .d-vgood .d-icon { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); color: #34d399; }
+    .d-vgood .d-score-text { color: #34d399; }
+    .d-good .d-icon { background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); color: var(--yellow); }
+    .d-good .d-score-text { color: var(--yellow); }
+
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <div>العبير<div style="font-size: 12px; color: var(--text-gray); font-weight: 700; text-shadow: none; letter-spacing: 0;">بصمة النمو الرقمي</div></div>
+    </div>
+    
+    <!-- Link the Sidebar correctly -->
+    <nav class="nav-menu">
+      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="strengths.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
+      <a href="weaknesses.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> نقاط الضعف</a>
+      <a href="journey.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h12v2H3v-2zm0 4h12v2H3v-2zm0 4h8v2H3v-2z"/></svg> رحلة العميل</a>
+      <a href="content.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg> المحتوى</a>
+      <a href="competitors.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> المنافسون</a>
+      <a href="ads.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg> الإعلانات</a>
+      <a href="recommendations.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg> التوصيات</a>
+      <a href="plan.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg> الخطة المقترحة</a>
+      <a href="packages.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg> الباقات والأسعار</a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="upgrade-box">
+        <div style="font-size:40px; margin-bottom:12px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));">💎</div>
+        <h4>افتح التقرير الكامل</h4>
+        <p>واحصل على خطة نمو تفصيلية ومخصصة لحسابك</p>
+        <a href="packages.html" class="btn-upgrade">عرض باقات النمو</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <!-- Topbar -->
+    <div class="topbar animate-up delay-1">
+      <button class="btn-outline"><span>مشاركة النتيجة</span> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+      <a href="packages.html" class="btn-primary"><span>افتح التقرير الكامل</span> <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></a>
+    </div>
+
+    <!-- Top Profile Row -->
+    <div class="profile-header">
+      
+      <!-- Profile Details Card -->
+      <div class="card profile-card animate-up delay-1">
+        <div class="profile-img">🌐</div>
+        <div class="profile-info">
+          <h2 id="strClientName" style="color:var(--text-gray); font-size:18px;">يتم التحميل...</h2>
+          <p id="strClientHandle" style="color:var(--text-gray);">@يتم التحليل</p>
+          <div class="profile-tags">
+            <div class="ptag"><span style="color:var(--text-gray)">نوع الحساب:</span> <span id="profileAccountType">يتم التحليل...</span></div>
+            <div class="ptag"><span style="color:var(--text-gray)">المجال:</span> <span id="profileNiche">يتم التحليل...</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mini Score Card -->
+      <div class="card score-box-mini animate-up delay-2">
+        <div class="score-circle-wrap" style="width:110px; height:110px;">
+          <div class="score-circle" id="strCircle" data-color="var(--green)" data-percent="0">
+            <div class="score-inner" style="width:85px; height:85px;">
+              <div class="score-num" id="strScore" data-val="0" style="font-size:36px; letter-spacing:-1px;">0</div>
+              <div class="score-text" style="font-size:11px;">من 100</div>
+            </div>
+          </div>
+        </div>
+        <div style="transform: translateZ(10px);">
+          <h3 style="font-size:16px; font-weight:800; margin-bottom:10px; color:var(--text-gray);">تقييم حسابك العام</h3>
+          <div id="strTitle" style="font-size:22px; font-weight:900; color:var(--text-gray); display:flex; align-items:center; gap:8px;">⏳ جاري التحليل...</div>
+          <p id="strDesc" style="font-size:13px; color:var(--text-gray); margin-top:8px; line-height:1.5; font-weight:600;">يتم تحليل البيانات...</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Strengths Detailed List -->
+    <div class="card animate-up delay-3">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; transform: translateZ(20px);">
+        <div class="check-icon" style="width:40px; height:40px; font-size:20px;">✔</div>
+        <h3 class="card-title" style="margin:0; font-size:26px;">نقاط القوة في حسابك</h3>
+      </div>
+      <p style="color:var(--text-gray); font-size:16px; font-weight:600; margin-bottom:32px; transform: translateZ(10px);">هذه هي الجوانب التي تؤدي بشكل جيد في حسابك، استمر في الحفاظ عليها وتعزيزها باحترافية.</p>
+
+      <div class="details-list" id="strengthsList">
+        <!-- ⏳ Loading skeleton — سيُستبدل بالبيانات الحقيقية من report-connect.js -->
+        <div id="strLoadingMsg" style="text-align:center; padding:40px; color:var(--text-gray);">
+          <div style="font-size:32px; margin-bottom:12px;">⏳</div>
+          <p style="font-size:15px; font-weight:700;">جاري تحميل نقاط القوة...</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Number Counter Animation
+      const animateValue = (obj, start, end, duration) => {
+        let startTimestamp = null;
+        const step = (timestamp) => {
+          if (!startTimestamp) startTimestamp = timestamp;
+          const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+          obj.innerHTML = Math.floor(easeOut * (end - start) + start);
+          if (progress < 1) window.requestAnimationFrame(step);
+          else obj.innerHTML = end;
+        };
+        window.requestAnimationFrame(step);
+      };
+
+      setTimeout(() => {
+        const numberElements = document.querySelectorAll('.score-num[data-val], .d-score-num[data-val]');
+        numberElements.forEach(el => {
+          const target = parseInt(el.getAttribute('data-val'));
+          if(!isNaN(target)) animateValue(el, 0, target, 2000);
+        });
+      }, 500);
+
+      // Ring Charts Fill Animation
+      setTimeout(() => {
+        const rings = document.querySelectorAll('.score-circle[data-percent]');
+        rings.forEach(ring => {
+          const percent = parseInt(ring.getAttribute('data-percent'));
+          const color = ring.getAttribute('data-color');
+          let currentPercent = 0;
+          
+          const animateRing = () => {
+            currentPercent += (percent - currentPercent) * 0.08;
+            ring.style.background = `conic-gradient(${color} ${currentPercent}%, rgba(255,255,255,0.1) 0)`;
+            if (percent - currentPercent > 0.5) requestAnimationFrame(animateRing);
+            else ring.style.background = `conic-gradient(${color} ${percent}%, rgba(255,255,255,0.1) 0)`;
+          };
+          requestAnimationFrame(animateRing);
+        });
+      }, 800);
+
+      // 3D Tilt Effect on Cards
+      const cards = document.querySelectorAll('.card');
+      cards.forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          const rotateX = ((y - centerY) / centerY) * -5;
+          const rotateY = ((x - centerX) / centerX) * 5;
+          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)`;
+        });
+      });
+
+      // Interactive Orbs
+      const orbs = document.querySelectorAll('.bg-orb');
+      window.addEventListener('scroll', () => {
+        const scrolled = window.scrollY;
+        orbs[0].style.transform = `translateY(${scrolled * 0.2}px)`;
+        orbs[1].style.transform = `translateY(${scrolled * 0.15}px)`;
+        orbs[2].style.transform = `translateY(${scrolled * -0.1}px) translateX(${scrolled * 0.05}px)`;
+      });
+    });
+  </script>
+  <script src="js/report-connect.js?v=2.5"></script>
+</body>
+</html>

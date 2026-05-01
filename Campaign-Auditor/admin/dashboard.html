@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الإدارة — مدقق الحملات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo';background:#080c14;color:#fff;min-height:100vh}
+        body::before{content:'';position:fixed;inset:0;background:radial-gradient(circle at 20% 20%,rgba(0,255,136,0.03) 0%,transparent 50%);pointer-events:none}
+        .dashboard{max-width:1200px;margin:0 auto;padding:30px 20px;position:relative;z-index:1}
+        .dash-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;flex-wrap:wrap;gap:15px}
+        .dash-header h1{font-size:22px;background:linear-gradient(135deg,#00ff88,#00e5ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .dash-header .actions{display:flex;gap:10px}
+        .btn-sm{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-family:'Cairo';font-weight:700;font-size:13px;transition:all 0.3s}
+        .btn-export{background:rgba(0,255,136,0.12);color:#00ff88;border:1px solid rgba(0,255,136,0.25)}.btn-export:hover{background:rgba(0,255,136,0.25)}
+        .btn-logout{background:rgba(255,59,48,0.12);color:#ff3b3b;border:1px solid rgba(255,59,48,0.25)}.btn-logout:hover{background:rgba(255,59,48,0.25)}
+        .stats-row{display:flex;gap:15px;margin-bottom:30px;flex-wrap:wrap}
+        .stat-card{flex:1;min-width:180px;background:rgba(0,255,136,0.03);border:1px solid rgba(0,255,136,0.15);border-radius:12px;padding:20px;text-align:center;backdrop-filter:blur(10px)}
+        .stat-card h3{font-size:13px;color:#9ab0a8;margin-bottom:8px;font-weight:600}
+        .stat-card .value{font-family:'Space Mono';font-size:32px;font-weight:700;background:linear-gradient(135deg,#00ff88,#00e5ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .table-container{background:rgba(0,255,136,0.02);border:1px solid rgba(0,255,136,0.12);border-radius:12px;overflow-x:auto}
+        table{width:100%;border-collapse:collapse;min-width:1000px}
+        th{background:rgba(0,255,136,0.08);color:#00ff88;padding:14px 12px;font-size:13px;font-weight:700;text-align:right;white-space:nowrap;border-bottom:1px solid rgba(0,255,136,0.15)}
+        td{padding:12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.03);color:#ccc;vertical-align:top}
+        tr:hover td{background:rgba(0,255,136,0.02)}
+        .badge{padding:3px 10px;border-radius:20px;font-weight:700;font-size:12px;display:inline-block}
+        .badge-red{background:rgba(255,59,48,0.15);color:#ff3b3b}.badge-orange{background:rgba(255,107,53,0.15);color:#ff6b35}
+        .badge-yellow{background:rgba(255,170,0,0.15);color:#ffaa00}.badge-green{background:rgba(0,255,136,0.12);color:#00ff88}
+        .budget-tag{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);color:#00ff88;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap}
+        .platform-tag{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);padding:3px 8px;border-radius:6px;font-size:12px;color:#9ab0a8;white-space:nowrap}
+        .btn-wa{background:#25D366;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:'Cairo';font-size:12px;font-weight:700;white-space:nowrap}.btn-wa:hover{background:#128C7E}
+        .notes-input{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);color:#fff;padding:6px 8px;border-radius:6px;font-family:'Cairo';font-size:12px;width:110px;outline:none}.notes-input:focus{border-color:#00ff88}
+        .btn-save{background:rgba(0,255,136,0.15);color:#00ff88;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:4px;font-family:'Cairo'}
+        @media(max-width:768px){.dash-header{flex-direction:column;text-align:center}.stats-row{flex-direction:column}}
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="dash-header">
+            <h1>🩺 لوحة إدارة مدقق الحملات</h1>
+            <div class="actions">
+                <button class="btn-sm btn-export" id="exportBtn"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
+                <button class="btn-sm btn-logout" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i> خروج</button>
+            </div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-card"><h3>🩺 إجمالي التشخيصات</h3><div class="value" id="totalLeads">0</div></div>
+            <div class="stat-card"><h3>📅 تشخيصات اليوم</h3><div class="value" id="todayLeads">0</div></div>
+        </div>
+        <div class="table-container">
+            <table id="leadsTable">
+                <thead><tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>المنصة</th><th>الميزانية</th><th>الدرجة</th><th>الحالة</th><th>التاريخ</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
+                <tbody><tr><td colspan="10" style="text-align:center;padding:30px;color:#4a6058;">جاري جلب البيانات...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+    <script src="js/admin.js"></script>
+</body>
+</html>

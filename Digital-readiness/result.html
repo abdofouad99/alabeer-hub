@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نتيجة فحص الجاهزية الرقمية | العبير</title>
+<meta name="description" content="تقرير مفصّل عن مرحلتك في التحول الرقمي مع خارطة طريق مخصصة.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container" id="app">
+
+  <!-- Topbar -->
+  <div class="topbar animate">
+    <div class="brand">
+      <div class="brand-icon">🔍</div>
+      <div>
+        <div class="brand-name">فحص الجاهزية الرقمية</div>
+        <div class="brand-sub">العبير للتسويق الإلكتروني</div>
+      </div>
+    </div>
+    <a href="index.html" class="btn2" style="font-size:13px">← إعادة التقييم</a>
+  </div>
+
+  <!-- Loading Skeleton -->
+  <div id="skeletonBlock">
+    <div class="card" style="margin-bottom:14px"><div class="skel-title skeleton"></div><div class="skel-block skeleton"></div></div>
+    <div class="card"><div class="skel-text skeleton"></div><div class="skel-text skeleton" style="width:80%"></div><div class="skel-block skeleton"></div></div>
+  </div>
+
+  <!-- Result Content -->
+  <div id="resultContent" style="display:none">
+
+    <!-- التقرير الاستشاري -->
+    <div class="card animate" id="heroCard" style="text-align:center;margin-bottom:14px">
+      <div class="h1" style="margin-bottom:14px">التقرير الاستشاري</div>
+      <div class="brand-sub" style="margin-bottom:18px">العبير للتسويق الإلكتروني — فحص الجاهزية الرقمية</div>
+
+      <!-- SVG Score Ring -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="position:relative;width:120px;height:120px">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+            <circle id="scoreArc" cx="60" cy="60" r="50" fill="none" stroke="url(#grad)" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="0 314" transform="rotate(-90 60 60)" style="transition:stroke-dasharray 1.5s cubic-bezier(.4,0,.2,1)"/>
+            <defs>
+              <linearGradient id="grad"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient>
+            </defs>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column">
+            <span id="scoreNum" style="font-size:32px;font-weight:900;line-height:1">—</span>
+            <span style="font-size:11px;color:var(--muted)">/100</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div id="stageBadge" class="stage-badge" style="margin-bottom:6px"></div>
+          <div id="summaryText" class="muted" style="font-size:14px;max-width:350px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- الخلاصة -->
+    <div class="card animate" style="margin-bottom:14px;background:linear-gradient(135deg,rgba(139,92,246,.06),rgba(6,182,212,.04))">
+      <div class="h3">📋 الخلاصة التنفيذية</div>
+      <p id="summaryFull" style="margin-top:6px;font-size:15px;line-height:1.8"></p>
+    </div>
+
+    <!-- تحليل المحاور -->
+    <div class="card animate" style="margin-bottom:14px">
+      <div class="h2" style="margin-bottom:18px">تحليل المحاور الخمسة</div>
+      <div id="breakdownBars" class="grid" style="gap:14px"></div>
+    </div>
+
+    <!-- نقاط القوة والضعف -->
+    <div class="card animate" style="margin-bottom:14px">
+      <div class="h2" style="text-align:center;margin-bottom:16px">نقاط القوة والضعف</div>
+      <div id="strengthsBox" class="glass-card" style="border-color:rgba(16,185,129,.2);margin-bottom:14px;padding:18px"></div>
+      <div id="weaknessBox" class="glass-card" style="border-color:rgba(239,68,68,.2);padding:18px"></div>
+    </div>
+
+    <!-- خطة 7 أيام -->
+    <div class="card animate" style="margin-bottom:14px">
+      <div class="h2">🚀 خطة ال 7 أيام (Quick Wins)</div>
+      <div id="quickWinsList" class="grid" style="gap:8px;margin-top:10px"></div>
+    </div>
+
+    <!-- خطة 30 يوم -->
+    <div class="card animate" style="margin-bottom:14px">
+      <div class="h2">📅 خطة الـ 30 يوم</div>
+      <div id="monthlyPlan" style="margin-top:10px"></div>
+    </div>
+
+    <!-- أدوات مقترحة -->
+    <div class="card animate" style="margin-bottom:14px">
+      <div class="h2">🛠️ أدوات مقترحة</div>
+      <div id="toolsList" class="grid" style="gap:10px;margin-top:10px"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="card animate" style="text-align:center;margin-bottom:14px">
+      <button class="btn2" style="margin:4px" onclick="navigator.clipboard.writeText(location.href);this.textContent='✅ تم النسخ!'">📋 مشاركة النتيجة</button>
+      <button class="btn2" style="margin:4px" onclick="window.print()">📄 تحميل PDF</button>
+      <a href="https://wa.me/967739537053?text=%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%AE%D8%B7%D8%A9%20%D8%AA%D8%AD%D9%88%D9%84%20%D8%B1%D9%82%D9%85%D9%8A" class="btn" style="margin-top:8px;display:inline-flex">🟢 اطلب خطة تحول رقمي</a>
+    </div>
+
+  </div><!-- /resultContent -->
+</div>
+
+<div class="footer">
+  &copy; 2026 العبير للتسويق الإلكتروني — نظام فحص الجاهزية الرقمية v1.0
+</div>
+
+<script src="js/result.js"></script>
+</body>
+</html>

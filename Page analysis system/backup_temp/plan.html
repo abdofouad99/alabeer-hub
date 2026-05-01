@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الخطة المقترحة — العبير للتسويق</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #09090b;
+      --sidebar-bg: rgba(15, 23, 42, 0.6);
+      --sidebar-border: rgba(255, 255, 255, 0.05);
+      
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(24px) saturate(180%);
+      
+      --text-dark: #f8fafc;
+      --text-gray: #94a3b8;
+      
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --purple: #8b5cf6;
+      
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --shadow-hover: 0 20px 40px -10px rgba(245, 142, 26, 0.15);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-dark); 
+      display: flex; 
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.3; transition: transform 0.1s ease-out; }
+    .orb-1 { top: -100px; right: -100px; width: 500px; height: 500px; background: var(--primary); }
+    .orb-2 { bottom: -100px; left: -100px; width: 600px; height: 600px; background: var(--purple); opacity: 0.15; }
+    .orb-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: var(--green); opacity: 0.1; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+    .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; } 
+    .delay-3 { animation-delay: 0.3s; } .delay-4 { animation-delay: 0.4s; }
+
+    .sidebar {
+      width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-left: 1px solid var(--sidebar-border);
+      display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100;
+    }
+    .brand { 
+      padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px; 
+      border-bottom: 1px solid var(--sidebar-border); background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+    }
+    .brand span { color: var(--primary); text-shadow: 0 0 20px var(--primary-glow); }
+    
+    .nav-menu { flex: 1; padding: 24px 0; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: 14px; padding: 14px 32px;
+      color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 15px;
+      transition: all 0.3s ease; border-right: 4px solid transparent; position: relative;
+    }
+    .nav-item:hover { color: var(--text-dark); background: rgba(255,255,255,0.05); transform: translateX(-5px); }
+    .nav-item.active {
+      color: var(--text-dark); background: linear-gradient(90deg, rgba(245, 142, 26, 0.1) 0%, transparent 100%);
+      border-right-color: var(--primary);
+    }
+    .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+
+    .sidebar-bottom { padding: 32px 24px; border-top: 1px solid var(--sidebar-border); }
+    .upgrade-box {
+      background: linear-gradient(135deg, rgba(245, 142, 26, 0.2), rgba(245, 142, 26, 0.05)); border-radius: 16px; padding: 24px; text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3); border: 1px solid rgba(245, 142, 26, 0.3);
+      position: relative; overflow: hidden;
+    }
+    .upgrade-box::before { content:''; position:absolute; top:0; left:-100%; width:50%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent); transform:skewX(-20deg); transition:0.5s; }
+    .upgrade-box:hover::before { left:200%; }
+    .upgrade-box h4 { font-size: 18px; margin-bottom: 8px; font-weight: 900; color: var(--text-dark); }
+    .upgrade-box p { font-size: 13px; color: var(--text-gray); margin-bottom: 20px; line-height: 1.6; font-weight: 600; }
+    .btn-upgrade {
+      display: block; width: 100%; background: var(--primary); color: #fff;
+      padding: 12px; border-radius: 10px; font-weight: 900; text-decoration: none; font-size: 15px;
+      transition: 0.3s; box-shadow: 0 4px 15px var(--primary-glow);
+    }
+    .btn-upgrade:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--primary-glow); background: #f08310; }
+
+    .main-content { flex: 1; margin-right: 280px; padding: 0 48px 60px; display: flex; flex-direction: column; perspective: 1000px; }
+
+    .topbar { display: flex; justify-content: flex-end; align-items: center; padding: 32px 0; gap: 16px; margin-bottom: 10px; }
+    .btn-outline {
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border);
+      color: var(--text-dark); padding: 12px 24px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.3s; box-shadow: var(--shadow-soft);
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .btn-primary {
+      background: var(--primary); color: #fff; border: none; box-shadow: 0 10px 25px var(--primary-glow);
+      padding: 12px 28px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.3s; text-decoration: none; display: flex; align-items: center; gap: 8px;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 15px 35px var(--primary-glow); background: #f08310; }
+
+    .card { 
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-soft); 
+      border: 1px solid var(--glass-border); transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+      transform-style: preserve-3d;
+    }
+
+    /* =======================================
+       INNER PAGES STYLES
+       ======================================= */
+    .profile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .profile-card { display: flex; align-items: center; gap: 24px; padding: 24px 32px; flex: 1; margin-left: 24px;}
+    .profile-img { width: 90px; height: 90px; border-radius: 20px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 40px; box-shadow: inset 0 5px 15px rgba(0,0,0,0.5); }
+    .profile-info h2 { font-size: 26px; font-weight: 900; color: var(--text-dark); margin-bottom: 6px; letter-spacing:-0.5px;}
+    .profile-info p { color: var(--text-gray); font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .profile-tags { display: flex; gap: 12px; }
+    .ptag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 800; color: var(--text-dark); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    
+    /* Plan Specific Styles */
+    .roadmap { display: flex; flex-direction: column; gap: 32px; position:relative; margin: 40px 0; padding-right: 50px; transform: translateZ(10px);}
+    .roadmap::before { content:''; position:absolute; right: 20px; top:20px; bottom:20px; width:4px; background: rgba(255,255,255,0.05); border-radius:4px; }
+    
+    .rm-phase { position: relative; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 32px; border-radius: 16px; transition: 0.3s; }
+    .rm-phase:hover { transform: translateX(-10px); background: rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.1); }
+    
+    .rm-marker { position:absolute; right: -54px; top: 32px; width:44px; height:44px; border-radius:50%; background: #0f172a; border: 4px solid var(--primary); display:flex; align-items:center; justify-content:center; font-weight:900; color:var(--primary); font-size:18px; z-index:2; box-shadow: 0 0 15px var(--primary-glow); }
+    
+    .rm-title { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 16px;}
+    .rm-title h4 { font-size: 24px; font-weight: 900; color: #fff; }
+    .rm-date { background: rgba(245, 142, 26, 0.1); color: var(--primary); padding: 6px 16px; border-radius: 8px; font-size: 14px; font-weight: 800; border: 1px solid rgba(245, 142, 26, 0.2);}
+    .rm-desc { color: var(--text-gray); font-size: 15px; font-weight: 600; line-height: 1.8; margin-bottom: 24px;}
+    
+    .rm-tasks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .rm-task { background: rgba(0,0,0,0.3); padding: 16px; border-radius: 10px; font-size: 14px; font-weight: 700; display:flex; align-items:center; gap:10px; border: 1px solid rgba(255,255,255,0.03); }
+    .rm-task i { color: var(--green); font-style: normal; font-size:16px;}
+
+    /* Special Highlight for Phase 3 */
+    .phase-3 .rm-marker { border-color: var(--green); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); color: var(--green); }
+    .phase-3 .rm-date { background: rgba(16, 185, 129, 0.1); color: var(--green); border-color: rgba(16, 185, 129, 0.2); }
+
+    /* ROI Projection Card */
+    .roi-card { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(0,0,0,0.4)); border: 1px solid rgba(16, 185, 129, 0.3); padding: 48px; border-radius: 20px; text-align: center; margin-top:50px; position:relative; overflow:hidden; transform: translateZ(20px);}
+    .roi-card::after { content:''; position:absolute; top:0; left:0; width:100%; height:4px; background:var(--green); }
+    .roi-card h3 { font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 12px; }
+    .roi-card p { font-size: 16px; color: var(--text-gray); font-weight: 600; margin-bottom: 32px; max-width:600px; margin-left:auto; margin-right:auto;}
+    
+    .roi-numbers { display: flex; justify-content: center; gap: 40px; margin-bottom: 40px;}
+    .roi-num { background: rgba(0,0,0,0.4); padding: 32px; border-radius: 16px; min-width: 220px; border: 1px solid rgba(255,255,255,0.05); }
+    .roi-num h5 { color: var(--text-gray); font-size: 16px; margin-bottom: 12px; font-weight: 800; }
+    .roi-num .val { font-size: 42px; font-weight: 900; color: var(--green); text-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+    .roi-num .sub-val { color: rgba(255,255,255,0.5); font-size:14px; margin-top:8px; font-weight:600;}
+
+    .final-cta { display:inline-flex; align-items:center; gap:12px; background: var(--green); color: #fff; font-size: 18px; font-weight: 900; padding: 18px 48px; border-radius: 14px; text-decoration:none; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); transition:0.3s; position:relative; z-index:2;}
+    .final-cta:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(16, 185, 129, 0.4); background: #0e9f6e; }
+
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <div>العبير<div style="font-size: 12px; color: var(--text-gray); font-weight: 700; text-shadow: none; letter-spacing: 0;">بصمة النمو الرقمي</div></div>
+    </div>
+    
+    <nav class="nav-menu">
+      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="strengths.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
+      <a href="weaknesses.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> نقاط الضعف</a>
+      <a href="journey.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h12v2H3v-2zm0 4h12v2H3v-2zm0 4h8v2H3v-2z"/></svg> رحلة العميل</a>
+      <a href="content.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg> المحتوى</a>
+      <a href="competitors.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> المنافسون</a>
+      <a href="ads.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg> الإعلانات</a>
+      <a href="recommendations.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg> التوصيات</a>
+      <a href="roadmap-30d.html" class="nav-item">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        خطة الـ 30 يوماً
+      </a>
+      <a href="plan.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg> خطة الإقلاع</a>
+      <a href="packages.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg> الباقات والأسعار</a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <!-- Topbar -->
+    <div class="topbar animate-up delay-1">
+      <button class="btn-outline"><span>تحميل PDF</span> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+      <a href="packages.html" class="btn-primary"><span>بدء التنفيذ الآن</span> <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+
+    <!-- Top Profile Row -->
+    <div class="profile-header">
+      <div class="card profile-card animate-up delay-1" style="margin-left:0;">
+        <div class="profile-img">🚀</div>
+        <div class="profile-info">
+          <h2 style="font-size:32px; color:var(--primary);">خطة الإقلاع لـ <span id="planClientName">حسابك</span></h2>
+          <p>خارطة طريق مدروسة لتنفيذ التوصيات الاستراتيجية خلال 30 يوماً</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Plan Container -->
+    <div class="card animate-up delay-2" style="padding: 40px; background: transparent; border: none; box-shadow: none;">
+      
+      <!-- Dynamic Roadmap -->
+      <div class="roadmap" id="dynamicRoadmap">
+        
+        <!-- Phase 1: Quick Wins -->
+        <div class="rm-phase" id="phase1">
+          <div class="rm-marker">1</div>
+          <div class="rm-title">
+            <h4>إصلاح الثغرات وتجهيز الأساس (Quick Wins)</h4>
+            <div class="rm-date">الأيام 1 - 7</div>
+          </div>
+          <p class="rm-desc">بناءً على الفحص الفني، هذه هي الإجراءات السريعة التي يجب اتخاذها فوراً لوقف الهدر وتحسين أساسات الحساب.</p>
+          <div class="rm-tasks" id="tasksPhase1">
+            <div class="rm-task"><i>⌛</i> جاري تحليل البيانات...</div>
+          </div>
+        </div>
+
+        <!-- Phase 2: Core Optimization -->
+        <div class="rm-phase" id="phase2">
+          <div class="rm-marker">2</div>
+          <div class="rm-title">
+            <h4>إطلاق شرارة النمو وبناء الثقة (Core Optimization)</h4>
+            <div class="rm-date">الأيام 8 - 20</div>
+          </div>
+          <p class="rm-desc">بعد سد الثغرات، سنبدأ بتنفيذ التوصيات الاستراتيجية (عالية ومتوسطة الأهمية) التي استخرجها الذكاء الاصطناعي لرفع معدل التحويل.</p>
+          <div class="rm-tasks" id="tasksPhase2">
+            <div class="rm-task"><i>⌛</i> جاري تحليل البيانات...</div>
+          </div>
+        </div>
+
+        <!-- Phase 3: Scaling -->
+        <div class="rm-phase phase-3" id="phase3">
+          <div class="rm-marker">3</div>
+          <div class="rm-title">
+            <h4>التوسع ومضاعفة العائد (Scaling & ROI)</h4>
+            <div class="rm-date">الأيام 21 - 30</div>
+          </div>
+          <p class="rm-desc">استناداً إلى نقاط القوة الحالية في حسابك، هذه هي الخطوات المتقدمة لمضاعفة الميزانية الإعلانية وتحقيق أقصى عائد.</p>
+          <div class="rm-tasks" id="tasksPhase3">
+            <div class="rm-task"><i>⌛</i> جاري تحليل البيانات...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ROI Projection Card -->
+      <div class="roi-card animate-up delay-3">
+        <h3>التوقعات الاستثمارية بعد 30 يوماً من التنفيذ</h3>
+        <p>بناءً على معطيات السوق الحالية للمنافسين ومستوى جودة منتجك، هذا ما نطمح للوصول إليه كحد أدنى عند تطبيق الخطة بحذافيرها.</p>
+        
+        <div class="roi-numbers">
+          <div class="roi-num">
+            <h5>معدل التحويل (CR) المتوقع</h5>
+            <div class="val" id="roiCr">2.8%</div>
+            <div class="sub-val" id="roiCrSub">ارتفاع من 0.8% حالياً</div>
+          </div>
+          <div class="roi-num">
+            <h5>العائد على الإعلانات (ROAS)</h5>
+            <div class="val" id="roiRoas">3.5x</div>
+            <div class="sub-val" id="roiRoasSub">انتقال من منطقة الخسارة للربح</div>
+          </div>
+          <div class="roi-num">
+            <h5>تكلفة الاستحواذ (CAC)</h5>
+            <div class="val" id="roiCac">-$12</div>
+            <div class="sub-val">انخفاض في تكلفة جلب العميل</div>
+          </div>
+        </div>
+
+        <a href="packages.html" class="final-cta">
+          انتقل لصفحة الاطلاع على الباقات <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // 3D Tilt Effect for Phases
+      const phases = document.querySelectorAll('.rm-phase, .roi-card');
+      phases.forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          const rotateX = ((y - centerY) / centerY) * -1;
+          const rotateY = ((x - centerX) / centerX) * 1;
+          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)`;
+        });
+      });
+
+      // Parallax Orbs
+      const orbs = document.querySelectorAll('.bg-orb');
+      window.addEventListener('scroll', () => {
+        const scrolled = window.scrollY;
+        if(orbs[0]) orbs[0].style.transform = `translateY(${scrolled * 0.2}px)`;
+        if(orbs[1]) orbs[1].style.transform = `translateY(${scrolled * 0.15}px)`;
+        if(orbs[2]) orbs[2].style.transform = `translateY(${scrolled * -0.1}px) translateX(${scrolled * 0.05}px)`;
+      });
+    });
+  </script>
+  <script src="js/report-connect.js?v=2.6"></script>
+</body>
+</html>

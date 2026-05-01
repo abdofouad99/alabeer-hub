@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>طلبات تنفيذ VIP | لوحة التحكم</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main:#060608;--sidebar-bg:rgba(15,23,42,0.7);--glass-bg: rgba(255,255,255,0.9);
+      --glass-border: rgba(0,0,0,0.09);--glass-blur:blur(24px) saturate(180%);
+      --text-dark: #0f172a;--text-gray: #475569;--primary:#f58e1a;--primary-glow:rgba(245,142,26,0.3);
+      --green:#10b981;--red:#ef4444;--yellow:#eab308;--purple:#8b5cf6;--blue:#3b82f6;
+      --shadow-soft:0 10px 40px -10px rgba(0,0,0,0.5);--radius:16px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Cairo',sans-serif;}
+    body{background: var(--bg-main); color: var(--body-text);display:flex;min-height:100vh;overflow-x:hidden;}
+    .bg-orb{position:fixed;border-radius:50%;filter:blur(120px);z-index:-1;opacity:0.15;}
+    .orb-1{top:-100px;right:-100px;width:500px;height:500px;background:var(--red);}
+    .orb-2{bottom:-100px;left:-100px;width:400px;height:400px;background:var(--primary);opacity:0.1;}
+    .sidebar{width:280px;background:var(--sidebar-bg);backdrop-filter:var(--glass-blur);border-left:1px solid var(--glass-border);display:flex;flex-direction:column;position:fixed;right:0;top:0;height:100vh;z-index:100;}
+    .main-content{flex:1;margin-right:280px;display:flex;flex-direction:column;}
+    .brand{padding:32px 24px;font-size:22px;font-weight:900;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--glass-border);color:#fff;}
+    .brand span{color:var(--primary);}
+    .nav-group-title{padding:20px 24px 8px;font-size:11px;font-weight:800;color:var(--text-gray);text-transform:uppercase;letter-spacing:1px;}
+    .nav-menu{flex:1;overflow-y:auto;padding-bottom:24px;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:12px 24px;color:var(--text-gray);text-decoration:none;font-weight:700;font-size:14px;border-right:4px solid transparent;transition:0.3s;}
+    .nav-item:hover{background:rgba(255,255,255,0.05);color:#fff;}
+    .nav-item.active{color:#fff;background:linear-gradient(90deg,rgba(239,68,68,0.15),transparent);border-right-color:var(--red);}
+    .topbar{display:flex;justify-content:space-between;align-items:center;padding:24px 48px;background:rgba(6,6,8,0.8);backdrop-filter:blur(10px);border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:90;}
+    .topbar-title{font-size:22px;font-weight:900;}
+    .search-box{background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;outline:none;width:260px;}
+    .search-box::placeholder{color:var(--text-gray);}
+    .dashboard-body{padding:32px 48px;display:flex;flex-direction:column;gap:28px;}
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+    .stat-card{background:linear-gradient(135deg,rgba(255,255,255,0.05),transparent);border:1px solid var(--glass-border);border-radius:16px;padding:24px;}
+    .stat-num{font-size:36px;font-weight:900;margin:8px 0 4px;}
+    .stat-label{font-size:13px;color:var(--text-gray);font-weight:700;}
+    .table-wrap{background: rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:var(--radius);overflow:hidden;}
+    table{width:100%;border-collapse:collapse;}
+    th{padding:14px 20px;text-align:right;font-size:13px;font-weight:800;color:var(--text-gray);background: rgba(255,255,255,0.06);border-bottom:1px solid var(--glass-border);}
+    td{padding:14px 20px;font-size:14px;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(255,255,255,0.02);}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;}
+    .badge-green{background:rgba(16,185,129,0.15);color:var(--green);}
+    .badge-yellow{background:rgba(234,179,8,0.15);color:var(--yellow);}
+    .badge-red{background:rgba(239,68,68,0.15);color:var(--red);}
+    .badge-blue{background:rgba(59,130,246,0.15);color:var(--blue);}
+    .action-btns{display:flex;gap:8px;}
+    .btn-sm{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;border:none;font-family:'Cairo',sans-serif;transition:0.3s;}
+    .btn-sm:hover{transform:translateY(-1px);}
+    .btn-view{background:rgba(59,130,246,0.2);color:var(--blue);}
+    .btn-del{background:rgba(239,68,68,0.15);color:var(--red);}
+    .btn-action{background:rgba(16,185,129,0.2);color:var(--green);}
+    .loading{text-align:center;padding:60px;color:var(--text-gray);font-weight:700;}
+    .status-select{background: rgba(255,255,255,0.07);border:1px solid var(--glass-border);color: #e2e8f0;padding:6px;border-radius:6px;font-family:'Cairo';font-weight:700;font-size:13px;outline:none;}
+    .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;border:1px solid var(--glass-border);color:#fff;padding:14px 28px;border-radius:12px;font-weight:700;z-index:9999;transition:0.4s;opacity:0;}
+    .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+    .toast.success{border-color:var(--green);color:var(--green);}
+    .toast.error{border-color:var(--red);color:var(--red);}
+    .notes-box{font-size:12px;color:var(--text-gray);margin-top:4px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+
+  </style>
+  <link href="../css/theme.css" rel="stylesheet">
+</style>
+</head>
+<body>
+<script>
+  // Global Fetch Interceptor for Auth
+  const originalFetch = window.fetch;
+  window.fetch = async function() {
+    const res = await originalFetch.apply(this, arguments);
+    if (res.status === 401) {
+      window.location.href = 'login.html';
+    }
+    return res;
+  };
+</script>
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      <span>لوحة</span> الإدارة
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-group-title">الرئيسية</div>
+      <a href="dashboard.html" class="nav-item">📊 مركز القيادة</a>
+      <a href="analytics.html" class="nav-item">📈 التحليلات المتقدمة</a>
+      <div class="nav-group-title">إدارة النظام</div>
+      <a href="packages.html" class="nav-item">📦 إدارة الباقات والأسعار</a>
+      <a href="users.html" class="nav-item">👥 إدارة المستخدمين والعملاء</a>
+      <a href="coupons.html" class="nav-item">🎟️ كوبونات الخصم</a>
+      <a href="reports.html" class="nav-item">📄 مراجعة تقارير التحليل</a>
+      <div class="nav-group-title">العمليات</div>
+      <a href="vip_requests.html" class="nav-item active">👑 طلبات تنفيذ VIP</a>
+      <a href="support.html" class="nav-item">💬 تذاكر الدعم</a>
+    
+      <a href="#" onclick="logout()" class="nav-item" style="color:var(--red); margin-top:20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:20px;">🚪 تسجيل الخروج</a>
+      <script>async function logout() { await fetch("../api/admin_logout.php"); window.location.href="login.html"; }</script>
+    </nav>
+
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">👑 طلبات تنفيذ VIP</div>
+      <div class="topbar-actions">
+        <input type="search" class="search-box" id="searchInput" placeholder="🔍 بحث عن طلب..." oninput="filterTable()">
+      </div>
+    </header>
+
+    <div class="dashboard-body">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">إجمالي الطلبات</div>
+          <div class="stat-num" id="statTotal" style="color:var(--blue);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">طلبات جديدة</div>
+          <div class="stat-num" id="statNew" style="color:var(--red);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">قيد التنفيذ / تواصلنا</div>
+          <div class="stat-num" id="statProgress" style="color:var(--yellow);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">مكتملة</div>
+          <div class="stat-num" id="statCompleted" style="color:var(--green);">--</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>العميل</th>
+              <th>بيانات التواصل</th>
+              <th>ملاحظات</th>
+              <th>تاريخ الطلب</th>
+              <th>تغيير الحالة</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="7" class="loading">⏳ جاري تحميل الطلبات...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allData = [];
+
+    async function loadData() {
+      try {
+        const res = await fetch('../api/admin_vip.php');
+        const data = await res.json();
+        if(data.ok) {
+          allData = data.requests || [];
+          document.getElementById('statTotal').textContent = data.stats.total;
+          document.getElementById('statNew').textContent = data.stats.new;
+          document.getElementById('statProgress').textContent = data.stats.in_progress;
+          document.getElementById('statCompleted').textContent = data.stats.completed;
+          renderTable();
+        } else {
+          showToast('❌ ' + data.error, 'error');
+        }
+      } catch(err) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="loading">⚠️ خطأ في الاتصال بقاعدة البيانات</td></tr>';
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      
+      const filtered = allData.filter(r => {
+        const txt = ((r.full_name||'') + ' ' + (r.company_name||'') + ' ' + (r.phone||'')).toLowerCase();
+        return txt.includes(searchTerm);
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">لا توجد طلبات.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => {
+        const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-SA') : '-';
+        
+        return `<tr>
+          <td style="color:var(--text-gray);">#${r.id}</td>
+          <td>
+            <div style="font-weight:800;">${r.full_name}</div>
+            <div style="font-size:12px;color:var(--text-gray);">${r.company_name || 'بدون نشاط'}</div>
+          </td>
+          <td>
+            <div style="font-size:13px; color:var(--blue);">${r.phone}</div>
+            <div style="font-size:12px; color:var(--text-gray);">${r.email}</div>
+          </td>
+          <td>
+            <div class="notes-box" title="${r.notes||''}">${r.notes || '-'}</div>
+          </td>
+          <td style="color:var(--text-gray);">${dateStr}</td>
+          <td>
+            <select class="status-select" onchange="updateStatus(${r.id}, this.value)">
+              <option value="new" ${r.status === 'new' ? 'selected' : ''}>🆕 جديد</option>
+              <option value="contacted" ${r.status === 'contacted' ? 'selected' : ''}>📞 تم التواصل</option>
+              <option value="in_progress" ${r.status === 'in_progress' ? 'selected' : ''}>⏳ قيد التنفيذ</option>
+              <option value="completed" ${r.status === 'completed' ? 'selected' : ''}>✅ مكتمل</option>
+              <option value="rejected" ${r.status === 'rejected' ? 'selected' : ''}>❌ مرفوض</option>
+            </select>
+          </td>
+          <td>
+            <div class="action-btns">
+              <button class="btn-sm btn-del" onclick="deleteReq(${r.id})">حذف</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function filterTable() { renderTable(); }
+
+    async function updateStatus(id, newStatus) {
+      try {
+        const res = await fetch('../api/admin_vip.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ _action: 'update_status', id: id, status: newStatus })
+        });
+        const data = await res.json();
+        if(data.ok) {
+          showToast(data.message, 'success');
+          loadData();
+        } else {
+          showToast(data.error, 'error');
+        }
+      } catch(e) {
+        showToast('⚠️ خطأ في الاتصال', 'error');
+      }
+    }
+
+    async function deleteReq(id) {
+      if(!confirm('هل أنت متأكد من حذف هذا الطلب نهائياً؟')) return;
+      try {
+        const res = await fetch('../api/admin_vip.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ _action: 'delete', id: id })
+        });
+        const data = await res.json();
+        if(data.ok) {
+          showToast(data.message, 'success');
+          loadData();
+        } else {
+          showToast(data.error, 'error');
+        }
+      } catch(e) {
+        showToast('⚠️ خطأ في الاتصال', 'error');
+      }
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `toast ${type} show`;
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+  </script>
+
+  <!-- Theme Toggle -->
+  <button id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">🌙</button>
+  <script>
+    (function(){
+      if(localStorage.getItem('theme')==='light'){
+        document.body.classList.add('light-mode');
+        var b=document.getElementById('themeToggle');
+        if(b) b.textContent='☀️';
+      }
+    })();
+    function toggleTheme(){
+      document.body.classList.toggle('light-mode');
+      var isLight=document.body.classList.contains('light-mode');
+      localStorage.setItem('theme',isLight?'light':'dark');
+      var btn=document.getElementById('themeToggle');
+      if(btn) btn.textContent=isLight?'☀️':'🌙';
+    }
+  </script>
+</body>
+</html>
+

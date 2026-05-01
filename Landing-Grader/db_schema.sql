@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS landing_leads (
+    id INT(11) AUTO_INCREMENT PRIMARY KEY,
+    client_name VARCHAR(255) NOT NULL,
+    client_phone VARCHAR(50) NOT NULL,
+    website_url VARCHAR(500) NOT NULL,
+    lp_score INT(11) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

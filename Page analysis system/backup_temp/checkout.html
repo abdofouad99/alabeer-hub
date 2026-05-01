@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إتمام التعاقد — العبير للتسويق</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #09090b;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(24px) saturate(180%);
+      
+      --text-dark: #f8fafc;
+      --text-gray: #94a3b8;
+      
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #eab308;
+      
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-dark); 
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Ambient Orbs */
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(140px); z-index: -1; opacity: 0.2; }
+    .orb-1 { top: -20%; left: -10%; width: 600px; height: 600px; background: var(--primary); }
+    .orb-2 { bottom: -20%; right: -10%; width: 800px; height: 800px; background: #8b5cf6; }
+
+    /* Top Navigation (Minimal) */
+    .top-nav {
+      padding: 24px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--glass-border);
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: var(--glass-blur);
+      z-index: 20;
+    }
+    .brand { font-size: 24px; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff;}
+    .brand span { color: var(--primary); }
+    .back-btn { color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
+    .back-btn:hover { color: #fff; transform: translateX(5px); }
+
+    /* Main Checkout Layout */
+    .checkout-wrapper {
+      max-width: 1100px;
+      margin: 60px auto;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 40px;
+      padding: 0 24px;
+      z-index: 10;
+      align-items: start;
+    }
+
+    /* Animations */
+    @keyframes slideInRight { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
+    
+    .panel-right { animation: slideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .panel-left { animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* Right side - Summary Panel */
+    .summary-panel { padding: 40px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 24px; backdrop-filter: var(--glass-blur); }
+    .summary-title { font-size: 26px; font-weight: 900; color: #fff; margin-bottom: 8px; line-height: 1.4;}
+    .summary-subtitle { font-size: 15px; color: var(--text-gray); font-weight: 600; margin-bottom: 32px; }
+    
+    .feature-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+    .feature-item { display: flex; align-items: flex-start; gap: 12px; }
+    .f-icon { color: var(--primary); font-size: 18px; margin-top:2px;}
+    .f-text { color: #fff; font-size: 15px; font-weight: 700; line-height: 1.6; }
+
+    .price-box { 
+      background: linear-gradient(135deg, rgba(245, 142, 26, 0.1), rgba(0,0,0,0.5)); 
+      padding: 32px; border-radius: 16px; margin-bottom: 32px; 
+      border: 1px solid rgba(245, 142, 26, 0.2); text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .price-box::after { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); animation: spin 10s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    
+    .price-box h3 { font-size: 48px; font-weight: 900; color: #fff; letter-spacing: -1px; position:relative; z-index:2;}
+    .price-box p { font-size: 15px; color: var(--primary); font-weight: 800; margin-top: 8px; position:relative; z-index:2;}
+
+    .guarantee-box { display: flex; align-items: center; gap: 16px; padding: 20px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 16px; }
+    .g-icon { font-size: 32px; }
+    .g-text h5 { color: var(--green); font-size: 15px; font-weight: 800; margin-bottom:4px; }
+    .g-text p { color: var(--text-gray); font-size: 12px; font-weight: 600; line-height: 1.5; }
+
+    /* Left side - Payment Form */
+    .form-panel { 
+      background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+      position:relative;
+    }
+    .form-panel::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: linear-gradient(90deg, var(--primary), #eab308); border-radius: 24px 24px 0 0; }
+
+    .form-section-title { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 24px; display:flex; align-items:center; gap:8px;}
+    
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 14px; font-weight: 700; color: var(--text-gray); margin-bottom: 8px; }
+    .form-control { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); padding: 14px 16px; border-radius: 12px; color: #fff; font-size: 15px; font-family: 'Cairo'; transition: 0.3s; }
+    .form-control::placeholder { color: rgba(255,255,255,0.2); }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); background: rgba(0,0,0,0.8);}
+
+    .payment-methods { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px;}
+    .pm-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px 8px; display:flex; flex-direction: column; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:0.3s; opacity:0.6; text-align: center;}
+    .pm-card:hover { background: rgba(255,255,255,0.05); opacity:0.8;}
+    .pm-card.active { background: rgba(245, 142, 26, 0.1); border-color: var(--primary); opacity:1; box-shadow: inset 0 0 10px rgba(245, 142, 26, 0.2);}
+    .pm-card span { font-weight: 700; font-size: 13px; }
+    .pm-card svg { width: 24px; height: 24px; }
+
+    .btn-submit { 
+      width: 100%; background: var(--primary); color: #fff; font-size: 18px; font-weight: 900; 
+      padding: 18px; border-radius: 12px; border: none; cursor: pointer; transition: 0.3s; 
+      box-shadow: 0 10px 25px var(--primary-glow); margin-top:24px;
+      display: flex; justify-content: center; align-items: center; gap: 12px;
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 15px 35px var(--primary-glow); background: #f08310; }
+
+    .secure-text { text-align: center; font-size: 13px; color: var(--text-gray); margin-top: 20px; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;}
+
+    /* Custom Checkbox */
+    .terms { display: flex; align-items: flex-start; gap: 10px; margin-top: 20px; }
+    .terms input[type="checkbox"] { margin-top: 4px; accent-color: var(--primary); width: 16px; height: 16px; cursor:pointer;}
+    .terms label { font-size: 13px; color: var(--text-gray); font-weight: 600; line-height: 1.6; cursor:pointer;}
+    .terms label a { color: var(--primary); text-decoration: none; }
+
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <!-- Top Navigation -->
+  <header class="top-nav">
+    <a href="packages.html" class="back-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      عودة للباقات
+    </a>
+    <a href="#" class="brand">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      العبير للتسويق
+    </a>
+  </header>
+
+  <!-- Checkout Content -->
+  <div class="checkout-wrapper">
+    
+    <!-- Right Side: Summary & Value -->
+    <div class="summary-panel panel-right">
+      <h1 class="summary-title" id="pkg-name">اﻟﺒﺎﻗﺔ اﻟﺸﺎﻣﻠﺔ 🔥</h1>
+      <p class="summary-subtitle" id="pkg-desc">استلم تقريرك الشامل مع خطة الـ 30 يوم والإعلانات.</p>
+      
+      <div class="price-box">
+        <h3 id="pkg-price">$50</h3>
+        <p>استثمار حقيقي في نمو مبيعاتك</p>
+      </div>
+
+      <div class="feature-list" id="pkg-features">
+        <div class="feature-item">
+          <div class="f-icon">✓</div>
+          <div class="f-text">ﺗﻘﺮﻳﺮ ﻛﺎﻣﻞ PDF (ﻧﻘﺎط اﻟﻘﻮة، اﻟﻀﻌﻒ، رﺣﻠﺔ اﻟﻌﻤﻴﻞ)</div>
+        </div>
+        <div class="feature-item">
+          <div class="f-icon">✓</div>
+          <div class="f-text">ﺟﻠﺴﺔ اﺳﺘﺸﺎرﻳﺔ (ﺳﺎﻋﺔ ﻛﺎﻣﻠﺔ)</div>
+        </div>
+        <div class="feature-item">
+          <div class="f-icon">✓</div>
+          <div class="f-text">ﺧﻄﺔ إﻋﻼﻧﻴﺔ وﺗﺮﺗﻴﺐ اﻷوﻟﻮﻳﺎت (30 ﻳﻮم)</div>
+        </div>
+      </div>
+
+      <div class="guarantee-box">
+        <div class="g-icon">🤝</div>
+        <div class="g-text">
+          <h5>أمان وثقة</h5>
+          <p>خطوات واضحة وقابلة للتنفيذ مبنية على تحليل أرقام واقعية ونقاط ضعف مثبتة.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Left Side: Payment Form -->
+    <div class="form-panel panel-left">
+      <h2 class="form-section-title">بيانات الاستلام</h2>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">الاسم الكامل</label>
+          <input type="text" class="form-control" placeholder="أدخل اسمك الكريم">
+        </div>
+        <div class="form-group">
+          <label class="form-label">اسم الحساب / النشاط</label>
+          <input type="text" class="form-control" placeholder="@account">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">رقم الجوال (للتواصل السريع لتحديد الجلسة)</label>
+        <input type="tel" class="form-control" placeholder="05X XXX XXXX" dir="ltr">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">البريد الإلكتروني (لاستلام التقرير)</label>
+        <input type="email" class="form-control" placeholder="name@company.com" dir="ltr">
+      </div>
+
+      <h2 class="form-section-title" style="margin-top: 32px;">طريقة الدفع (المتاحة في المستند)</h2>
+      <div class="payment-methods">
+        <div class="pm-card active" data-method="card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          <span>بطاقة بنكية</span>
+        </div>
+        <div class="pm-card" data-method="paypal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4"></path><path d="M7.6 15H17l-1 6H8.6l-1-6z"></path><path d="M12 11v4"></path></svg>
+          <span>PayPal</span>
+        </div>
+        <div class="pm-card" data-method="transfer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+          <span>تحويل بنكي</span>
+        </div>
+      </div>
+
+      <!-- Card Details Form -->
+      <div class="card-details">
+        <div class="form-group">
+          <label class="form-label">الاسم على البطاقة</label>
+          <input type="text" class="form-control" placeholder="YOUR NAME">
+        </div>
+        <div class="form-group">
+          <label class="form-label">رقم البطاقة</label>
+          <input type="text" class="form-control" placeholder="0000 0000 0000 0000" dir="ltr" maxlength="19">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">تاريخ الانتهاء</label>
+            <input type="text" class="form-control" placeholder="MM / YY" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label class="form-label">رمز التحقق (CVV)</label>
+            <input type="text" class="form-control" placeholder="123" dir="ltr" maxlength="3">
+          </div>
+        </div>
+      </div>
+      
+      <!-- Transfer Details (Hidden by default) -->
+      <div class="transfer-details" style="display:none; background:rgba(255,255,255,0.05); padding:20px; border-radius:12px; margin-bottom:20px;">
+        <h4 style="color:var(--primary); margin-bottom:12px; font-size:15px;">بيانات الحساب البنكي (مؤسسة العبير للتسويق):</h4>
+        <p style="color:var(--text-gray); font-size:14px; margin-bottom:8px;"><strong>البنك:</strong> مصرف الراجحي</p>
+        <p style="color:var(--text-gray); font-size:14px; margin-bottom:8px;"><strong>رقم الحساب:</strong> 00000000000000</p>
+        <p style="color:var(--text-gray); font-size:14px; margin-bottom:8px;"><strong>الآيبان:</strong> SA00 0000 0000 0000 0000 0000</p>
+        <p style="color:#fff; font-size:13px; margin-top:16px;">يرجى إرفاق إيصال التحويل عبر واتساب بعد إتمام العملية.</p>
+      </div>
+
+      <div class="terms">
+        <input type="checkbox" id="terms" checked>
+        <label for="terms">أوافق على الشروط والأحكام وأفوض بإتمام العملية.</label>
+      </div>
+
+      <button class="btn-submit" id="btn-submit">
+        إتمام الدفع واستلام التقرير ($50)
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      </button>
+
+      <div class="secure-text">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        مدفوعاتك مشفرة ومؤمنة بأعلى معايير الحماية
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Logic to set checkout data based on URL parameter ?plan=
+    document.addEventListener("DOMContentLoaded", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const plan = urlParams.get('plan') || 'shamel';
+      
+      const pkgName = document.getElementById('pkg-name');
+      const pkgDesc = document.getElementById('pkg-desc');
+      const pkgPrice = document.getElementById('pkg-price');
+      const pkgFeatures = document.getElementById('pkg-features');
+      const btnSubmit = document.getElementById('btn-submit');
+
+      if (plan === 'free') {
+        pkgName.textContent = "اﻟﺒﺎﻗﺔ اﻟﻤﺠﺎﻧﻴﺔ";
+        pkgDesc.textContent = "تجربة أولى لاكتشاف وضع حسابك الحالي.";
+        pkgPrice.textContent = "$0";
+        btnSubmit.innerHTML = `تأكيد وبدء التحليل ($0) <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+        document.querySelector('.payment-methods').style.display = 'none';
+        document.querySelector('.card-details').style.display = 'none';
+        document.querySelectorAll('h2')[1].style.display = 'none'; // Hide "Payment Method" title
+      } 
+      else if (plan === 'pro') {
+        pkgName.textContent = "اﻟﺒﺎﻗﺔ اﻻﺣﺘﺮاﻓﻴﺔ ⭐";
+        pkgDesc.textContent = "تحليل شامل مع التوصيات الفورية وخطة أولية.";
+        pkgPrice.textContent = "$10";
+        btnSubmit.innerHTML = `إتمام الدفع واستلام التقرير ($10) <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+        pkgFeatures.innerHTML = `
+          <div class="feature-item"><div class="f-icon">✓</div><div class="f-text">ﺗﻘﺮﻳﺮ ﻛﺎﻣﻞ PDF (ﻧﻘﺎط اﻟﻘﻮة واﻟﻀﻌﻒ)</div></div>
+          <div class="feature-item"><div class="f-icon">✓</div><div class="f-text">رﺣﻠﺔ اﻟﻌﻤﻴﻞ وﺗﻮﺻﻴﺎت ﻓﻮرﻳﺔ</div></div>
+          <div class="feature-item"><div class="f-icon">✓</div><div class="f-text">ﺧﻄﺔ أوﻟﻴﺔ ﻟﻠﻨﻤﻮ</div></div>
+        `;
+      }
+      else if (plan === 'vip') {
+        pkgName.innerHTML = `VIP للنخبة 👑`;
+        pkgDesc.textContent = "تنفيذ كامل وإدارة حساب وحملات إعلانية.";
+        pkgPrice.textContent = "حسب الحالة";
+        btnSubmit.innerHTML = `تأكيد طلب التميز (VIP) للتواصل والتنفيذ <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+        pkgFeatures.innerHTML = `
+          <div class="feature-item"><div class="f-icon">✓</div><div class="f-text">ﺗﻨﻔﻴﺬ ﻛﺎﻣﻞ ﺑﻮاﺳﻄﺔ اﻟﻤﺆﺳﺴﺔ</div></div>
+          <div class="feature-item"><div class="f-icon">✓</div><div class="f-text">إدارة اﻟﺤﺴﺎب واﻹﻋﻼﻧﺎت واﻟﻤﺤﺘﻮى</div></div>
+        `;
+      }
+      // default is shamel
+
+      // Payment method toggle logic
+      document.querySelectorAll('.pm-card').forEach(card => {
+        card.addEventListener('click', function() {
+          document.querySelectorAll('.pm-card').forEach(c => c.classList.remove('active'));
+          this.classList.add('active');
+          
+          const method = this.getAttribute('data-method');
+          const cardDetails = document.querySelector('.card-details');
+          const transferDetails = document.querySelector('.transfer-details');
+          
+          if (method === 'card') {
+            cardDetails.style.display = 'block';
+            transferDetails.style.display = 'none';
+          } else if (method === 'transfer') {
+            cardDetails.style.display = 'none';
+            transferDetails.style.display = 'block';
+          } else if (method === 'paypal') {
+            cardDetails.style.display = 'none';
+            transferDetails.style.display = 'none';
+            // PayPal typically redirects, so no extra form fields
+          }
+        });
+      });
+      // Handle Submit Simulation
+      btnSubmit.addEventListener('click', () => {
+        btnSubmit.innerHTML = `جاري المعالجة... <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><circle cx="12" cy="12" r="10"></circle><path d="M12 2v4"></path></svg>`;
+        
+        // Add a simple spin animation inline
+        if (!document.getElementById('spinStyle')) {
+          const style = document.createElement('style');
+          style.id = 'spinStyle';
+          style.innerHTML = `@keyframes spinner { to { transform: rotate(360deg); } } .spin { animation: spinner 1s linear infinite; }`;
+          document.head.appendChild(style);
+        }
+
+        setTimeout(() => {
+          btnSubmit.style.background = 'var(--green)';
+          btnSubmit.innerHTML = `تم الدفع بنجاح! ✔`;
+          
+          setTimeout(() => {
+            const id = urlParams.get('id');
+            if (id) {
+              window.location.href = 'result.html?id=' + id;
+            } else {
+              window.location.href = 'result.html';
+            }
+          }, 1000);
+        }, 2000);
+      });
+    });
+  </script>
+  <script src="js/report-connect.js?v=2.5"></script>
+</body>
+</html>

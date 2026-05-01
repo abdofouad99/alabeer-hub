@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل مسؤولي ROAS | العبير</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Tajawal', sans-serif; }
+        body { background-color: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .login-box { background: rgba(30, 41, 59, 0.8); padding: 40px; border-radius: 12px; border: 1px solid #334155; width: 100%; max-width: 400px; box-shadow: 0 0 40px rgba(16, 185, 129, 0.2); }
+        h1 { text-align: center; color: #10b981; margin-bottom: 25px; }
+        .input-group { margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; font-size: 1rem; }
+        input:focus { border-color: #10b981; outline: none; }
+        button { width: 100%; padding: 14px; background: #10b981; border: none; font-weight: bold; color: white; border-radius: 6px; font-size: 1.1rem; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #059669; }
+        .error { color: #ef4444; background: rgba(239,68,68,0.1); padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center; display: none; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h1>إدارة محاكي ROAS</h1>
+        <div id="errorMsg" class="error"></div>
+        <form id="loginForm">
+            <div class="input-group">
+                <input type="email" id="email" placeholder="البريد الإلكتروني" required>
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="كلمة المرور" required>
+            </div>
+            <button type="submit" id="btn">تسجيل الدخول</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn');
+            const err = document.getElementById('errorMsg');
+            btn.innerText = 'جاري التحقق...';
+            btn.disabled = true;
+            err.style.display = 'none';
+
+            try {
+                const res = await fetch('../api/admin/auth.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = 'dashboard.html';
+                } else {
+                    err.innerText = data.message || 'بيانات غير صحيحة';
+                    err.style.display = 'block';
+                    btn.innerText = 'تسجيل الدخول';
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error logging in', error);
+                
+                // fallback للمطور 
+                if(window.location.protocol === 'file:') {
+                    window.location.href = 'dashboard.html';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

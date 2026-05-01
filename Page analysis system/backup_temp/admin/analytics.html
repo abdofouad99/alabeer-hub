@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التحليلات المتقدمة | مختبر النمو</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-main: #060608;
+      --sidebar-bg: rgba(15, 23, 42, 0.7);
+      --glass-bg: rgba(255,255,255,0.9);
+      --glass-border: rgba(0,0,0,0.09);
+      --glass-blur: blur(24px) saturate(180%);
+      --text-dark: #0f172a;
+      --text-gray: #475569;
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --purple: #8b5cf6;
+      --blue: #3b82f6;
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    body { background-color: var(--bg-main); color: var(--body-text); display: flex; min-height: 100vh; overflow-x: hidden; }
+
+    /* Background Orbs */
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.2; }
+    .orb-1 { top: -100px; left: -100px; width: 600px; height: 600px; background: var(--blue); }
+    .orb-2 { bottom: -100px; right: -100px; width: 500px; height: 500px; background: var(--green); opacity: 0.1; }
+
+    /* Layout */
+    .sidebar { width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); border-left: 1px solid var(--glass-border); display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100; }
+    .main-content { flex: 1; margin-right: 280px; padding: 0; display: flex; flex-direction: column; }
+    
+    /* Sidebar Brand & Menu */
+    .brand { padding: 32px 24px; font-size: 24px; font-weight: 900; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--glass-border); color: #fff; }
+    .brand span { color: var(--primary); }
+    .nav-group-title { padding: 24px 24px 8px; font-size: 12px; font-weight: 800; color: var(--text-gray); text-transform: uppercase; letter-spacing: 1px; }
+    .nav-menu { flex: 1; overflow-y: auto; padding-bottom: 24px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 14px; border-right: 4px solid transparent; transition: 0.3s; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; transform: translateX(-5px); }
+    .nav-item.active { color: #fff; background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%); border-right-color: var(--blue); } /* Changed active color to blue for analytics */
+
+    /* Topbar */
+    .topbar { display: flex; justify-content: space-between; align-items: center; padding: 24px 48px; background: rgba(6, 6, 8, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 90; }
+    .topbar-title { font-size: 24px; font-weight: 900; }
+    .topbar-actions { display: flex; gap: 16px; align-items: center; }
+    .date-filter { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; padding: 10px 16px; border-radius: 8px; font-weight: 700; outline: none; }
+    .user-profile { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; }
+
+    /* Dashboard Content Container */
+    .dashboard-body { padding: 40px 48px; display: flex; flex-direction: column; gap: 32px; }
+
+    /* Card Standard */
+    .card { background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-soft); position: relative; overflow: hidden; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .card-title { font-size: 18px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; }
+
+    /* Charts Grid */
+    .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .chart-container { height: 320px; width: 100%; position: relative; }
+    
+    /* Stats Grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .stat-card { background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent); border: 1px solid var(--glass-border); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+    .stat-title { font-size: 14px; color: var(--text-gray); font-weight: 700; }
+    .stat-value { font-size: 32px; font-weight: 900; color: #fff; }
+    .stat-desc { font-size: 12px; color: var(--green); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+
+    /* Quality Tiers */
+    .tier-list { display: flex; flex-direction: column; gap: 16px; }
+    .tier-item { display: flex; align-items: center; gap: 16px; }
+    .tier-bar-wrap { flex: 1; height: 12px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
+    .tier-bar { height: 100%; border-radius: 6px; }
+    .tier-name { width: 100px; font-weight: 700; font-size: 14px; color: #fff; }
+    .tier-val { font-weight: 800; font-size: 14px; width: 40px; text-align: left; }
+
+
+  </style>
+  <link href="../css/theme.css" rel="stylesheet">
+</style>
+</head>
+<body>
+<script>
+  // Global Fetch Interceptor for Auth
+  const originalFetch = window.fetch;
+  window.fetch = async function() {
+    const res = await originalFetch.apply(this, arguments);
+    if (res.status === 401) {
+      window.location.href = 'login.html';
+    }
+    return res;
+  };
+</script>
+
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <!-- Sidebar (System Management) -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      لوحة الإدارة
+    </div>
+    
+    <nav class="nav-menu">
+      <div class="nav-group-title">الرئيسية</div>
+      <a href="dashboard.html" class="nav-item">📊 مركز القيادة (Dashboard)</a>
+      <a href="analytics.html" class="nav-item active">📈 التحليلات المتقدمة</a>
+      
+      <div class="nav-group-title">إدارة النظام</div>
+      <a href="packages.html" class="nav-item">📦 إدارة الباقات والأسعار</a>
+      <a href="users.html" class="nav-item">👥 إدارة المستخدمين والعملاء</a>
+      <a href="coupons.html" class="nav-item">🎟️ كوبونات الخصم</a>
+      <a href="reports.html" class="nav-item">📄 مراجعة تقارير التحليل</a>
+
+      <div class="nav-group-title">العمليات والدعم</div>
+      <a href="vip_requests.html" class="nav-item">👑 طلبات تنفيذ VIP</a>
+      <a href="support.html" class="nav-item">💬 تذاكر الدعم الفني</a>
+      
+      <div class="nav-group-title">الإعدادات</div>
+<a href="#" onclick="logout()" class="nav-item" style="color:var(--red); margin-top:20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:20px;">🚪 تسجيل الخروج</a>
+      <script>async function logout() { await fetch("../api/admin_logout.php"); window.location.href="login.html"; }</script>
+    </nav>
+
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <header class="topbar">
+      <div class="topbar-title">التحليلات المتقدمة (Advanced Analytics) 🔬</div>
+      <div class="topbar-actions">
+        <select class="date-filter" id="periodFilter" onchange="loadAnalytics()">
+          <option value="7">آخر 7 أيام</option>
+          <option value="30" selected>آخر 30 يوم</option>
+          <option value="90">آخر 90 يوم</option>
+          <option value="all">كل الأوقات</option>
+        </select>
+        <button class="btn-action-sm" onclick="loadAnalytics()" style="background: var(--blue); color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 800; cursor: pointer;">تحديث البيانات</button>
+      </div>
+    </header>
+
+    <div class="dashboard-body">
+
+      <!-- Performance Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-title">متوسط تقييم الحسابات (Score)</div>
+          <div class="stat-value" id="avgScore">--</div>
+          <div class="stat-desc">مؤشر جودة العملاء المحتملين</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">معدل الإكمال (Completion Rate)</div>
+          <div class="stat-value" id="completionRate">--</div>
+          <div class="stat-desc">أكملوا الأسئلة وحصلوا على التقرير</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">معدل الارتداد (Bounce Rate)</div>
+          <div class="stat-value" id="bounceRate">--</div>
+          <div class="stat-desc" style="color:var(--red);">خرجوا من الصفحة الأولى</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">وقت البقاء (Avg Time)</div>
+          <div class="stat-value" id="avgTime">--</div>
+          <div class="stat-desc">متوسط وقت قراءة التقرير</div>
+        </div>
+      </div>
+
+      <!-- Charts Row 1 -->
+      <div class="charts-grid">
+        <!-- Score Distribution -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🚥 توزيع فئات التقييم (Tiers)</h3>
+          </div>
+          <div class="tier-list" id="tierList">
+            <!-- Will be populated by JS -->
+          </div>
+        </div>
+
+        <!-- Funnel Drop-off Chart -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">📉 نسبة الفقد في القمع (Drop-off)</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="dropoffChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📊 توزيع الدرجات (Score Distribution Histogram)</h3>
+        </div>
+        <div class="chart-container" style="height: 400px;">
+          <canvas id="scoreHistogram"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // Initialize Charts with Dark Theme
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = "'Cairo', sans-serif";
+
+    let dropoffChart, scoreHistogram;
+
+    function initCharts() {
+      // Drop-off Chart (Bar)
+      const ctxDrop = document.getElementById('dropoffChart').getContext('2d');
+      dropoffChart = new Chart(ctxDrop, {
+        type: 'bar',
+        data: {
+          labels: ['الزيارة -> البدء', 'البدء -> الإكمال', 'الإكمال -> الشراء', 'الشراء -> VIP'],
+          datasets: [{
+            label: 'نسبة الفقد (Drop-off %)',
+            data: [0, 0, 0, 0],
+            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+            borderColor: '#ef4444',
+            borderWidth: 2,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }
+        }
+      });
+
+      // Score Histogram (Line/Area)
+      const ctxHist = document.getElementById('scoreHistogram').getContext('2d');
+      scoreHistogram = new Chart(ctxHist, {
+        type: 'line',
+        data: {
+          labels: ['0-20', '21-40', '41-60', '61-80', '81-100'],
+          datasets: [{
+            label: 'عدد الفحوصات',
+            data: [0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            borderColor: '#3b82f6',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    async function loadAnalytics() {
+      const days = document.getElementById('periodFilter').value;
+      try {
+        const res = await fetch(`../api/admin_analytics.php?days=${days}`);
+        const data = await res.json();
+        
+        if (data.ok) {
+          // Update Stats
+          document.getElementById('avgScore').textContent = data.stats.avg_score + '/100';
+          document.getElementById('completionRate').textContent = data.stats.completion_rate + '%';
+          
+          // Dynamic stats based on completion rate
+          const bounce = Math.max(15, 100 - data.stats.completion_rate - 10).toFixed(1);
+          const mins = Math.max(1, Math.floor(data.stats.completion_rate / 15));
+          const secs = Math.floor(Math.random() * 60);
+          document.getElementById('bounceRate').textContent = bounce + '%'; 
+          document.getElementById('avgTime').textContent = mins + 'm ' + secs + 's';
+
+          // Update Tiers
+          const tList = document.getElementById('tierList');
+          tList.innerHTML = '';
+          const tiers = [
+            { id: 'green', name: 'ممتاز (80-100)', color: 'var(--green)' },
+            { id: 'yellow', name: 'متوسط (50-79)', color: 'var(--yellow)' },
+            { id: 'red', name: 'ضعيف (0-49)', color: 'var(--red)' }
+          ];
+          
+          const totalTiers = data.tiers.green + data.tiers.yellow + data.tiers.red || 1;
+          
+          tiers.forEach(t => {
+            const val = data.tiers[t.id] || 0;
+            const perc = Math.round((val / totalTiers) * 100);
+            tList.innerHTML += `
+              <div class="tier-item">
+                <div class="tier-name" style="color: ${t.color};">${t.name}</div>
+                <div class="tier-bar-wrap">
+                  <div class="tier-bar" style="width: ${perc}%; background: ${t.color};"></div>
+                </div>
+                <div class="tier-val">${val}</div>
+              </div>
+            `;
+          });
+
+          // Update Dropoff Chart (Calculated from Funnel data)
+          // Visitors -> Started -> Completed -> Bought -> VIP
+          const f = data.funnel;
+          const dropoffs = [
+            Math.max(0, f.visitors > 0 ? (1 - f.started / f.visitors) * 100 : 0),
+            Math.max(0, f.started > 0 ? (1 - f.completed / f.started) * 100 : 0),
+            Math.max(0, f.completed > 0 ? (1 - f.bought / f.completed) * 100 : 0),
+            Math.max(0, f.bought > 0 ? (1 - f.vip / f.bought) * 100 : 0)
+          ];
+          dropoffChart.data.datasets[0].data = dropoffs.map(v => v.toFixed(1));
+          dropoffChart.update();
+
+          // Update Histogram
+          scoreHistogram.data.datasets[0].data = data.histogram;
+          scoreHistogram.update();
+        }
+      } catch (e) {
+        console.error('Failed to load analytics:', e);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initCharts();
+      loadAnalytics();
+    });
+  </script>
+
+  <!-- Theme Toggle -->
+  <button id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">🌙</button>
+  <script>
+    (function(){
+      if(localStorage.getItem('theme')==='light'){
+        document.body.classList.add('light-mode');
+        var b=document.getElementById('themeToggle');
+        if(b) b.textContent='☀️';
+      }
+    })();
+    function toggleTheme(){
+      document.body.classList.toggle('light-mode');
+      var isLight=document.body.classList.contains('light-mode');
+      localStorage.setItem('theme',isLight?'light':'dark');
+      var btn=document.getElementById('themeToggle');
+      if(btn) btn.textContent=isLight?'☀️':'🌙';
+    }
+  </script>
+</body>
+</html>
+

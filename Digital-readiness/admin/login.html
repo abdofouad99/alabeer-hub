@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>دخول لوحة الأدمن | فحص الجاهزية الرقمية</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="container" style="max-width:460px;margin-top:80px">
+  <div class="card animate" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:10px">🛡️</div>
+    <div class="h1" style="margin-bottom:6px">لوحة الإدارة</div>
+    <div class="muted" style="margin-bottom:22px">فحص الجاهزية الرقمية — العبير</div>
+
+    <div id="loginForm">
+      <div style="margin-bottom:12px">
+        <input class="input" type="email" id="email" placeholder="البريد الإلكتروني">
+      </div>
+      <div style="margin-bottom:12px">
+        <input class="input" type="password" id="password" placeholder="كلمة المرور">
+      </div>
+      <div id="loginErr" class="alert alert-error" style="display:none"></div>
+      <button class="btn" style="width:100%;margin-top:8px" onclick="doLogin()">🔑 تسجيل الدخول</button>
+    </div>
+
+    <a href="../index.html" style="display:block;margin-top:18px;font-size:13px;color:var(--muted)">← العودة للنظام</a>
+  </div>
+</div>
+
+<script>
+const API = '../api/admin';
+
+async function doLogin() {
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const errEl    = document.getElementById('loginErr');
+  errEl.style.display = 'none';
+
+  if (!email || !password) { errEl.textContent='البريد وكلمة المرور مطلوبان'; errEl.style.display=''; return; }
+
+  try {
+    const res = await fetch(`${API}/auth.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (data.error) { errEl.textContent = data.error; errEl.style.display = ''; return; }
+    window.location.href = 'dashboard.html';
+  } catch (e) {
+    errEl.textContent = 'خطأ في الاتصال بالخادم'; errEl.style.display = '';
+  }
+}
+
+document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>

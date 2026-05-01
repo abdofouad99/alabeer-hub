@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التشريح التفصيلي — العبير للتسويق</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #09090b;
+      --bg-card: rgba(20, 20, 25, 0.7);
+      --sidebar-bg: rgba(15, 23, 42, 0.6);
+      --sidebar-border: rgba(255, 255, 255, 0.05);
+      
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(24px) saturate(180%);
+      
+      --text-dark: #f8fafc;
+      --text-gray: #94a3b8;
+      --text-dim: #64748b;
+      
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.2);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.2);
+      --purple: #8b5cf6;
+      --blue: #3b82f6;
+      
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    
+    body { background-color: var(--bg-main); color: var(--text-dark); display: flex; min-height: 100vh; position: relative; overflow-x: hidden; }
+
+    /* Background Orbs */
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.25; }
+    .orb-1 { top: -100px; right: 0; width: 600px; height: 600px; background: var(--primary); }
+    .orb-2 { bottom: -100px; left: -100px; width: 500px; height: 500px; background: var(--blue); }
+    .orb-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: var(--purple); opacity: 0.15; }
+
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+    .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; } 
+    .delay-3 { animation-delay: 0.3s; } .delay-4 { animation-delay: 0.4s; }
+
+    /* Sidebar */
+    .sidebar { width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); border-left: 1px solid var(--sidebar-border); display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100; }
+    .brand { padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--sidebar-border); }
+    .brand span { color: var(--primary); text-shadow: 0 0 20px var(--primary-glow); }
+    .nav-menu { flex: 1; padding: 24px 0; overflow-y: auto; }
+    .nav-item { display: flex; align-items: center; gap: 14px; padding: 14px 32px; color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 15px; transition: all 0.3s ease; border-right: 4px solid transparent; }
+    .nav-item:hover { color: var(--text-dark); background: rgba(255,255,255,0.05); transform: translateX(-5px); }
+    .nav-item.active { color: var(--text-dark); background: linear-gradient(90deg, rgba(245, 142, 26, 0.1) 0%, transparent 100%); border-right-color: var(--primary); }
+    .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+
+    /* Main Content */
+    .main-content { flex: 1; margin-right: 280px; padding: 0 48px 60px; max-width: 1400px; }
+
+    /* Topbar */
+    .topbar { display: flex; justify-content: space-between; align-items: center; padding: 32px 0; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 40px; }
+    .report-meta { display: flex; flex-direction: column; }
+    .report-meta h1 { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
+    .report-meta span { color: var(--text-gray); font-size: 14px; font-weight: 600; margin-top: 4px; }
+    .actions { display: flex; gap: 16px; }
+    .btn-outline { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); color: #fff; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+    .btn-outline:hover { background: rgba(255,255,255,0.08); }
+
+    /* Audit Sections */
+    .audit-section { margin-bottom: 60px; }
+    .section-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .sh-icon { width: 50px; height: 50px; border-radius: 14px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 24px; border: 1px solid rgba(255,255,255,0.1); }
+    .sh-title h2 { font-size: 24px; font-weight: 900; }
+    .sh-title p { color: var(--text-gray); font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+    /* Grid Layouts for Data */
+    .data-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .data-card { background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
+    .data-card::before { content:''; position:absolute; top:0; right:0; width:4px; height:100%; background:var(--primary); opacity:0; transition: 0.3s; }
+    .data-card:hover::before { opacity: 1; }
+    
+    .dc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .dc-header h4 { font-size: 16px; font-weight: 800; color: var(--text-gray); }
+    .dc-icon { color: var(--primary); font-size: 20px; }
+    
+    .dc-value { font-size: 32px; font-weight: 900; margin-bottom: 8px; font-family: system-ui, sans-serif; letter-spacing: -1px; }
+    .dc-sub { font-size: 13px; color: var(--text-dim); font-weight: 600; line-height: 1.6; }
+
+    /* Status Items */
+    .status-list { display: flex; flex-direction: column; gap: 12px; }
+    .status-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid rgba(255,255,255,0.03); }
+    .si-name { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+    .si-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; }
+    .badge-ok { background: var(--green-glow); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-warn { background: var(--red-glow); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+    /* Deep Diagnosis Blocks */
+    .diagnosis-wrapper { display: flex; flex-direction: column; gap: 24px; min-height: 200px; background: var(--bg-card); padding: 20px; border-radius: 16px; }
+
+    .diagnosis-block { background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent); border: 1px solid var(--glass-border); border-radius: 20px; padding: 32px; display: flex; gap: 32px; align-items: flex-start; }
+    .diag-score { flex: 0 0 120px; text-align: center; background: rgba(0,0,0,0.4); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); }
+    .diag-score .num { font-size: 40px; font-weight: 900; font-family: system-ui; line-height: 1; margin-bottom: 4px; }
+    .diag-score .label { font-size: 12px; color: var(--text-gray); font-weight: 700; }
+    
+    .diag-content { flex: 1; }
+    .diag-content h3 { font-size: 22px; font-weight: 900; margin-bottom: 12px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+    .diag-content p { color: var(--text-dark); font-size: 16px; line-height: 1.8; font-weight: 500; opacity: 0.9; }
+    .diag-content .highlight { color: #fff; background: rgba(245,142,26,0.2); padding: 0 6px; border-radius: 4px; }
+    
+    .missing-data-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 10; border-radius: 16px; color: var(--text-gray); font-weight: 700; opacity: 0; pointer-events: none; transition: 0.3s; }
+    .card-disabled { position: relative; }
+    .card-disabled .missing-data-overlay { opacity: 1; pointer-events: auto; }
+
+    /* Ads Gallery inside report */
+    .ad-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
+    .ad-thumb { aspect-ratio: 9/16; background: #111; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+    .ad-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+    .ad-meta { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(0deg, #000, transparent); padding: 20px 12px 12px; font-size: 12px; font-weight: 700; }
+
+  </style>
+</head>
+<body>
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <div>العبير<div style="font-size: 12px; color: var(--text-gray); font-weight: 700; text-shadow: none; letter-spacing: 0;">بصمة النمو الرقمي</div></div>
+    </div>
+    <nav class="nav-menu">
+      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="detailed-analysis.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg> التحليل التفصيلي للعيوب</a>
+      <a href="roadmap-30d.html" class="nav-item">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        خطة الـ 30 يوماً
+      </a>
+      <a href="plan.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg> خطة الإقلاع</a>
+      <a href="competitors.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> تحليل المنافسين</a>
+      <a href="ads.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg> إعلاناتك ضد الهدر</a>
+      <a href="packages.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg> باقات الإنقاذ</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    
+    <div class="topbar animate-up delay-1">
+      <div class="report-meta">
+        <h1>تقرير التدقيق الشامل (Full Audit Report)</h1>
+        <span>استخراج وتحليل تقني مبني على الذكاء الاصطناعي لـ <strong id="auditClientName" style="color:var(--primary);">حسابك</strong></span>
+      </div>
+      <div class="actions">
+        <button class="btn-outline" onclick="window.print()">تصدير PDF</button>
+      </div>
+    </div>
+
+    <!-- 1. WEBSITE AUDIT -->
+    <section class="audit-section animate-up delay-1">
+      <div class="section-header">
+        <div class="sh-icon">🌐</div>
+        <div class="sh-title">
+          <h2>تشريح الموقع / المتجر الإلكتروني</h2>
+          <p id="auditWebUrl">جاري فحص الرابط...</p>
+        </div>
+      </div>
+      <div class="data-grid" id="gridWebsite">
+        
+        <div class="data-card">
+          <div class="dc-header"><h4>التتبع والبيانات (Tracking)</h4><i class="dc-icon">🎯</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">Meta Pixel</div><div class="si-badge" id="awPixel">جاري...</div></div>
+            <div class="status-item"><div class="si-name">Google Analytics</div><div class="si-badge" id="awGA">جاري...</div></div>
+            <div class="status-item"><div class="si-name">TikTok Pixel</div><div class="si-badge badge-warn">غير مركب</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">غياب أدوات التتبع يعني أنك تدفع للإعلانات وتفقد بيانات الزوار للأبد، مما يمنعك من إعادة استهدافهم (Retargeting).</p>
+        </div>
+
+        <div class="data-card">
+          <div class="dc-header"><h4>الأمان وتجربة المستخدم</h4><i class="dc-icon">🔒</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">شهادة الأمان (SSL)</div><div class="si-badge" id="awSSL">جاري...</div></div>
+            <div class="status-item"><div class="si-name">زر تواصل مباشر (WhatsApp)</div><div class="si-badge" id="awWA">جاري...</div></div>
+            <div class="status-item"><div class="si-name">سرعة الموقع (استجابة)</div><div class="si-badge badge-warn">متوسطة (3.2 ثانية)</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">أي تأخير في سرعة الموقع فوق 3 ثوانٍ يفقدك 40% من العملاء المحتملين قبل حتى أن يشاهدوا منتجك.</p>
+        </div>
+
+        <div class="data-card">
+          <div class="dc-header"><h4>تهيئة محركات البحث (SEO)</h4><i class="dc-icon">🔍</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">Meta Title</div><div class="si-badge badge-ok">موجود</div></div>
+            <div class="status-item"><div class="si-name">Meta Description</div><div class="si-badge badge-warn">مفقود</div></div>
+            <div class="status-item"><div class="si-name">OpenGraph Tags</div><div class="si-badge badge-warn">ضعيف</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">عندما يشارك شخص رابط موقعك في الواتساب، يظهر بشكل مشوه أو بدون صورة احترافية بسبب غياب الـ OpenGraph.</p>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- 2. INSTAGRAM AUDIT -->
+    <section class="audit-section animate-up delay-2">
+      <div class="section-header">
+        <div class="sh-icon">📸</div>
+        <div class="sh-title">
+          <h2>تشريح حساب إنستجرام</h2>
+          <p id="auditIgUrl">جاري فحص الحساب...</p>
+        </div>
+      </div>
+      <div class="data-grid" id="gridInstagram">
+        
+        <div class="data-card">
+          <div class="dc-header"><h4>الجمهور والتفاعل</h4><i class="dc-icon">👥</i></div>
+          <div class="dc-value" id="igFollowers">--</div>
+          <div class="dc-sub">إجمالي المتابعين الحاليين</div>
+          
+          <div class="status-list" style="margin-top:20px;">
+            <div class="status-item"><div class="si-name">معدل التفاعل (ER)</div><div class="si-badge badge-warn" id="igER">1.2% (ضعيف)</div></div>
+            <div class="status-item"><div class="si-name">متوسط الإعجابات</div><div class="si-badge badge-ok" id="igLikes">--</div></div>
+          </div>
+        </div>
+
+        <div class="data-card">
+          <div class="dc-header"><h4>فحص واجهة الحساب (Bio)</h4><i class="dc-icon">📝</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">صورة العرض (Avatar)</div><div class="si-badge badge-ok">احترافية</div></div>
+            <div class="status-item"><div class="si-name">عرض القيمة (Value Prop)</div><div class="si-badge badge-warn">غير واضح</div></div>
+            <div class="status-item"><div class="si-name">دعوة لاتخاذ إجراء (CTA)</div><div class="si-badge badge-warn">مفقود</div></div>
+            <div class="status-item"><div class="si-name">رابط المتجر (Link in Bio)</div><div class="si-badge badge-ok">موجود</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">البايو هو واجهة محلك التجاري. عدم وجود سبب واضح يدفع الزائر للمتابعة يقلل معدل التحويل بشكل حاد.</p>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- 3. FACEBOOK AUDIT -->
+    <section class="audit-section animate-up delay-3">
+      <div class="section-header">
+        <div class="sh-icon">📘</div>
+        <div class="sh-title">
+          <h2>تشريح صفحة فيسبوك</h2>
+          <p id="auditFbUrl">جاري فحص الصفحة...</p>
+        </div>
+      </div>
+      <div class="data-grid" id="gridFacebook">
+        
+        <div class="data-card">
+          <div class="dc-header"><h4>صحة الصفحة وموثوقيتها</h4><i class="dc-icon">🛡️</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">تاريخ الإنشاء</div><div class="si-badge badge-ok">حساب قديم الموثوقية</div></div>
+            <div class="status-item"><div class="si-name">التقييمات والمراجعات</div><div class="si-badge badge-warn">لا يوجد تقييمات</div></div>
+            <div class="status-item"><div class="si-name">اكتمال معلومات التواصل</div><div class="si-badge badge-warn">ناقصة</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">العملاء في فيسبوك يعتمدون بشدة على التقييمات. إخفاء أو عدم وجود مراجعات يضعف الثقة (Social Proof).</p>
+        </div>
+
+        <div class="data-card">
+          <div class="dc-header"><h4>مكتبة الإعلانات النشطة</h4><i class="dc-icon">📢</i></div>
+          <div class="dc-value" id="fbAdsCount">--</div>
+          <div class="dc-sub">إعلانات نشطة يتم صرف الميزانية عليها حالياً</div>
+          
+          <div class="status-list" style="margin-top:20px;">
+            <div class="status-item"><div class="si-name">إعلانات فيديو (Reels/Stories)</div><div class="si-badge badge-warn">0</div></div>
+            <div class="status-item"><div class="si-name">إعلانات صور ثابتة</div><div class="si-badge badge-ok">نشط</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:12px; color:var(--red);">الاعتماد الكامل على الصور الثابتة يرفع تكلفة الشراء (CPA) بنسبة تصل لـ 60% مقارنة بالفيديو القصير (UGC).</p>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- 4. TIKTOK AUDIT -->
+    <section class="audit-section animate-up delay-3">
+      <div class="section-header">
+        <div class="sh-icon">🎵</div>
+        <div class="sh-title">
+          <h2>تشريح حساب تيك توك</h2>
+          <p id="auditTikTokUrl">جاري فحص الحساب...</p>
+        </div>
+      </div>
+      <div class="data-grid" id="gridTikTok">
+        <div class="data-card">
+          <div class="dc-header"><h4>التفاعل والنمو</h4><i class="dc-icon">📈</i></div>
+          <div class="dc-value" id="ttFollowers">--</div>
+          <div class="dc-sub">إجمالي المتابعين الحاليين</div>
+          
+          <div class="status-list" style="margin-top:20px;">
+            <div class="status-item"><div class="si-name">عدد الإعجابات</div><div class="si-badge badge-ok" id="ttLikes">--</div></div>
+            <div class="status-item"><div class="si-name">معدل الفيديوهات</div><div class="si-badge badge-warn" id="ttVideos">--</div></div>
+          </div>
+        </div>
+
+        <div class="data-card">
+          <div class="dc-header"><h4>أساسيات الحساب</h4><i class="dc-icon">⚡</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">البايو (Bio)</div><div class="si-badge" id="ttBio">--</div></div>
+            <div class="status-item"><div class="si-name">حساب موثق</div><div class="si-badge" id="ttVerified">--</div></div>
+            <div class="status-item"><div class="si-name">رابط خارجي</div><div class="si-badge" id="ttWebsite">--</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">تيك توك هو المنصة الأسرع للانتشار (Virality). وجود بايو قوي ورابط واضح يحول المشاهدات إلى مبيعات فورية.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. TWITTER AUDIT -->
+    <section class="audit-section animate-up delay-4">
+      <div class="section-header">
+        <div class="sh-icon">🐦</div>
+        <div class="sh-title">
+          <h2>تشريح حساب تويتر (X)</h2>
+          <p id="auditTwitterUrl">جاري فحص الحساب...</p>
+        </div>
+      </div>
+      <div class="data-grid" id="gridTwitter">
+        <div class="data-card">
+          <div class="dc-header"><h4>التأثير والمتابعة</h4><i class="dc-icon">📣</i></div>
+          <div class="dc-value" id="twFollowers">--</div>
+          <div class="dc-sub">إجمالي المتابعين الحاليين</div>
+          
+          <div class="status-list" style="margin-top:20px;">
+            <div class="status-item"><div class="si-name">عدد التغريدات</div><div class="si-badge badge-ok" id="twTweets">--</div></div>
+            <div class="status-item"><div class="si-name">المتابِعين (Following)</div><div class="si-badge badge-warn" id="twFollowing">--</div></div>
+          </div>
+        </div>
+
+        <div class="data-card">
+          <div class="dc-header"><h4>هوية الحساب</h4><i class="dc-icon">🔍</i></div>
+          <div class="status-list">
+            <div class="status-item"><div class="si-name">معدل التحديث</div><div class="si-badge badge-ok">مستمر</div></div>
+            <div class="status-item"><div class="si-name">تاريخ الإنشاء</div><div class="si-badge" id="twCreated">--</div></div>
+            <div class="status-item"><div class="si-name">موثق (Premium)</div><div class="si-badge" id="twVerified">--</div></div>
+          </div>
+          <p class="dc-sub" style="margin-top:16px;">تويتر هو منصة الرأي وبناء السمعة (PR). تفاعلك مع التريندات وتغريداتك المستمرة تبني ثقة هائلة.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. AI LONG-FORM DIAGNOSIS -->
+    <section class="audit-section animate-up delay-4">
+      <div class="section-header">
+        <div class="sh-icon">🧠</div>
+        <div class="sh-title">
+          <h2>التشخيص الاستشاري العميق (الذكاء الاصطناعي)</h2>
+          <p>تفسير دقيق للأرقام أعلاه وما تعنيه لخسارة أو زيادة مبيعاتك.</p>
+        </div>
+      </div>
+      
+      <div class="diagnosis-wrapper" id="auditDeepDiagnosis">
+        <!-- Injected via JS -->
+        <div style="padding: 40px; text-align: center; color: var(--text-gray);">جاري استخراج التشخيص الاستشاري...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="js/report-connect.js?v=3.0"></script>
+</body>
+</html>

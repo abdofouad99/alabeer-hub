@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>كوبونات الخصم | لوحة التحكم</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main:#060608;--sidebar-bg:rgba(15,23,42,0.7);--glass-bg: rgba(255,255,255,0.9);
+      --glass-border: rgba(0,0,0,0.09);--glass-blur:blur(24px) saturate(180%);
+      --text-dark: #0f172a;--text-gray: #475569;--primary:#f58e1a;
+      --green:#10b981;--red:#ef4444;--yellow:#eab308;--purple:#8b5cf6;--blue:#3b82f6;
+      --teal:#06b6d4;--radius:16px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Cairo',sans-serif;}
+    body{background: var(--bg-main); color: var(--body-text);display:flex;min-height:100vh;overflow-x:hidden;}
+    .bg-orb{position:fixed;border-radius:50%;filter:blur(120px);z-index:-1;opacity:0.15;}
+    .orb-1{top:-80px;right:-80px;width:500px;height:500px;background:var(--teal);}
+    .orb-2{bottom:-80px;left:-80px;width:400px;height:400px;background:var(--primary);opacity:0.1;}
+    /* Sidebar */
+    .sidebar{width:280px;background:var(--sidebar-bg);backdrop-filter:var(--glass-blur);border-left:1px solid var(--glass-border);display:flex;flex-direction:column;position:fixed;right:0;top:0;height:100vh;z-index:100;}
+    .main-content{flex:1;margin-right:280px;display:flex;flex-direction:column;}
+    .brand{padding:32px 24px;font-size:22px;font-weight:900;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--glass-border);color:#fff;}
+    .brand span{color:var(--primary);}
+    .nav-group-title{padding:20px 24px 8px;font-size:11px;font-weight:800;color:var(--text-gray);text-transform:uppercase;letter-spacing:1px;}
+    .nav-menu{flex:1;overflow-y:auto;padding-bottom:24px;}
+    .nav-item{display:flex;align-items:center;gap:12px;padding:12px 24px;color:var(--text-gray);text-decoration:none;font-weight:700;font-size:14px;border-right:4px solid transparent;transition:0.3s;}
+    .nav-item:hover{background:rgba(255,255,255,0.05);color:#fff;}
+    .nav-item.active{color:#fff;background:linear-gradient(90deg,rgba(6,182,212,0.15),transparent);border-right-color:var(--teal);}
+    /* Topbar */
+    .topbar{display:flex;justify-content:space-between;align-items:center;padding:24px 48px;background:rgba(6,6,8,0.8);backdrop-filter:blur(10px);border-bottom:1px solid var(--glass-border);position:sticky;top:0;z-index:90;}
+    .topbar-title{font-size:22px;font-weight:900;}
+    .topbar-actions{display:flex;gap:12px;align-items:center;}
+    .btn-add{background:var(--teal);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:800;cursor:pointer;font-size:14px;font-family:'Cairo',sans-serif;transition:0.3s;}
+    .btn-add:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(6,182,212,0.4);}
+    /* Body */
+    .dashboard-body{padding:32px 48px;display:flex;flex-direction:column;gap:28px;}
+    /* Stats */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+    .stat-card{background:linear-gradient(135deg,rgba(255,255,255,0.05),transparent);border:1px solid var(--glass-border);border-radius:16px;padding:24px;}
+    .stat-num{font-size:34px;font-weight:900;margin:8px 0 4px;}
+    .stat-label{font-size:13px;color:var(--text-gray);font-weight:700;}
+    /* Table */
+    .table-wrap{background: rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:var(--radius);overflow:hidden;}
+    table{width:100%;border-collapse:collapse;}
+    th{padding:14px 20px;text-align:right;font-size:12px;font-weight:800;color:var(--text-gray);background: rgba(255,255,255,0.06);border-bottom:1px solid var(--glass-border);text-transform:uppercase;letter-spacing:0.5px;}
+    td{padding:14px 20px;font-size:14px;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(255,255,255,0.02);}
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;}
+    .badge-green{background:rgba(16,185,129,0.15);color:var(--green);}
+    .badge-red{background:rgba(239,68,68,0.15);color:var(--red);}
+    .badge-yellow{background:rgba(234,179,8,0.15);color:var(--yellow);}
+    .badge-teal{background:rgba(6,182,212,0.15);color:var(--teal);}
+    /* Coupon Code Style */
+    .coupon-code{font-family:monospace;background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.3);color:var(--teal);padding:4px 12px;border-radius:8px;font-size:15px;font-weight:900;letter-spacing:2px;}
+    /* Buttons */
+    .action-btns{display:flex;gap:8px;}
+    .btn-sm{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;border:none;font-family:'Cairo',sans-serif;transition:0.3s;}
+    .btn-sm:hover{transform:translateY(-1px);}
+    .btn-edit{background:rgba(59,130,246,0.2);color:var(--blue);}
+    .btn-del{background:rgba(239,68,68,0.15);color:var(--red);}
+    .btn-toggle{background:rgba(16,185,129,0.15);color:var(--green);}
+    .loading{text-align:center;padding:60px;color:var(--text-gray);font-weight:700;}
+    /* Progress bar for usage */
+    .usage-bar-wrap{width:80px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;display:inline-block;margin-left:8px;}
+    .usage-bar{height:100%;border-radius:3px;background:var(--teal);}
+    /* Modal */
+    .modal-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:1000;display:none;align-items:center;justify-content:center;}
+    .modal-overlay.active{display:flex;}
+    .modal-content{background:#0f172a;border:1px solid var(--glass-border);border-radius:20px;width:520px;max-width:95%;padding:36px;position:relative;border-top:3px solid var(--teal);}
+    .modal-title{font-size:20px;font-weight:900;margin-bottom:28px;color:#fff;}
+    .close-btn{position:absolute;left:20px;top:20px;background:transparent;border:none;color:var(--text-gray);font-size:22px;cursor:pointer;transition:0.3s;}
+    .close-btn:hover{color:#fff;}
+    .form-group{margin-bottom:18px;}
+    .form-label{display:block;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--text-gray);}
+    .form-control{width:100%;background: rgba(255,255,255,0.06);border:1px solid var(--glass-border);padding:12px 16px;border-radius:10px;color:#fff;font-size:14px;font-family:'Cairo',sans-serif;outline:none;transition:0.3s;}
+    .form-control:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(6,182,212,0.15);}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .form-hint{font-size:12px;color:var(--text-gray);margin-top:6px;}
+    .btn-save{width:100%;background:var(--teal);color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:900;cursor:pointer;font-family:'Cairo',sans-serif;transition:0.3s;margin-top:8px;}
+    .btn-save:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(6,182,212,0.4);}
+    /* Toggle Switch */
+    .switch-wrap{display:flex;align-items:center;gap:12px;}
+    .switch{width:44px;height:24px;background:rgba(255,255,255,0.1);border-radius:12px;position:relative;cursor:pointer;transition:0.3s;}
+    .switch.on{background:var(--teal);}
+    .switch::after{content:'';width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;top:3px;right:3px;transition:0.3s;}
+    .switch.on::after{right:auto;left:3px;}
+    /* Toast */
+    .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;border:1px solid var(--glass-border);color:#fff;padding:14px 28px;border-radius:12px;font-weight:700;z-index:9999;transition:0.4s;opacity:0;}
+    .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+    .toast.success{border-color:var(--green);color:var(--green);}
+    .toast.error{border-color:var(--red);color:var(--red);}
+
+
+  </style>
+  <link href="../css/theme.css" rel="stylesheet">
+</style>
+</head>
+<body>
+<script>
+  // Global Fetch Interceptor for Auth
+  const originalFetch = window.fetch;
+  window.fetch = async function() {
+    const res = await originalFetch.apply(this, arguments);
+    if (res.status === 401) {
+      window.location.href = 'login.html';
+    }
+    return res;
+  };
+</script>
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      <span>لوحة</span> الإدارة
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-group-title">الرئيسية</div>
+      <a href="dashboard.html" class="nav-item">📊 مركز القيادة</a>
+      <a href="analytics.html" class="nav-item">📈 التحليلات المتقدمة</a>
+      <div class="nav-group-title">إدارة النظام</div>
+      <a href="packages.html" class="nav-item">📦 إدارة الباقات والأسعار</a>
+      <a href="users.html" class="nav-item">👥 إدارة المستخدمين والعملاء</a>
+      <a href="coupons.html" class="nav-item active">🎟️ كوبونات الخصم</a>
+      <a href="reports.html" class="nav-item">📄 مراجعة تقارير التحليل</a>
+      <div class="nav-group-title">العمليات</div>
+      <a href="vip_requests.html" class="nav-item">👑 طلبات تنفيذ VIP</a>
+      <a href="support.html" class="nav-item">💬 تذاكر الدعم</a>
+    
+      <a href="#" onclick="logout()" class="nav-item" style="color:var(--red); margin-top:20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:20px;">🚪 تسجيل الخروج</a>
+      <script>async function logout() { await fetch("../api/admin_logout.php"); window.location.href="login.html"; }</script>
+    </nav>
+
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">🎟️ إدارة كوبونات الخصم</div>
+      <div class="topbar-actions">
+        <button class="btn-add" onclick="openModal()">+ إنشاء كوبون جديد</button>
+      </div>
+    </header>
+
+    <div class="dashboard-body">
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">🎟️ إجمالي الكوبونات</div>
+          <div class="stat-num" id="statTotal" style="color:var(--teal);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">✅ كوبونات فعّالة</div>
+          <div class="stat-num" id="statActive" style="color:var(--green);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">🔥 إجمالي الاستخدام</div>
+          <div class="stat-num" id="statUsed" style="color:var(--primary);">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">⏰ منتهية الصلاحية</div>
+          <div class="stat-num" id="statExpired" style="color:var(--red);">--</div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>كود الخصم</th>
+              <th>نسبة الخصم</th>
+              <th>الاستخدام</th>
+              <th>الحد الأقصى</th>
+              <th>صالح حتى</th>
+              <th>الحالة</th>
+              <th>تاريخ الإنشاء</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="couponsBody">
+            <tr><td colspan="8" class="loading">⏳ جاري تحميل الكوبونات...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Modal: Add/Edit Coupon -->
+  <div class="modal-overlay" id="couponModal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal()">×</button>
+      <h2 class="modal-title" id="modalTitle">إنشاء كوبون جديد</h2>
+      <form onsubmit="saveCoupon(event)">
+        <input type="hidden" id="couponId">
+
+        <div class="form-group">
+          <label class="form-label">كود الكوبون (سيتم تحويله لأحرف كبيرة)</label>
+          <input type="text" id="couponCode" class="form-control" placeholder="مثال: RAMADAN30" required>
+          <div class="form-hint">الأحرف الإنجليزية والأرقام فقط</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">نسبة الخصم (%)</label>
+            <input type="number" id="couponDiscount" class="form-control" placeholder="30" min="1" max="100" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">الحد الأقصى للاستخدام</label>
+            <input type="number" id="couponLimit" class="form-control" placeholder="فارغ = غير محدود" min="1">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">صالح حتى تاريخ (اختياري)</label>
+          <input type="datetime-local" id="couponExpiry" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">حالة الكوبون</label>
+          <div class="switch-wrap">
+            <div class="switch on" id="statusSwitch" onclick="toggleSwitch()"></div>
+            <span id="statusLabel" style="font-weight:800;color:var(--green);">فعّال</span>
+          </div>
+          <input type="hidden" id="couponActive" value="1">
+        </div>
+
+        <button type="submit" class="btn-save" id="saveBtn">💾 حفظ الكوبون</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allCoupons = [];
+    const modal = document.getElementById('couponModal');
+
+    async function loadCoupons() {
+      try {
+        const res = await fetch('../api/admin_coupons.php');
+        const data = await res.json();
+        allCoupons = data.ok ? data.coupons : [];
+        renderTable();
+        updateStats();
+      } catch(e) {
+        document.getElementById('couponsBody').innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red);">⚠️ خطأ في الاتصال بقاعدة البيانات</td></tr>`;
+      }
+    }
+
+    function updateStats() {
+      const now = new Date();
+      document.getElementById('statTotal').textContent = allCoupons.length;
+      document.getElementById('statActive').textContent = allCoupons.filter(c => c.is_active == 1).length;
+      document.getElementById('statUsed').textContent = allCoupons.reduce((s, c) => s + parseInt(c.times_used || 0), 0);
+      document.getElementById('statExpired').textContent = allCoupons.filter(c => c.valid_until && new Date(c.valid_until) < now).length;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('couponsBody');
+      if (!allCoupons.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:60px;color:var(--text-gray);">لا توجد كوبونات — اضغط "إنشاء كوبون جديد" للبدء</td></tr>`;
+        return;
+      }
+
+      const now = new Date();
+      tbody.innerHTML = allCoupons.map(c => {
+        const isExpired = c.valid_until && new Date(c.valid_until) < now;
+        const usedPct = c.usage_limit ? Math.min(100, (c.times_used / c.usage_limit) * 100) : 0;
+        const expiryStr = c.valid_until ? new Date(c.valid_until).toLocaleDateString('ar-SA') : '∞ غير محدود';
+        const createdStr = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-SA') : '—';
+
+        let statusBadge;
+        if (!c.is_active)     statusBadge = `<span class="badge badge-red">⛔ معطّل</span>`;
+        else if (isExpired)   statusBadge = `<span class="badge badge-yellow">⏰ منتهي</span>`;
+        else                  statusBadge = `<span class="badge badge-green">✅ فعّال</span>`;
+
+        const limitStr = c.usage_limit ? c.usage_limit : '∞';
+
+        return `<tr>
+          <td><span class="coupon-code">${c.code}</span></td>
+          <td style="color:var(--teal);font-size:20px;font-weight:900;">${c.discount_percent}%</td>
+          <td>
+            <span style="font-weight:800;">${c.times_used}</span>
+            ${c.usage_limit ? `<div class="usage-bar-wrap"><div class="usage-bar" style="width:${usedPct}%;"></div></div>` : ''}
+          </td>
+          <td style="color:var(--text-gray);">${limitStr}</td>
+          <td style="color:${isExpired ? 'var(--red)' : 'var(--text-gray)'};">${expiryStr}</td>
+          <td>${statusBadge}</td>
+          <td style="color:var(--text-gray);">${createdStr}</td>
+          <td>
+            <div class="action-btns">
+              <button class="btn-sm btn-edit" onclick="openModal(${c.id})">تعديل</button>
+              <button class="btn-sm btn-toggle" onclick="toggleCoupon(${c.id}, ${c.is_active})">${c.is_active ? 'تعطيل' : 'تفعيل'}</button>
+              <button class="btn-sm btn-del" onclick="deleteCoupon(${c.id}, '${c.code}')">حذف</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function openModal(id = null) {
+      document.querySelector('form').reset();
+      document.getElementById('couponId').value = '';
+      document.getElementById('couponActive').value = '1';
+      setSwitch(true);
+
+      if (id) {
+        const c = allCoupons.find(x => x.id == id);
+        if (!c) return;
+        document.getElementById('modalTitle').textContent = `تعديل: ${c.code}`;
+        document.getElementById('couponId').value = c.id;
+        document.getElementById('couponCode').value = c.code;
+        document.getElementById('couponCode').disabled = true;
+        document.getElementById('couponDiscount').value = c.discount_percent;
+        document.getElementById('couponLimit').value = c.usage_limit || '';
+        if (c.valid_until) document.getElementById('couponExpiry').value = c.valid_until.slice(0, 16);
+        setSwitch(c.is_active == 1);
+      } else {
+        document.getElementById('modalTitle').textContent = 'إنشاء كوبون جديد';
+        document.getElementById('couponCode').disabled = false;
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeModal() { modal.classList.remove('active'); }
+
+    function setSwitch(on) {
+      const sw = document.getElementById('statusSwitch');
+      const lb = document.getElementById('statusLabel');
+      document.getElementById('couponActive').value = on ? '1' : '0';
+      if (on) { sw.classList.add('on'); lb.textContent = 'فعّال'; lb.style.color = 'var(--green)'; }
+      else    { sw.classList.remove('on'); lb.textContent = 'معطّل'; lb.style.color = 'var(--red)'; }
+    }
+
+    function toggleSwitch() {
+      const isOn = document.getElementById('statusSwitch').classList.contains('on');
+      setSwitch(!isOn);
+    }
+
+    async function saveCoupon(e) {
+      e.preventDefault();
+      const id = document.getElementById('couponId').value;
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true; btn.textContent = 'جارٍ الحفظ...';
+
+      const payload = {
+        id: id || null,
+        code: document.getElementById('couponCode').value.toUpperCase().trim(),
+        discount_percent: parseInt(document.getElementById('couponDiscount').value),
+        usage_limit: document.getElementById('couponLimit').value || null,
+        valid_until: document.getElementById('couponExpiry').value || null,
+        is_active: document.getElementById('couponActive').value
+      };
+
+      try {
+        const res = await fetch('../api/admin_coupons.php', {
+          method: id ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) { closeModal(); showToast('✅ ' + data.message, 'success'); loadCoupons(); }
+        else          showToast('❌ ' + data.error, 'error');
+      } catch(err) { showToast('⚠️ خطأ في الاتصال', 'error'); }
+      finally { btn.disabled = false; btn.textContent = '💾 حفظ الكوبون'; }
+    }
+
+    async function toggleCoupon(id, currentState) {
+      const newState = currentState == 1 ? 0 : 1;
+      try {
+        const res = await fetch('../api/admin_coupons.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _action: 'toggle', id: id, is_active: newState })
+        });
+        const data = await res.json();
+        if (data.ok) { showToast(newState ? '✅ تم تفعيل الكوبون' : '⛔ تم تعطيل الكوبون', 'success'); loadCoupons(); }
+        else showToast('❌ ' + data.error, 'error');
+      } catch(e) { showToast('⚠️ خطأ في الاتصال', 'error'); }
+    }
+
+    async function deleteCoupon(id, code) {
+      if (!confirm(`هل أنت متأكد من حذف كوبون "${code}"؟ هذا الإجراء لا يمكن التراجع عنه.`)) return;
+      try {
+        const res = await fetch('../api/admin_coupons.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _action: 'delete', id: id })
+        });
+        const data = await res.json();
+        if (data.ok) { showToast('🗑️ تم حذف الكوبون', 'success'); loadCoupons(); }
+        else showToast('❌ ' + data.error, 'error');
+      } catch(e) { showToast('⚠️ خطأ في الاتصال', 'error'); }
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `toast ${type} show`;
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('DOMContentLoaded', loadCoupons);
+  </script>
+
+  <!-- Theme Toggle -->
+  <button id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">🌙</button>
+  <script>
+    (function(){
+      if(localStorage.getItem('theme')==='light'){
+        document.body.classList.add('light-mode');
+        var b=document.getElementById('themeToggle');
+        if(b) b.textContent='☀️';
+      }
+    })();
+    function toggleTheme(){
+      document.body.classList.toggle('light-mode');
+      var isLight=document.body.classList.contains('light-mode');
+      localStorage.setItem('theme',isLight?'light':'dark');
+      var btn=document.getElementById('themeToggle');
+      if(btn) btn.textContent=isLight?'☀️':'🌙';
+    }
+  </script>
+</body>
+</html>
+

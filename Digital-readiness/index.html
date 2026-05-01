@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>فحص الجاهزية الرقمية | العبير للتسويق الإلكتروني</title>
+<meta name="description" content="اكتشف مرحلتك في التحول الرقمي — فحص مجاني شامل مع خارطة طريق مخصصة لنقلتك الرقمية.">
+<meta name="robots" content="index, follow">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container" id="app">
+
+  <!-- Topbar -->
+  <div class="topbar animate">
+    <div class="brand">
+      <div class="brand-icon">🔍</div>
+      <div>
+        <div class="brand-name">فحص الجاهزية الرقمية</div>
+        <div class="brand-sub">العبير للتسويق الإلكتروني</div>
+      </div>
+    </div>
+    <div class="badge badge-purple">⏱ 5 دقائق</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="wizard-progress" id="progress">
+    <div class="progress-step active" id="ps1"></div>
+    <div class="progress-step" id="ps2"></div>
+    <div class="progress-step" id="ps3"></div>
+  </div>
+
+  <!-- ═══════════ Step 1: البيانات الأساسية ═══════════ -->
+  <div class="card animate step-panel" id="step1">
+    <div class="h2">📋 بياناتك الأساسية</div>
+    <p class="muted" style="margin-bottom:18px">أخبرنا عن شركتك حتى نُخصّص التقرير لك.</p>
+
+    <div class="grid" style="gap:14px">
+      <div>
+        <input class="input" type="text" id="full_name" placeholder="الاسم الكامل *">
+        <div class="field-err" id="err_full_name"></div>
+      </div>
+      <div>
+        <input class="input" type="tel" id="phone" placeholder="رقم الجوال *" dir="ltr" style="text-align:right">
+        <div class="field-err" id="err_phone"></div>
+      </div>
+      <div>
+        <input class="input" type="text" id="company_name" placeholder="اسم الشركة / المشروع *">
+        <div class="field-err" id="err_company_name"></div>
+      </div>
+      <div class="grid2">
+        <div>
+          <select class="select" id="industry">
+            <option value="">— مجال العمل —</option>
+            <option value="retail">تجارة تجزئة</option>
+            <option value="food">مطاعم وكافيهات</option>
+            <option value="fashion">أزياء وملابس</option>
+            <option value="beauty">تجميل وعناية</option>
+            <option value="health">صحة وطب</option>
+            <option value="education">تعليم وتدريب</option>
+            <option value="realestate">عقارات</option>
+            <option value="tech">تقنية وبرمجيات</option>
+            <option value="services">خدمات عامة</option>
+            <option value="manufacturing">تصنيع وإنتاج</option>
+            <option value="consulting">استشارات</option>
+            <option value="other">أخرى</option>
+          </select>
+        </div>
+        <div>
+          <select class="select" id="employees">
+            <option value="">— عدد الموظفين —</option>
+            <option value="1">1 (فردي)</option>
+            <option value="2-5">2 - 5</option>
+            <option value="6-15">6 - 15</option>
+            <option value="16-50">16 - 50</option>
+            <option value="51-200">51 - 200</option>
+            <option value="200+">أكثر من 200</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <select class="select" id="country">
+          <option value="">— الدولة —</option>
+          <option value="السعودية">السعودية</option>
+          <option value="الإمارات">الإمارات</option>
+          <option value="اليمن">اليمن</option>
+          <option value="مصر">مصر</option>
+          <option value="الأردن">الأردن</option>
+          <option value="الكويت">الكويت</option>
+          <option value="قطر">قطر</option>
+          <option value="البحرين">البحرين</option>
+          <option value="عُمان">عُمان</option>
+          <option value="العراق">العراق</option>
+          <option value="ليبيا">ليبيا</option>
+          <option value="تونس">تونس</option>
+          <option value="المغرب">المغرب</option>
+          <option value="أخرى">أخرى</option>
+        </select>
+      </div>
+      <div>
+        <input class="input" type="url" id="website_url" placeholder="رابط الموقع (إن وُجد)" dir="ltr" style="text-align:right">
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-start;margin-top:22px">
+      <button class="btn" id="btnNext1">التالي ←</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ Step 2: التواجد الرقمي + البيع + التسويق ═══════════ -->
+  <div class="card animate step-panel" id="step2" style="display:none">
+    <div class="h2">🌐 التواجد والبيع والتسويق</div>
+    <p class="muted" style="margin-bottom:18px">حدد ما ينطبق على وضعك الحالي.</p>
+
+    <!-- التواجد الرقمي -->
+    <div class="section-label">التواجد الرقمي</div>
+    <div class="grid" style="gap:10px;margin-bottom:20px">
+      <label class="check-label" data-key="has_website"><input type="checkbox"> لدي موقع إلكتروني</label>
+      <label class="check-label" data-key="website_mobile_friendly"><input type="checkbox"> الموقع متجاوب مع الجوال</label>
+      <label class="check-label" data-key="has_social_accounts"><input type="checkbox"> لدي حسابات على السوشيال ميديا</label>
+      <label class="check-label" data-key="google_maps_listed"><input type="checkbox"> مسجّل على خرائط جوجل</label>
+      <label class="check-label" data-key="domain_email"><input type="checkbox"> لدي بريد باسم النطاق (info@company.com)</label>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- البيع الإلكتروني -->
+    <div class="section-label">البيع الإلكتروني</div>
+    <div class="grid" style="gap:10px;margin-bottom:20px">
+      <label class="check-label" data-key="online_store"><input type="checkbox"> لدي متجر إلكتروني</label>
+      <label class="check-label" data-key="payment_gateway"><input type="checkbox"> بوابة دفع إلكتروني مفعّلة</label>
+      <label class="check-label" data-key="shipping_system"><input type="checkbox"> نظام شحن متصل بالمتجر</label>
+      <label class="check-label" data-key="product_catalog"><input type="checkbox"> كتالوج منتجات رقمي</label>
+      <label class="check-label" data-key="invoicing_system"><input type="checkbox"> نظام فوترة إلكتروني</label>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- التسويق الرقمي -->
+    <div class="section-label">التسويق الرقمي</div>
+    <div class="grid" style="gap:10px;margin-bottom:20px">
+      <label class="check-label" data-key="runs_ads"><input type="checkbox"> أُشغّل إعلانات رقمية</label>
+      <label class="check-label" data-key="content_plan"><input type="checkbox"> لدي خطة محتوى منتظمة</label>
+      <label class="check-label" data-key="email_marketing"><input type="checkbox"> أستخدم التسويق بالبريد</label>
+      <label class="check-label" data-key="seo_active"><input type="checkbox"> أعمل على تحسين محركات البحث (SEO)</label>
+      <label class="check-label" data-key="whatsapp_business"><input type="checkbox"> أستخدم واتساب أعمال</label>
+    </div>
+
+    <!-- المنصات المستخدمة -->
+    <div class="section-label">المنصات المستخدمة</div>
+    <div class="chips" id="platformChips" style="margin-bottom:14px">
+      <span class="chip" data-val="Instagram">Instagram</span>
+      <span class="chip" data-val="TikTok">TikTok</span>
+      <span class="chip" data-val="Twitter">X / Twitter</span>
+      <span class="chip" data-val="Facebook">Facebook</span>
+      <span class="chip" data-val="Snapchat">Snapchat</span>
+      <span class="chip" data-val="LinkedIn">LinkedIn</span>
+      <span class="chip" data-val="YouTube">YouTube</span>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-top:22px">
+      <button class="btn2" id="btnPrev2">→ السابق</button>
+      <button class="btn" id="btnNext2">التالي ←</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ Step 3: الأتمتة + البيانات + إرسال ═══════════ -->
+  <div class="card animate step-panel" id="step3" style="display:none">
+    <div class="h2">⚙️ الأتمتة والبيانات</div>
+    <p class="muted" style="margin-bottom:18px">آخر خطوة — الأنظمة الداخلية وقياس الأداء.</p>
+
+    <!-- الأتمتة والأنظمة -->
+    <div class="section-label">الأتمتة والأنظمة</div>
+    <div class="grid" style="gap:10px;margin-bottom:20px">
+      <label class="check-label" data-key="uses_crm"><input type="checkbox"> نستخدم نظام CRM لإدارة العملاء</label>
+      <label class="check-label" data-key="whatsapp_api"><input type="checkbox"> واتساب API (رسائل آلية)</label>
+      <label class="check-label" data-key="auto_invoicing"><input type="checkbox"> فوترة تلقائية</label>
+      <label class="check-label" data-key="project_management"><input type="checkbox"> أداة إدارة مهام (Trello / Asana..)</label>
+      <label class="check-label" data-key="chatbot"><input type="checkbox"> بوت ردود تلقائية</label>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- البيانات والقياس -->
+    <div class="section-label">البيانات والقياس</div>
+    <div class="grid" style="gap:10px;margin-bottom:20px">
+      <label class="check-label" data-key="analytics_installed"><input type="checkbox"> Google Analytics مثبّت</label>
+      <label class="check-label" data-key="pixel_installed"><input type="checkbox"> Meta/TikTok Pixel مثبّت</label>
+      <label class="check-label" data-key="tracks_kpis"><input type="checkbox"> نتتبع مؤشرات أداء محددة (KPIs)</label>
+      <label class="check-label" data-key="monthly_reports"><input type="checkbox"> تقارير شهرية منتظمة</label>
+      <label class="check-label" data-key="data_driven_decisions"><input type="checkbox"> نعتمد على البيانات في القرارات</label>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-top:22px">
+      <button class="btn2" id="btnPrev3">→ السابق</button>
+      <button class="btn" id="btnSubmit">🔍 اكتشف مرحلتك الآن</button>
+    </div>
+
+    <!-- Loading after submit -->
+    <div id="submitLoading" style="display:none;text-align:center;padding:30px 0">
+      <div class="spinner" style="font-size:36px;margin-bottom:12px">🔍</div>
+      <div class="h3">نحلل جاهزيتك الرقمية...</div>
+      <p class="muted" style="margin-top:6px">قد يستغرق بضع ثوانٍ</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  &copy; 2026 العبير للتسويق الإلكتروني — نظام فحص الجاهزية الرقمية v1.0
+</div>
+
+<script src="js/quiz.js"></script>
+</body>
+</html>

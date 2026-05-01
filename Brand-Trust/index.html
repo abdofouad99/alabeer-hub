@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مقياس ثقة العلامة التجارية (Premium)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js and HTML2PDF -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+    <div class="premium-container">
+        <!-- Step 1: Elite Scanner Input Form -->
+        <section id="step-scan-form" class="step active">
+            <div class="header">
+                <h1>🛡️ مقياس <span>الثقة</span> والمبيعات </h1>
+                <p>صُمم للعلامات التجارية الطموحة: اكتشف ثغرات هروب العملاء وقارن ثقتك بأشرس منافسيك.</p>
+            </div>
+            <form id="scanForm">
+                <div class="form-grid">
+                    <div class="input-group full-width">
+                        <label>رابط متجرك / موقعك الرسمي</label>
+                        <input type="url" id="websiteUrl" placeholder="https://yourstore.com" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>تأثير السوشيال ميديا</label>
+                        <input type="text" id="socialAccounts" placeholder="حساباتك (انستجرام، تيك توك)" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>حجم الدليل الاجتماعي (التقييمات)</label>
+                        <input type="number" id="reviewsCount" placeholder="إجمالي التقييمات الإيجابية" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label>تشفير وأمان الموقع (SSL)</label>
+                        <select id="hasSSL" required>
+                            <option value="yes">محمي (HTTPS متوفر)</option>
+                            <option value="no">غير محمي</option>
+                            <option value="not_sure">لست متأكداً</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>سياسة الاسترجاع (الضمان الذهبي)</label>
+                        <select id="hasRefund" required>
+                            <option value="yes">متوفرة وواضحة جداً للعميل</option>
+                            <option value="no">مبهمة أو غير موجودة</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>طرق الدفع والتقسيط</label>
+                        <input type="text" id="paymentMethods" placeholder="أبل باي، تمارا، تابي، عند الاستلام..." required>
+                    </div>
+
+                    <div class="input-group">
+                        <label>أقوى منافس لك في السوق</label>
+                        <input type="text" id="competitorName" placeholder="أدخل اسم المنافس (للمقارنة السريعة)" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-glowing">⚡ إطلاق الفحص الأمني والمقارنة المتقدمة</button>
+            </form>
+        </section>
+
+        <!-- Step 2: Advanced Radar Scan Effect -->
+        <section id="step-scanning" class="step">
+            <div class="radar-box">
+                <div class="radar">
+                    <div class="radar-sweep"></div>
+                </div>
+                <div class="radar-text" id="scanningStatus">بدء المعالجة الخوارزمية...</div>
+            </div>
+        </section>
+
+        <!-- Step 3: Shock & Resolution -->
+        <section id="step-results" class="step" id="exportContent">
+            
+            <div class="pulsing-alert hidden" id="scorePulsingAlert">
+                <!-- Text injected via JS -->
+            </div>
+
+            <div class="shock-header">
+                <!-- Gauge Chart -->
+                <div class="gauge-container">
+                    <canvas id="gaugeChart"></canvas>
+                    <div class="score-center" id="finalScoreValue" style="color: var(--danger)">0%</div>
+                </div>
+                
+                <!-- Radar Chart -->
+                <div class="radar-chart-container">
+                    <canvas id="radarChart"></canvas>
+                </div>
+            </div>
+
+            <div class="competitor-alert" id="competitorTextOverlay" style="text-align: center; font-size: 1.2rem; margin-bottom: 30px; border-bottom: 1px solid var(--crystal-border); padding-bottom: 15px;">
+                <!-- VS Text -->
+            </div>
+
+            <!-- Actionable Quick Fixes -->
+            <div class="quick-fixes">
+                <h3>🛠️ روشتة العلاج الأولية:</h3>
+                <ul id="quickFixesList"></ul>
+            </div>
+
+            <!-- Gamification Slider -->
+            <div class="gamification-wrapper">
+                <h3>🚀 محاكي التدخل الاستشاري</h3>
+                <p>اسحب المؤشر لترى ما سيحدث لمبيعاتك المهدرة لو طبقت أنظمة "العبير للتسويق" لرفع ثقة علامتك.</p>
+                <input type="range" class="range-slider" id="fixSlider" min="0" max="100" value="0">
+                
+                <div class="impact-stats">
+                    <div class="impact-box">
+                        <span>مستوى الثقة الجديد</span>
+                        <strong id="simTrustScore" style="color: var(--accent);">0%</strong>
+                    </div>
+                    <div class="impact-box">
+                        <span>المبيعات المستردة</span>
+                        <strong id="simSalesBoost">+0%</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Premium Lead Capture -->
+            <div class="premium-lead">
+                <h2 id="lostSalesAmount">أنت تنزف آلاف الريالات!</h2>
+                <p>العملاء يحبون منتجك لكنهم يخافون من الشراء، لا تدفع للإعلانات والموقع به خلل. <b>ادخِل بياناتك الآن لاستلام "الخطة الاستشارية" مجاناً مع التقرير PDF لموقعك.</b></p>
+                <form id="leadForm">
+                    <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:0;">
+                        <input type="text" id="leadName" class="input-group" style="width:100%; border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.2); color:#fff;" placeholder="اسمك الكريم" required>
+                        <input type="tel" id="leadPhone" class="input-group" style="width:100%; border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.2); color:#fff;" placeholder="رقم الجوال لتفعيل الخطة" required>
+                    </div>
+                    <div class="form-grid" style="grid-template-columns: 1fr; margin-top:-5px;">
+                        <input type="email" id="leadEmail" class="input-group" style="width:100%; border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.2); color:#fff;" placeholder="البريد الإلكتروني للتقرير" required>
+                    </div>
+                    <button type="submit" class="btn-glowing" style="background: linear-gradient(135deg, #FF3366 0%, #FF0040 100%); color: #fff;">📥 استخراج واستلام تقرير الـ PDF الفاخر</button>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/trust-scan.js"></script>
+</body>
+</html>

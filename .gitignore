@@ -1,0 +1,11 @@
+﻿# Secrets & Config
+**/config.php
+**/.env
+.env
+
+# Backup folders
+Page analysis system_v4_working_backup/
+
+# OS
+.DS_Store
+Thumbs.db

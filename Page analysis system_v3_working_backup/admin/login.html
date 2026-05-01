@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>دخول لوحة الأدمن | العبير</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="container" style="max-width:450px">
+  <header class="topbar" style="margin-bottom:24px">
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div>
+        <div class="brand-name">لوحة العبير</div>
+        <div class="brand-sub">بصمة النمو — Admin</div>
+      </div>
+    </div>
+    <a href="../index.html" class="btn2" style="padding:8px 14px;font-size:13px">← الرئيسية</a>
+  </header>
+
+  <div class="glass-card animate">
+    <h1 class="h1" style="margin-bottom:6px">تسجيل الدخول</h1>
+    <p class="muted" style="font-size:13px;margin-bottom:24px">أدخل بيانات حساب الأدمن للمتابعة</p>
+
+    <div class="grid" style="gap:14px">
+      <input class="input" id="adminEmail" type="email" placeholder="البريد الإلكتروني" value="admin@alabeer.com" />
+      <input class="input" id="adminPass"  type="password" placeholder="كلمة المرور" />
+      <div id="loginErr" class="alert alert-error" style="display:none"></div>
+      <button class="btn btn-gold" id="loginBtn" onclick="doLogin()">🔐 دخول</button>
+    </div>
+  </div>
+
+  <footer class="footer">© 2026 العبير للتسويق الإلكتروني</footer>
+</div>
+
+<script>
+async function doLogin() {
+  const email   = document.getElementById('adminEmail').value.trim();
+  const pass    = document.getElementById('adminPass').value;
+  const errBox  = document.getElementById('loginErr');
+  const btn     = document.getElementById('loginBtn');
+
+  errBox.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">⏳</span> جاري التحقق...';
+
+  try {
+    const res  = await fetch('../api/admin/auth.php?action=login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({ email, password: pass }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'خطأ غير معروف');
+    window.location.href = 'dashboard.html';
+  } catch(e) {
+    errBox.textContent   = '⚠️ ' + e.message;
+    errBox.style.display = 'flex';
+    btn.disabled         = false;
+    btn.innerHTML        = '🔐 دخول';
+  }
+}
+
+// Enter key
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('adminPass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+  // Auto-redirect if already logged in
+  fetch('../api/admin/auth.php?action=check', { credentials:'include' })
+    .then(r=>r.json())
+    .then(d=>{ if(d.authed) window.location.href='dashboard.html'; })
+    .catch(()=>{});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+# ملفات السجلات
+logs/
+*.log
+
+# cache files
+cache/
+*.cache
+
+# ملفات التكوين الحساسة
+config.local.php
+.env
+
+# ملفات قاعدة البيانات
+*.sql
+!schema_mysql.sql
+
+# مجلدات Node.js
+node_modules/
+npm-debug.log*
+
+# مجلدات Python
+__pycache__/
+*.pyc
+*.pyo
+
+# ملفات الاختبارات
+tests/results/
+phpunit.xml
+
+# ملفات النسخ الاحتياطي
+*.backup
+*.bak
+*~
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+
+# ملفات المحرر
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ملفات الاختبار المؤقتة
+test-*.php
+debug-*.php

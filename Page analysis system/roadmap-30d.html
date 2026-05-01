@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>خطة الـ 30 يوماً الاستراتيجية | Al-Abeer Marketing OS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #09090b;
+      --sidebar-bg: rgba(15, 23, 42, 0.6);
+      --sidebar-border: rgba(255, 255, 255, 0.05);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(24px) saturate(180%);
+      --text-dark: #f8fafc;
+      --text-gray: #94a3b8;
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --purple: #8b5cf6;
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-dark); 
+      display: flex; 
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.3; transition: transform 0.1s ease-out; }
+    .orb-1 { top: -100px; right: -100px; width: 500px; height: 500px; background: var(--primary); }
+    .orb-2 { bottom: -100px; left: -100px; width: 600px; height: 600px; background: var(--purple); opacity: 0.15; }
+
+    .sidebar {
+      width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-left: 1px solid var(--sidebar-border);
+      display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100;
+    }
+    .brand { 
+      padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px; 
+      border-bottom: 1px solid var(--sidebar-border);
+    }
+    .brand span { color: var(--primary); text-shadow: 0 0 20px var(--primary-glow); }
+    
+    .nav-menu { flex: 1; padding: 24px 0; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: 14px; padding: 14px 32px;
+      color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 15px;
+      transition: all 0.3s ease; border-right: 4px solid transparent;
+    }
+    .nav-item:hover { color: var(--text-dark); background: rgba(255,255,255,0.05); transform: translateX(-5px); }
+    .nav-item.active {
+      color: var(--text-dark); background: linear-gradient(90deg, rgba(245, 142, 26, 0.1) 0%, transparent 100%);
+      border-right-color: var(--primary);
+    }
+    .nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+    .main-content { flex: 1; margin-right: 280px; padding: 40px 48px 60px; display: flex; flex-direction: column; }
+
+    /* Roadmap Specific */
+    .roadmap-container { max-width: 1000px; margin: 0 auto; width: 100%; }
+    .roadmap-header { text-align: center; margin-bottom: 50px; padding: 40px 20px; background: var(--glass-bg); border-radius: 24px; border: 1px solid var(--glass-border); }
+    .roadmap-header h1 { font-size: 36px; margin-bottom: 15px; color: var(--primary); font-weight: 900; }
+    
+    .timeline { position: relative; padding: 20px 0; }
+    .timeline::before { content: ''; position: absolute; right: 40px; top: 0; bottom: 0; width: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; }
+    
+    .week-block { position: relative; margin-bottom: 40px; padding-right: 80px; opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+    .week-block.visible { opacity: 1; transform: translateY(0); }
+    .week-marker { position: absolute; right: 22px; top: 0; width: 40px; height: 40px; background: var(--bg-main); border: 4px solid var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; color: var(--primary); z-index: 2; box-shadow: 0 0 15px var(--primary-glow); }
+    
+    .week-card { background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: 20px; padding: 30px; }
+    .week-label { font-size: 14px; color: var(--primary); font-weight: 800; margin-bottom: 8px; display: block; }
+    .week-title { font-size: 24px; font-weight: 900; margin-bottom: 15px; color: #fff; }
+    
+    .week-goals { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .goal-tag { background: rgba(16, 185, 129, 0.1); color: var(--green); padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 800; border: 1px solid rgba(16, 185, 129, 0.2); }
+    
+    .task-list { list-style: none; padding: 0; margin: 0 0 20px 0; }
+    .task-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .task-item:last-child { border-bottom: none; }
+    .task-check { color: var(--primary); font-weight: 900; }
+    .task-text { font-size: 15px; line-height: 1.6; color: var(--text-gray); font-weight: 600; }
+    
+    .week-kpi { background: rgba(245, 142, 26, 0.05); border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px dashed rgba(245, 142, 26, 0.2); }
+    .kpi-icon { font-size: 24px; }
+    .kpi-info h5 { margin: 0; font-size: 13px; color: var(--primary); font-weight: 800; }
+    .kpi-info p { margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: var(--text-dark); }
+
+    .expected-outcome { margin-top: 60px; background: linear-gradient(135deg, var(--primary), #e67e00); border-radius: 24px; padding: 48px; text-align: center; position: relative; overflow: hidden; }
+    .expected-outcome h2 { margin-bottom: 15px; font-size: 32px; font-weight: 900; color: #fff; }
+    .expected-outcome p { font-size: 18px; color: #fff; opacity: 0.95; font-weight: 600; max-width: 800px; margin: 0 auto 32px; }
+
+    .btn-primary { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: var(--primary); padding: 16px 40px; border-radius: 12px; text-decoration: none; font-weight: 900; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0,0,0,0.3); }
+
+    @media (max-width: 768px) {
+      .main-content { margin-right: 0; padding: 20px; }
+      .sidebar { display: none; }
+      .timeline::before { right: 20px; }
+      .week-marker { right: 2px; }
+      .week-block { padding-right: 50px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <div>العبير<div style="font-size: 12px; color: var(--text-gray); font-weight: 700; text-shadow: none; letter-spacing: 0;">بصمة النمو الرقمي</div></div>
+    </div>
+    <nav class="nav-menu">
+      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="detailed-analysis.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg> تحليل القنوات</a>
+      <a href="roadmap-30d.html" class="nav-item active">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        خطة الـ 30 يوماً
+      </a>
+      <a href="plan.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg> خطة الإقلاع</a>
+      <a href="competitors.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> المنافسون</a>
+      <a href="ads.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg> الإعلانات</a>
+      <a href="packages.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg> الباقات والأسعار</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="roadmap-container">
+        <header class="roadmap-header">
+          <h1>خطة الـ 30 يوماً للنمو المتسارع</h1>
+          <p>خارطة طريق تنفيذية مقسمة لخطوات أسبوعية واضحة لتحويل حسابك لماكينة مبيعات.</p>
+        </header>
+
+        <div class="timeline" id="roadmapTimeline">
+          <!-- Week 1 -->
+          <div class="week-block" id="week1">
+            <div class="week-marker">1</div>
+            <div class="week-card">
+              <span class="week-label">الأسبوع الأول</span>
+              <h3 class="week-title" id="titleW1">أسبوع التأسيس وسد الفجوات</h3>
+              <div class="week-goals" id="goalsW1">
+                <span class="goal-tag">إعداد البيكسل</span>
+                <span class="goal-tag">تأمين الموقع</span>
+                <span class="goal-tag">تحسين البايو</span>
+              </div>
+              <div class="task-list" id="tasksW1">
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">تفعيل Meta Pixel و Google Analytics 4.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">إصلاح مشاكل الـ SSL وتأمين رابط الموقع.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">إعادة كتابة البايو بطريقة تسويقية جذابة.</div></div>
+              </div>
+              <div class="week-kpi">
+                <div class="kpi-icon">🎯</div>
+                <div class="kpi-info">
+                  <h5>مؤشر النجاح للأسبوع</h5>
+                  <p id="kpiW1">بيانات تتبع دقيقة وحساب مهيأ لاستقبال الزوار.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week 2 -->
+          <div class="week-block" id="week2">
+            <div class="week-marker">2</div>
+            <div class="week-card">
+              <span class="week-label">الأسبوع الثاني</span>
+              <h3 class="week-title" id="titleW2">صناعة المحتوى والموثوقية</h3>
+              <div class="week-goals" id="goalsW2">
+                <span class="goal-tag">تصوير UGC</span>
+                <span class="goal-tag">نشر ريلز</span>
+                <span class="goal-tag">جمع مراجعات</span>
+              </div>
+              <div class="task-list" id="tasksW2">
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">إنتاج 3 فيديوهات UGC تركز على تجربة المنتج.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">نشر محتوى تفاعلي يومي في الستوري.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">إبراز آراء العملاء السابقين في الـ Highlights.</div></div>
+              </div>
+              <div class="week-kpi">
+                <div class="kpi-icon">⚡</div>
+                <div class="kpi-info">
+                  <h5>مؤشر النجاح للأسبوع</h5>
+                  <p id="kpiW2">ارتفاع ملحوظ في التفاعل وبناء قاعدة ثقة للزوار الجدد.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week 3 -->
+          <div class="week-block" id="week3">
+            <div class="week-marker">3</div>
+            <div class="week-card">
+              <span class="week-label">الأسبوع الثالث</span>
+              <h3 class="week-title" id="titleW3">إطلاق الإعلانات وإعادة الاستهداف</h3>
+              <div class="week-goals" id="goalsW3">
+                <span class="goal-tag">حملة تحويل</span>
+                <span class="goal-tag">Retargeting</span>
+                <span class="goal-tag">تحسين الـ CPA</span>
+              </div>
+              <div class="task-list" id="tasksW3">
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">إطلاق أول حملة إعلانية (Traffic/Conversion).</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">تفعيل حملة إعادة الاستهداف للزوار الذين لم يكملوا الشراء.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">اختبار 3 نماذج مختلفة من الإبداعات الإعلانية.</div></div>
+              </div>
+              <div class="week-kpi">
+                <div class="kpi-icon">💸</div>
+                <div class="kpi-info">
+                  <h5>مؤشر النجاح للأسبوع</h5>
+                  <p id="kpiW3">تحقيق أول مبيعات مباشرة من الإعلانات بتكلفة منخفضة.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week 4 -->
+          <div class="week-block" id="week4">
+            <div class="week-marker">4</div>
+            <div class="week-card">
+              <span class="week-label">الأسبوع الرابع</span>
+              <h3 class="week-title" id="titleW4">التوسع ومضاعفة النتائج</h3>
+              <div class="week-goals" id="goalsW4">
+                <span class="goal-tag">Scaling</span>
+                <span class="goal-tag">تحليل النتائج</span>
+                <span class="goal-tag">خطة الشهر القادم</span>
+              </div>
+              <div class="task-list" id="tasksW4">
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">مضاعفة الميزانية للحملات ذات الـ ROAS الأعلى.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">تحليل أداء الشهر بالكامل واستخراج نقاط القوة الجديدة.</div></div>
+                <div class="task-item"><div class="task-check">✓</div><div class="task-text">رسم خارطة طريق الشهر الثاني للتوسع في منصات إضافية.</div></div>
+              </div>
+              <div class="week-kpi">
+                <div class="kpi-icon">🚀</div>
+                <div class="kpi-info">
+                  <h5>مؤشر النجاح للأسبوع</h5>
+                  <p id="kpiW4">الوصول لمرحلة الربحية المستدامة وتجهيز الحساب للانطلاق.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <section class="expected-outcome animate-up">
+          <div class="outcome-orb"></div>
+          <h2>النتيجة النهائية المتوقعة</h2>
+          <p id="expectedResultText">بحلول نهاية الـ 30 يوماً، سيكون حسابك قد تحول من مجرد صفحة عادية إلى نظام بيع متكامل يملك هوية قوية، ثقة عالية من العملاء، وإعلانات رابحة تعمل كبديل لمندوب المبيعات.</p>
+          <a href="packages.html" class="btn-primary" style="background:#fff; color:var(--primary); font-weight:900; border:none; padding:15px 40px;">ابدأ التنفيذ الآن</a>
+        </section>
+      </div>
+
+    </main>
+
+  <script src="js/report-connect.js?v=3.1"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Intersection Observer for animation
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry, i) => {
+          if (entry.isIntersecting) {
+            setTimeout(() => {
+              entry.target.classList.add('visible');
+            }, i * 200);
+          }
+        });
+      }, { threshold: 0.1 });
+
+      document.querySelectorAll('.week-block').forEach(block => observer.observe(block));
+    });
+  </script>
+</body>
+</html>

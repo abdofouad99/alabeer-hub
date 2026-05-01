@@ -1,0 +1,97 @@
+# حماية ملفات API من الوصول المباشر
+<Files "*.php">
+    Order Deny,Allow
+    Deny from all
+    Allow from 127.0.0.1
+    Allow from ::1
+    Allow from localhost
+</Files>
+
+# السماح بالوصول للملفات العامة
+<Files "submit.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "analyze.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "status.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "result.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+<Files "clear-cache.php">
+    Order Deny,Allow
+    Deny from all
+    Allow from 127.0.0.1
+    Allow from ::1
+    Allow from localhost
+</Files>
+
+<Files "debug-data.php">
+    Order Deny,Allow
+    Deny from all
+    Allow from 127.0.0.1
+    Allow from ::1
+    Allow from localhost
+</Files>
+
+<Files "maintenance.php">
+    Order Deny,Allow
+    Deny from all
+    Allow from 127.0.0.1
+    Allow from ::1
+    Allow from localhost
+</Files>
+
+<Files "rerun-ai.php">
+    Order Deny,Allow
+    Deny from all
+    Allow from 127.0.0.1
+    Allow from ::1
+    Allow from localhost
+</Files>
+
+# حماية مجلدات حساسة
+<Directory "admin/">
+    Order Deny,Allow
+    Deny from all
+</Directory>
+
+# إعدادات الأمان العامة
+Options -Indexes
+ServerSignature Off
+FileETag None
+
+# ضغط المحتوى
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# Cache headers للأداء
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+</IfModule>

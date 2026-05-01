@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة التحكم | العبير</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="container" style="max-width:1100px">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div>
+        <div class="brand-name">لوحة إدارة العبير</div>
+        <div class="brand-sub">بصمة النمو — Dashboard</div>
+      </div>
+    </div>
+    <div class="row" style="gap:8px;flex-wrap:nowrap">
+      <button class="btn2" style="padding:9px 16px;font-size:13px" onclick="exportCSV()">📥 تصدير CSV</button>
+      <button class="btn2" style="padding:9px 16px;font-size:13px;color:var(--red)" onclick="doLogout()">🚪 خروج</button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="row" style="margin-bottom:20px;gap:8px">
+    <button class="btn" id="tabListBtn" onclick="switchTab('list')">📋 قائمة العملاء</button>
+    <button class="btn2" id="tabStatsBtn" onclick="switchTab('stats')">📊 الإحصائيات</button>
+  </div>
+
+  <!-- ═══════ STATS TAB ═══════ -->
+  <div id="tabStats" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px">
+      <div class="stat-card"><div class="stat-icon blue">📋</div><div><div class="stat-num text-blue" id="s_total">—</div><div class="stat-desc">إجمالي التقييمات</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold">⭐</div><div><div class="stat-num text-gold" id="s_avg">—</div><div class="stat-desc">متوسط الدرجة</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">🟢</div><div><div class="stat-num text-green" id="s_green">—</div><div class="stat-desc">جاهز للانطلاق</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:rgba(240,192,64,.12)">🟡</div><div><div class="stat-num" style="color:var(--gold)" id="s_yellow">—</div><div class="stat-desc">قابل للنمو</div></div></div>
+      <div class="stat-card"><div class="stat-icon red">🔴</div><div><div class="stat-num text-red" id="s_red">—</div><div class="stat-desc">يحتاج إنقاذاً</div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:16px">
+      <div class="card"><h2 class="h2">توزيع الفئات</h2><canvas id="pieChart" height="220"></canvas></div>
+      <div class="card"><h2 class="h2">التسجيلات (15 يوم)</h2><canvas id="lineChart" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══════ LIST TAB ═══════ -->
+  <div id="tabList">
+    <div style="display:grid;grid-template-columns:1.3fr 0.7fr;gap:16px;align-items:start">
+
+      <!-- Left: list -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div><span class="h3">التقييمات</span> <span class="badge badge-blue" id="listCount">0</span></div>
+        </div>
+        <input class="input" id="searchQ" placeholder="🔍 بحث سريع..." oninput="filterList()" style="margin-bottom:12px" />
+        <div id="assessmentList" class="grid" style="max-height:520px;overflow-y:auto;gap:8px"></div>
+      </div>
+
+      <!-- Right: detail -->
+      <div class="card" style="position:sticky;top:20px">
+        <h2 class="h2" style="margin-bottom:14px">تفاصيل العميل</h2>
+        <div id="leadDetail">
+          <p class="muted" style="text-align:center;padding:40px 0">اختر تقييماً من القائمة</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تحليل المحتوى — العبير للتسويق</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #09090b;
+      --sidebar-bg: rgba(15, 23, 42, 0.6);
+      --sidebar-border: rgba(255, 255, 255, 0.05);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-blur: blur(24px) saturate(180%);
+      --text-dark: #f8fafc;
+      --text-gray: #94a3b8;
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.25);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.25);
+      --yellow: #eab308;
+      --yellow-glow: rgba(234, 179, 8, 0.25);
+      --purple: #8b5cf6;
+      --blue: #3b82f6;
+      --blue-glow: rgba(59, 130, 246, 0.25);
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-dark); 
+      display: flex; 
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.3; }
+    .orb-1 { top: -100px; right: -100px; width: 500px; height: 500px; background: var(--primary); }
+    .orb-2 { bottom: -100px; left: -100px; width: 600px; height: 600px; background: var(--purple); opacity: 0.15; }
+    .orb-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: var(--yellow); opacity: 0.1; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+    .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; } .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; } .delay-6 { animation-delay: 0.6s; }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+      border-left: 1px solid var(--sidebar-border);
+      display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100;
+    }
+    .brand { 
+      padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px; 
+      border-bottom: 1px solid var(--sidebar-border);
+    }
+    .nav-menu { flex: 1; padding: 24px 0; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: 14px; padding: 14px 32px;
+      color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 15px;
+      transition: all 0.3s ease; border-right: 4px solid transparent;
+    }
+    .nav-item:hover { color: var(--text-dark); background: rgba(255,255,255,0.05); transform: translateX(-5px); }
+    .nav-item.active { color: var(--text-dark); background: linear-gradient(90deg, rgba(245,142,26,0.1) 0%, transparent 100%); border-right-color: var(--primary); }
+    .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+    .sidebar-bottom { padding: 32px 24px; border-top: 1px solid var(--sidebar-border); }
+    .upgrade-box {
+      background: linear-gradient(135deg, rgba(245,142,26,0.2), rgba(245,142,26,0.05)); border-radius: 16px; padding: 24px; text-align: center;
+      border: 1px solid rgba(245,142,26,0.3);
+    }
+    .upgrade-box h4 { font-size: 18px; margin-bottom: 8px; font-weight: 900; }
+    .upgrade-box p { font-size: 13px; color: var(--text-gray); margin-bottom: 20px; line-height: 1.6; font-weight: 600; }
+    .btn-upgrade {
+      display: block; width: 100%; background: var(--primary); color: #fff;
+      padding: 12px; border-radius: 10px; font-weight: 900; text-decoration: none; font-size: 15px;
+      transition: 0.3s; box-shadow: 0 4px 15px var(--primary-glow);
+    }
+    .btn-upgrade:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--primary-glow); }
+
+    /* ─── MAIN ─── */
+    .main-content { flex: 1; margin-right: 280px; padding: 0 48px 80px; display: flex; flex-direction: column; }
+
+    .topbar { display: flex; justify-content: flex-end; align-items: center; padding: 32px 0; gap: 16px; margin-bottom: 10px; }
+    .btn-outline {
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border);
+      color: var(--text-dark); padding: 12px 24px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.3s;
+    }
+    .btn-outline:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .btn-primary {
+      background: var(--primary); color: #fff; border: none; box-shadow: 0 10px 25px var(--primary-glow);
+      padding: 12px 28px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.3s; text-decoration: none; display: flex; align-items: center; gap: 8px;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 15px 35px var(--primary-glow); background: #f08310; }
+
+    /* ─── PAGE HEADER ─── */
+    .page-header {
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 36px 40px; margin-bottom: 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .page-header-left { display: flex; align-items: center; gap: 20px; }
+    .page-icon { font-size: 52px; width: 80px; height: 80px; background: rgba(245,142,26,0.1); border-radius: 20px; display:flex; align-items:center; justify-content:center; border: 1px solid rgba(245,142,26,0.2); }
+    .page-header h1 { font-size: 30px; font-weight: 900; color: var(--text-dark); margin-bottom: 6px; }
+    .page-header p { font-size: 15px; color: var(--text-gray); font-weight: 600; }
+    .score-badge {
+      background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); border-radius: 16px;
+      padding: 20px 32px; text-align: center;
+    }
+    .score-badge .score-big { font-size: 52px; font-weight: 900; color: var(--yellow); line-height: 1; }
+    .score-badge .score-label { font-size: 13px; color: var(--text-gray); font-weight: 700; margin-top: 4px; }
+
+    /* ─── SECTION WRAPPER ─── */
+    .analysis-section {
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border); border-radius: var(--radius);
+      overflow: hidden; margin-bottom: 28px;
+    }
+    .section-head {
+      display: flex; align-items: center; gap: 16px;
+      padding: 28px 36px; border-bottom: 1px solid var(--glass-border);
+      background: rgba(0,0,0,0.15);
+    }
+    .section-num {
+      width: 44px; height: 44px; border-radius: 12px; display:flex; align-items:center; justify-content:center;
+      font-size: 20px; font-weight: 900; flex-shrink: 0;
+    }
+    .section-head h2 { font-size: 22px; font-weight: 900; color: var(--text-dark); }
+    .section-head p { font-size: 14px; color: var(--text-gray); font-weight: 600; margin-top: 4px; }
+    .section-body { padding: 32px 36px; }
+
+    /* ─── QUESTION GRID ─── */
+    .q-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 24px;
+    }
+    .q-grid.three-col { grid-template-columns: repeat(3, 1fr); }
+    .q-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      background: rgba(0,0,0,0.25); border-radius: 14px; padding: 18px 20px;
+      border: 1px solid rgba(255,255,255,0.05); transition: 0.3s;
+    }
+    .q-item:hover { background: rgba(255,255,255,0.03); transform: translateY(-2px); }
+    .q-status { flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; display:flex; align-items:center; justify-content:center; font-size: 18px; margin-top: 2px; }
+    .q-status.good { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.25); }
+    .q-status.warn { background: rgba(234,179,8,0.15); border: 1px solid rgba(234,179,8,0.25); }
+    .q-status.bad  { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.25); }
+    .q-status.neu  { background: rgba(148,163,184,0.15); border: 1px solid rgba(148,163,184,0.15); }
+    .q-content .q-label { font-size: 13px; font-weight: 900; color: var(--text-dark); margin-bottom: 5px; line-height: 1.4; }
+    .q-content .q-answer { font-size: 13px; font-weight: 600; color: var(--text-gray); line-height: 1.6; }
+
+    /* ─── SCORE BARS ─── */
+    .score-bars { display: flex; flex-direction: column; gap: 16px; }
+    .bar-row { display: grid; grid-template-columns: 180px 1fr 60px; align-items: center; gap: 16px; }
+    .bar-label { font-size: 14px; font-weight: 800; color: var(--text-dark); text-align: right; }
+    .bar-track { height: 10px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 99px; transition: width 1.5s cubic-bezier(0.16,1,0.3,1); width: 0; }
+    .bar-val { font-size: 15px; font-weight: 900; text-align: left; }
+    .bar-fill.green { background: linear-gradient(90deg, var(--green), #34d399); }
+    .bar-fill.yellow { background: linear-gradient(90deg, var(--yellow), #fde047); }
+    .bar-fill.red { background: linear-gradient(90deg, var(--red), #f87171); }
+    .bar-fill.blue { background: linear-gradient(90deg, var(--blue), #60a5fa); }
+    .bar-val.green { color: var(--green); }
+    .bar-val.yellow { color: var(--yellow); }
+    .bar-val.red { color: var(--red); }
+    .bar-val.blue { color: var(--blue); }
+
+    /* ─── CONTENT BALANCE WHEEL ─── */
+    .balance-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px; }
+    .balance-card {
+      background: rgba(0,0,0,0.25); border-radius: 16px; padding: 22px 16px; text-align: center;
+      border: 1px solid rgba(255,255,255,0.06); transition: 0.3s;
+    }
+    .balance-card:hover { transform: translateY(-4px); }
+    .balance-card .bc-emoji { font-size: 30px; margin-bottom: 10px; }
+    .balance-card .bc-title { font-size: 13px; font-weight: 900; color: var(--text-dark); margin-bottom: 10px; }
+    .balance-card .bc-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+    .balance-card .bc-fill { height: 100%; border-radius: 99px; }
+    .balance-card .bc-pct { font-size: 18px; font-weight: 900; }
+
+    /* ─── INSIGHT BOX ─── */
+    .insight-box {
+      border-radius: 16px; padding: 24px 28px; display:flex; gap: 18px; align-items: flex-start; margin-top: 24px;
+    }
+    .insight-box.orange { background: rgba(245,142,26,0.08); border: 1px solid rgba(245,142,26,0.2); }
+    .insight-box.green  { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); }
+    .insight-box.red    { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); }
+    .insight-box.blue   { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); }
+    .insight-box .ib-icon { font-size: 32px; flex-shrink:0; }
+    .insight-box h4 { font-size: 16px; font-weight: 900; margin-bottom: 8px; }
+    .insight-box.orange h4 { color: var(--primary); }
+    .insight-box.green h4  { color: var(--green); }
+    .insight-box.red h4    { color: var(--red); }
+    .insight-box.blue h4   { color: var(--blue); }
+    .insight-box p { font-size: 14px; font-weight: 600; color: var(--text-gray); line-height: 1.8; }
+
+    /* ─── PILLS ─── */
+    .pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .pill {
+      padding: 8px 18px; border-radius: 99px; font-size: 13px; font-weight: 800;
+      border: 1px solid; display: flex; align-items: center; gap: 6px;
+    }
+    .pill.green { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: var(--green); }
+    .pill.red   { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--red); }
+    .pill.yellow{ background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.3); color: var(--yellow); }
+    .pill.blue  { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: var(--blue); }
+    .pill.gray  { background: rgba(148,163,184,0.1); border-color: rgba(148,163,184,0.2); color: var(--text-gray); }
+
+    /* ─── ENGAGEMENT TABLE ─── */
+    .eng-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .eng-card {
+      background: rgba(0,0,0,0.3); border-radius: 16px; padding: 24px; text-align: center;
+      border: 1px solid rgba(255,255,255,0.06); transition: 0.3s;
+    }
+    .eng-card:hover { transform: translateY(-3px); }
+    .eng-card .ec-emoji { font-size: 28px; margin-bottom: 10px; }
+    .eng-card .ec-val { font-size: 34px; font-weight: 900; margin-bottom: 4px; line-height: 1; }
+    .eng-card .ec-label { font-size: 13px; font-weight: 700; color: var(--text-gray); margin-bottom: 10px; }
+    .eng-card .ec-status { font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 99px; display: inline-block; }
+    .ec-status.good { background: rgba(16,185,129,0.15); color: var(--green); }
+    .ec-status.warn { background: rgba(234,179,8,0.15); color: var(--yellow); }
+    .ec-status.bad  { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    /* divider */
+    .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 28px 0; }
+
+    /* section color variants */
+    .sec-orange .section-num { background: rgba(245,142,26,0.15); color: var(--primary); border: 1px solid rgba(245,142,26,0.2); }
+    .sec-green  .section-num { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+    .sec-blue   .section-num { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.2); }
+    .sec-yellow .section-num { background: rgba(234,179,8,0.15); color: var(--yellow); border: 1px solid rgba(234,179,8,0.2); }
+    .sec-purple .section-num { background: rgba(139,92,246,0.15); color: var(--purple); border: 1px solid rgba(139,92,246,0.2); }
+    .sec-red    .section-num { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+
+    .sec-orange .section-head { border-left: 4px solid var(--primary); }
+    .sec-green  .section-head { border-left: 4px solid var(--green); }
+    .sec-blue   .section-head { border-left: 4px solid var(--blue); }
+    .sec-yellow .section-head { border-left: 4px solid var(--yellow); }
+    .sec-purple .section-head { border-left: 4px solid var(--purple); }
+    .sec-red    .section-head { border-left: 4px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <div>العبير<div style="font-size:12px;color:var(--text-gray);font-weight:700;">بصمة النمو الرقمي</div></div>
+    </div>
+    <nav class="nav-menu">
+      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="strengths.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
+      <a href="weaknesses.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> نقاط الضعف</a>
+      <a href="journey.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h12v2H3v-2zm0 4h12v2H3v-2zm0 4h8v2H3v-2z"/></svg> رحلة العميل</a>
+      <a href="content.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg> المحتوى</a>
+      <a href="competitors.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> المنافسون</a>
+      <a href="ads.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M11 15h2v2h-2zm0-8h2v6h-2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg> الإعلانات</a>
+      <a href="recommendations.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg> التوصيات</a>
+      <a href="plan.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg> الخطة المقترحة</a>
+      <a href="packages.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg> الباقات والأسعار</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="upgrade-box">
+        <div style="font-size:40px;margin-bottom:12px;">💎</div>
+        <h4>افتح التقرير الكامل</h4>
+        <p>واحصل على خطة نمو تفصيلية ومخصصة لحسابك</p>
+        <a href="packages.html" class="btn-upgrade">عرض باقات النمو</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <main class="main-content">
+
+    <!-- Topbar -->
+    <div class="topbar animate-up delay-1">
+      <button class="btn-outline">مشاركة النتيجة ↗</button>
+      <a href="packages.html" class="btn-primary">🔓 افتح التقرير الكامل</a>
+    </div>
+
+    <!-- Page Header -->
+    <div class="page-header animate-up delay-2">
+      <div class="page-header-left">
+        <div class="page-icon">📊</div>
+        <div>
+          <h1>التحليل الشامل للمحتوى التسويقي</h1>
+          <p><span id="contentClientName">العميل</span> — <span id="contentClientHandle">@handle</span> · تحليل متعمق في 6 محاور أساسية</p>
+        </div>
+      </div>
+      <div class="score-badge">
+        <div class="score-big" id="mainScore" data-val="68">0</div>
+        <div class="score-label">الدرجة الإجمالية / 100</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SECTION 1 · الرسالة التسويقية والتحويل
+    ══════════════════════════════════════ -->
+    <div class="analysis-section sec-orange animate-up delay-2">
+      <div class="section-head">
+        <div class="section-num">١</div>
+        <div>
+          <h2>تحليل الرسالة التسويقية — التحويل والمبيعات</h2>
+          <p>قياس مدى تحويل الصفحة للزوار إلى عملاء فعليين</p>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <div class="q-grid">
+
+          <div class="q-item">
+            <div id="q1_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل الصفحة مهيأة للبيع أو الحجز؟</div>
+              <div id="q1_answer" class="q-answer">جزئياً — هناك منتجات معروضة لكن تجربة الشراء غير مُيسّرة بما يكفي. لا يوجد مسار واضح من المنشور إلى الشراء.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q2_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل توجد دعوة واضحة لاتخاذ إجراء (CTA)؟</div>
+              <div id="q2_answer" class="q-answer">غائبة في معظم المنشورات. العميل يشاهد المنتج دون أن يُوجَّه للخطوة التالية — الشراء أو الاستفسار.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q3_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل يوجد رابط / واتساب / وسيلة تواصل سهلة؟</div>
+              <div id="q3_answer" class="q-answer">رابط البايو موجود لكنه لا يُذكر في المنشورات. رابط الواتساب غير مثبّت بشكل بارز. التواصل يحتاج جهداً من العميل.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q4_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل الصفحة تقنع العميل بالشراء؟</div>
+              <div id="q4_answer" class="q-answer">ضعيف. غياب المراجعات، وشهادات العملاء، والدليل الاجتماعي (Social Proof) يجعل قرار الشراء صعباً.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q5_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل المحتوى يدعم اتخاذ القرار؟</div>
+              <div id="q5_answer" class="q-answer">جزئياً — هناك معلومات عن المنتجات، لكن تنقص المقارنات، وشرح الفوائد، ومعالجة الاعتراضات الشائعة.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q6_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل هناك عروض واضحة ومُقنعة؟</div>
+              <div id="q6_answer" class="q-answer">العروض نادرة وغير واضحة عند وجودها. لا يوجد إحساس بالندرة أو الاستعجال يحفّز العميل على الشراء الفوري.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q7_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل الحساب يقود العميل لخطوة واضحة؟</div>
+              <div id="q7_answer" class="q-answer">لا. العميل يُترك بعد المشاهدة دون توجيه — لا يعرف هل يراسل أم يضغط رابطاً أم يزور المتجر.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q8_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">وضوح النشاط التجاري</div>
+              <div id="q8_answer" class="q-answer">جيد — من أول نظرة يُفهم أن الحساب يبيع منتجات تجميل طبيعية. الهوية البصرية تعكس التخصص.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q9_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">وضوح الجمهور المستهدف</div>
+              <div id="q9_answer" class="q-answer">الرسالة عامة — تخاطب الجميع وبذلك لا تخاطب أحداً بعمق. غياب تحديد الشريحة (مثل: أمهات، مراهقات، محجبات).</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q10_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">وضوح العرض (Value Offer)</div>
+              <div id="q10_answer" class="q-answer">لماذا أشتري منك تحديداً؟ السؤال لا يجد إجابة واضحة في الصفحة. العرض الفريد (USP) غائب.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q11_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">وضوح القيمة المقدَّمة</div>
+              <div id="q11_answer" class="q-answer">المنتجات تُعرض دون شرح كافٍ للفائدة الحقيقية. التركيز على "ماذا" دون "لماذا يهمّك هذا".</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q12_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل الرسالة ملائمة للسوق المستهدف؟</div>
+              <div id="q12_answer" class="q-answer">اللغة العربية والأسلوب المناسب للسوق السعودي موجودان. الأسلوب العام يتوافق مع الثقافة المحلية.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q13_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل الزائر يعرف كيف يشتري؟</div>
+              <div id="q13_answer" class="q-answer">لا بوضوح. آلية الطلب تحتاج 3+ خطوات يكتشفها الزائر بنفسه — كل خطوة إضافية تعني خسارة عميل.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q14_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل طريقة التواصل واضحة ومريحة؟</div>
+              <div id="q14_answer" class="q-answer">قنوات التواصل موجودة لكنها غير مُبرزة. يُفضّل تثبيت رابط واتساب مباشر في البايو والقصص الثابتة.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q15_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل الحساب يشجع على الرسائل والشراء؟</div>
+              <div id="q15_answer" class="q-answer">لا يوجد تحفيز مباشر. لا جمل مثل "راسلنا الآن" أو "اطلب خلال 24 ساعة واستلم غداً" في المنشورات البيعية.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Score bars -->
+        <div class="divider"></div>
+        <div class="score-bars">
+          <div class="bar-row">
+            <div class="bar-label">وجود CTA فعّال</div>
+            <div class="bar-track"><div class="bar-fill red" data-width="25"></div></div>
+            <div class="bar-val red">25%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">سهولة الشراء / التواصل</div>
+            <div class="bar-track"><div class="bar-fill yellow" data-width="45"></div></div>
+            <div class="bar-val yellow">45%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">وضوح العرض والقيمة</div>
+            <div class="bar-track"><div class="bar-fill red" data-width="30"></div></div>
+            <div class="bar-val red">30%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">ملاءمة السوق المستهدف</div>
+            <div class="bar-track"><div class="bar-fill green" data-width="75"></div></div>
+            <div class="bar-val green">75%</div>
+          </div>
+        </div>
+
+        <div class="insight-box orange">
+          <div class="ib-icon">🤖</div>
+          <div>
+            <h4>التوجيه الذكي: حوّل متابعيك إلى مشترين</h4>
+            <p>أضف في كل منشور بيعي عبارة CTA واحدة واضحة. رابط واتساب مثبّت في البايو + ذكره في نهاية كل فيديو = زيادة التحويل بنسبة تصل إلى 3 أضعاف. ابدأ بنشر 2 شهادة عميل أسبوعياً لبناء الثقة.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SECTION 2 · تحليل الهوية
+    ══════════════════════════════════════ -->
+    <div class="analysis-section sec-green animate-up delay-3">
+      <div class="section-head">
+        <div class="section-num">٢</div>
+        <div>
+          <h2>تحليل الهوية البصرية والرقمية</h2>
+          <p>مدى وضوح واحترافية الهوية التسويقية للحساب</p>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <div class="q-grid">
+
+          <div class="q-item">
+            <div id="q16_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل الاسم واضح ويعكس النشاط؟</div>
+              <div id="q16_answer" class="q-answer">نعم — "ناتشورال بيوتي" يوحي مباشرة بالمنتجات الطبيعية والتجميل. سهل التذكر والبحث عنه.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q17_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل البايو يشرح النشاط بدقة؟</div>
+              <div id="q17_answer" class="q-answer">يحتاج تحسيناً — البايو الحالي عام. يجب أن يوضح: ماذا تبيع + لمن + ما الميزة الفريدة + كيف تطلب.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q18_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل صورة البروفايل والغلاف مناسبة؟</div>
+              <div id="q18_answer" class="q-answer">صورة البروفايل واضحة ومميزة. الغلاف (إن وُجد) يتناسق مع الهوية البصرية العامة — مستوى جيد.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q19_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل التخصص مفهوم بوضوح؟</div>
+              <div id="q19_answer" class="q-answer">نعم من الشكل العام. لكن التخصص الدقيق (طبيعي 100%؟ عضوي؟ محلي؟) غير واضح بما يكفي.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q20_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">التميز عن المنافسين</div>
+              <div id="q20_answer" class="q-answer">الهوية البصرية مقبولة لكن لا تبرز بشكل واضح عن عشرات الحسابات المشابهة في نفس المجال.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q21_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">قوة العلامة التجارية (Brand Strength)</div>
+              <div id="q21_answer" class="q-answer">العلامة في طور التأسيس — لا يوجد بعد عنصر "توقيع" يميّز الحساب فوراً (صوت خاص، شخصية، قصة).</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q22_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">التناسق البصري (Visual Consistency)</div>
+              <div id="q22_answer" class="q-answer">ممتاز — الألوان والخطوط متسقة عبر المنشورات. البروفايل يبدو محترفاً من الوهلة الأولى.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q23_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">مستوى الاحتراف العام</div>
+              <div id="q23_answer" class="q-answer">فوق المتوسط — التصاميم نظيفة والتصوير جيد. يفوق كثيراً من المنافسين في الجانب البصري.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q24_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل الصفحة تعطي انطباع ثقة؟</div>
+              <div id="q24_answer" class="q-answer">إلى حد ما — التصميم الجيد يبني ثقة أولية، لكن غياب شهادات العملاء والشفافية يضعف الثقة العميقة.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q25_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل الصفحة منظمة أم عشوائية؟</div>
+              <div id="q25_answer" class="q-answer">منظمة بشكل واضح — الـ Grid مرتب والألوان متناسقة. ترتيب البروفايل الهايلايتس يحتاج مراجعة بسيطة.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+        <div class="score-bars">
+          <div class="bar-row">
+            <div class="bar-label">التناسق البصري</div>
+            <div class="bar-track"><div class="bar-fill green" data-width="88"></div></div>
+            <div class="bar-val green">88%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">وضوح الهوية والتخصص</div>
+            <div class="bar-track"><div class="bar-fill green" data-width="72"></div></div>
+            <div class="bar-val green">72%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">قوة العلامة التجارية</div>
+            <div class="bar-track"><div class="bar-fill yellow" data-width="50"></div></div>
+            <div class="bar-val yellow">50%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">التميز عن المنافسين</div>
+            <div class="bar-track"><div class="bar-fill yellow" data-width="45"></div></div>
+            <div class="bar-val yellow">45%</div>
+          </div>
+        </div>
+
+        <div class="insight-box green">
+          <div class="ib-icon">💡</div>
+          <div>
+            <h4>نقطة قوة مع فرصة للارتقاء</h4>
+            <p>الهوية البصرية قوية — استثمر فيها. أضف "صوتاً" مميزاً للبراند: شخصية ثابتة، لهجة خاصة، أو قصة مؤسس توجد ارتباطاً عاطفياً مع الجمهور. حدّث البايو ليصبح: "منتجات عناية طبيعية 100% | توصيل سريع | اطلبي الآن 👇".</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SECTION 3 · تحليل المحتوى
+    ══════════════════════════════════════ -->
+    <div class="analysis-section sec-yellow animate-up delay-3">
+      <div class="section-head">
+        <div class="section-num">٣</div>
+        <div>
+          <h2>تحليل المحتوى التسويقي</h2>
+          <p>جودة وتنوع وفاعلية المحتوى المنشور في دعم رحلة العميل</p>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <!-- Content Types Pills -->
+        <div style="margin-bottom:24px;">
+          <div style="font-size:15px; font-weight:800; color:var(--text-dark); margin-bottom:12px;">أنواع المحتوى الموجودة حالياً:</div>
+          <div class="pill-row">
+            <div class="pill green">✅ صور المنتجات</div>
+            <div class="pill green">✅ ريلز تعريفية</div>
+            <div class="pill green">✅ قصص يومية</div>
+            <div class="pill yellow">⚠️ محتوى تعليمي (نادر)</div>
+            <div class="pill red">❌ شهادات العملاء</div>
+            <div class="pill red">❌ ما وراء الكواليس (BTS)</div>
+            <div class="pill red">❌ محتوى UGC</div>
+            <div class="pill red">❌ مقارنات / قبل وبعد</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Balance Wheel -->
+        <div style="font-size:15px; font-weight:800; color:var(--text-dark); margin-bottom:16px;">توازن المحتوى عبر مراحل رحلة العميل:</div>
+        <div class="balance-grid">
+          <div class="balance-card">
+            <div class="bc-emoji">👁️</div>
+            <div class="bc-title">الوعي</div>
+            <div class="bc-bar"><div class="bc-fill" style="width:65%;background:var(--blue);"></div></div>
+            <div class="bc-pct" style="color:var(--blue);">65%</div>
+          </div>
+          <div class="balance-card">
+            <div class="bc-emoji">🎯</div>
+            <div class="bc-title">الجذب</div>
+            <div class="bc-bar"><div class="bc-fill" style="width:55%;background:var(--green);"></div></div>
+            <div class="bc-pct" style="color:var(--green);">55%</div>
+          </div>
+          <div class="balance-card">
+            <div class="bc-emoji">🤝</div>
+            <div class="bc-title">الثقة</div>
+            <div class="bc-bar"><div class="bc-fill" style="width:20%;background:var(--yellow);"></div></div>
+            <div class="bc-pct" style="color:var(--yellow);">20%</div>
+          </div>
+          <div class="balance-card">
+            <div class="bc-emoji">🛒</div>
+            <div class="bc-title">البيع</div>
+            <div class="bc-bar"><div class="bc-fill" style="width:80%;background:var(--primary);"></div></div>
+            <div class="bc-pct" style="color:var(--primary);">80%</div>
+          </div>
+          <div class="balance-card">
+            <div class="bc-emoji">💎</div>
+            <div class="bc-title">الولاء</div>
+            <div class="bc-bar"><div class="bc-fill" style="width:10%;background:var(--purple);"></div></div>
+            <div class="bc-pct" style="color:var(--purple);">10%</div>
+          </div>
+        </div>
+
+        <div class="q-grid" style="margin-top:24px;">
+          <div class="q-item">
+            <div id="q26_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل المحتوى يخدم رحلة العميل كاملة؟</div>
+              <div id="q26_answer" class="q-answer">لا — التركيز مرتفع جداً على البيع المباشر (80%) بينما مرحلتا الثقة والولاء شبه غائبتين. العميل الجديد لا يجد ما يقنعه.</div>
+            </div>
+          </div>
+          <div class="q-item">
+            <div id="q27_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل المحتوى مناسب للجمهور المستهدف؟</div>
+              <div id="q27_answer" class="q-answer">بشكل عام نعم، لكن اللغة المستخدمة رسمية جداً أحياناً. الجمهور المستهدف يتجاوب أكثر مع الأسلوب العفوي والقصصي.</div>
+            </div>
+          </div>
+          <div class="q-item">
+            <div id="q28_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل المحتوى مناسب للمرحلة الحالية؟</div>
+              <div id="q28_answer" class="q-answer">الحساب في مرحلة بناء الثقة — لكن المحتوى يتصرف كأنه في مرحلة نضج. يحتاج إلى تكثيف محتوى التعريف والمصداقية.</div>
+            </div>
+          </div>
+          <div class="q-item">
+            <div id="q29_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل هناك نقص في نوع معين من المحتوى؟</div>
+              <div id="q29_answer" class="q-answer">نقص حاد في: محتوى بناء الثقة (شهادات، قبل/بعد، قصص عملاء)، ومحتوى الولاء (برامج، مكافآت، مجتمع).</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-box orange">
+          <div class="ib-icon">⚖️</div>
+          <div>
+            <h4>معادلة المحتوى المثالية لمتجرك</h4>
+            <p><strong style="color:#fff;">40% تعليمي</strong> (نصائح عناية، مكونات، أخطاء شائعة) + <strong style="color:#fff;">30% بناء ثقة</strong> (تجارب عملاء، قبل/بعد، شفافية) + <strong style="color:#fff;">30% بيعي</strong> (عروض، منتجات، CTA واضح). هذه المعادلة تبيع دون أن تبدو "محل".</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SECTION 4 · الانتظام والنمو
+    ══════════════════════════════════════ -->
+    <div class="analysis-section sec-blue animate-up delay-4">
+      <div class="section-head">
+        <div class="section-num">٤</div>
+        <div>
+          <h2>الانتظام والنمو</h2>
+          <p>تحليل ثبات النشر ومدى انعكاسه على الخوارزميات والنمو</p>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <div class="q-grid">
+
+          <div class="q-item">
+            <div id="q30_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل النشر منتظم؟</div>
+              <div id="q30_answer" class="q-answer">شبه منتظم — النشر يتراوح بين 3-5 مرات أسبوعياً لكن بدون جدولة ثابتة. الخوارزميات تفضّل الاتساق الزمني.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q31_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل هناك فترات انقطاع ملحوظة؟</div>
+              <div id="q31_answer" class="q-answer">نعم — هناك فجوات تمتد أحياناً لأكثر من أسبوع. كل انقطاع يُعاقب عليه الحساب خوارزمياً ويكلف بناء الزخم من جديد.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q32_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل الشكل العام يوحي بالنشاط؟</div>
+              <div id="q32_answer" class="q-answer">متذبذب — أسابيع نشيطة جداً ثم هدوء مفاجئ. هذا النمط يضر بالمصداقية ويربك الجمهور.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q33_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل هناك استراتيجية نمو واضحة؟</div>
+              <div id="q33_answer" class="q-answer">لا تتضح. النشر يسير بشكل عفوي دون تخطيط للحملات أو التوقيت الموسمي والمناسبات.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+        <div class="score-bars">
+          <div class="bar-row">
+            <div class="bar-label">انتظام النشر</div>
+            <div class="bar-track"><div class="bar-fill yellow" data-width="55"></div></div>
+            <div class="bar-val yellow">55%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">الثبات الزمني (Consistency)</div>
+            <div class="bar-track"><div class="bar-fill red" data-width="40"></div></div>
+            <div class="bar-val red">40%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">التخطيط التقويمي</div>
+            <div class="bar-track"><div class="bar-fill red" data-width="25"></div></div>
+            <div class="bar-val red">25%</div>
+          </div>
+        </div>
+
+        <div class="insight-box blue">
+          <div class="ib-icon">📅</div>
+          <div>
+            <h4>خطة النشر المثالية</h4>
+            <p>الهدف: <strong style="color:#fff;">5 منشورات أسبوعياً</strong> على الأقل — ريلز: 2، قصص: يومياً، منشور ثابت: 2. خصص آخر الشهر لإعداد محتوى الشهر القادم. استخدم Meta Business Suite للجدولة المسبقة وتجنب الانقطاع.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SECTION 5 · تحليل السوق المحلي
+    ══════════════════════════════════════ -->
+    <div class="analysis-section sec-purple animate-up delay-5">
+      <div class="section-head">
+        <div class="section-num">٥</div>
+        <div>
+          <h2>تحليل السوق المحلي والجمهور المستهدف</h2>
+          <p>مدى توافق الصفحة مع البيئة الجغرافية والثقافية للجمهور</p>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <div class="q-grid">
+
+          <div class="q-item">
+            <div id="q34_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">مدى توافق الصفحة مع البيئة المحلية</div>
+              <div id="q34_answer" class="q-answer">جيد — المحتوى يعكس الذوق والثقافة السعودية. المصطلحات والأسلوب مناسبان للمنطقة الجغرافية المستهدفة.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q35_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">توافق اللغة والأسلوب مع الجمهور</div>
+              <div id="q35_answer" class="q-answer">اللغة العربية الفصحى المبسطة مناسبة. يمكن إضافة لمسة من العامية السعودية لمزيد من الاقتراب العاطفي.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q36_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">هل الرسالة مناسبة لهذه الجغرافيا؟</div>
+              <div id="q36_answer" class="q-answer">نعم بشكل عام. تغيير المناخ والظروف البيئية للمنطقة يمكن توظيفها في الرسالة التسويقية (حرارة، رطوبة، تأثير الشمس).</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q37_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل نوع المحتوى مناسب لهذا السوق؟</div>
+              <div id="q37_answer" class="q-answer">إلى حد ما — السوق السعودي يستجيب بقوة للمحتوى القصصي والتوصيات الشخصية (Word of Mouth). هذا النوع غير مستثمَر.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q38_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">هل الأسلوب البيعي مناسب لهذا الجمهور؟</div>
+              <div id="q38_answer" class="q-answer">السوق المحلي يفضّل البيع عبر الثقة والعلاقة قبل المنتج. الأسلوب الحالي مباشر جداً دون بناء علاقة كافية أولاً.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q39_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">هل الصفحة تخاطب جمهوراً محدداً؟</div>
+              <div id="q39_answer" class="q-answer">لا — الرسالة عامة تخاطب كل من يهتم بالتجميل. تحديد شريحة (مثل: أمهات بعد الولادة، صاحبات البشرة الحساسة) سيرفع التحويل كثيراً.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="insight-box" style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);margin-top:24px;">
+          <div class="ib-icon">🗺️</div>
+          <div>
+            <h4 style="color:var(--purple);">فرصة السوق المحلي غير المستثمرة</h4>
+            <p>المستهلك السعودي يثق بالتوصيات الشخصية أكثر من الإعلانات. ابنِ برنامج سفراء علامة تجارية (Brand Ambassadors) من العملاء المخلصين — 10 عميلات نشطات تساوي حملة إعلانية كاملة.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SECTION 6 · تحليل التفاعل
+    ══════════════════════════════════════ -->
+    <div class="analysis-section sec-red animate-up delay-6">
+      <div class="section-head">
+        <div class="section-num">٦</div>
+        <div>
+          <h2>تحليل التفاعل والأداء</h2>
+          <p>قياس مدى تجاوب الجمهور مع المحتوى ومؤشرات النمو</p>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <!-- Engagement Cards -->
+        <div class="eng-grid" style="margin-bottom:28px;">
+          <div class="eng-card">
+            <div class="ec-emoji">❤️</div>
+            <div class="ec-val" style="color:var(--red);">3.2%</div>
+            <div class="ec-label">معدل التفاعل العام (ER)</div>
+            <div class="ec-status warn">⚠️ متوسط</div>
+          </div>
+          <div class="eng-card">
+            <div class="ec-emoji">💬</div>
+            <div class="ec-val" style="color:var(--blue);">0.4%</div>
+            <div class="ec-label">معدل التعليقات</div>
+            <div class="ec-status bad">❌ منخفض</div>
+          </div>
+          <div class="eng-card">
+            <div class="ec-emoji">📤</div>
+            <div class="ec-val" style="color:var(--yellow);">0.8%</div>
+            <div class="ec-label">معدل المشاركات (Shares)</div>
+            <div class="ec-status warn">⚠️ يحتاج تحسين</div>
+          </div>
+          <div class="eng-card">
+            <div class="ec-emoji">🔖</div>
+            <div class="ec-val" style="color:var(--purple);">1.1%</div>
+            <div class="ec-label">معدل الحفظ (Saves)</div>
+            <div class="ec-status warn">⚠️ منخفض</div>
+          </div>
+          <div class="eng-card">
+            <div class="ec-emoji">👁️</div>
+            <div class="ec-val" style="color:var(--green);">18K</div>
+            <div class="ec-label">متوسط الوصول (Reach)</div>
+            <div class="ec-status good">✅ جيد</div>
+          </div>
+          <div class="eng-card">
+            <div class="ec-emoji">📩</div>
+            <div class="ec-val" style="color:var(--primary);">0.2%</div>
+            <div class="ec-label">معدل الرسائل المباشرة</div>
+            <div class="ec-status bad">❌ منخفض جداً</div>
+          </div>
+        </div>
+
+        <div class="q-grid">
+
+          <div class="q-item">
+            <div id="q40_status" class="q-status good">✅</div>
+            <div class="q-content">
+              <div class="q-label">المنشورات الأعلى أداء</div>
+              <div id="q40_answer" class="q-answer">الريلز الذي يعرض "طريقة استخدام" المنتج حصل على 3x وصول مقارنة بصور الكتالوج — إشارة واضحة لنوع المحتوى المطلوب.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q41_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">أوقات النشر</div>
+              <div id="q41_answer" class="q-answer">النشر عشوائي — لا يتزامن مع أوقات الذروة للجمهور. الأفضل للنساء السعوديات: 8-10 مساءً والجمعة صباحاً.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q42_status" class="q-status warn">⚠️</div>
+            <div class="q-content">
+              <div class="q-label">طبيعة التفاعل وجودة التعليقات</div>
+              <div id="q42_answer" class="q-answer">التعليقات سطحية في الغالب (إيموجي أو "رائع"). قلة الأسئلة والنقاشات تدل على أن المحتوى لا يثير فضولاً كافياً.</div>
+            </div>
+          </div>
+
+          <div class="q-item">
+            <div id="q43_status" class="q-status bad">❌</div>
+            <div class="q-content">
+              <div class="q-label">مدى استجابة الجمهور للعروض</div>
+              <div id="q43_answer" class="q-answer">العروض لا تولّد ضجة كافية — لأنها تُطرح دون بناء مسبق للتوقع (Anticipation) أو إحساس بالحصرية.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+        <div class="score-bars">
+          <div class="bar-row">
+            <div class="bar-label">معدل التفاعل الإجمالي</div>
+            <div class="bar-track"><div class="bar-fill yellow" data-width="52"></div></div>
+            <div class="bar-val yellow">52%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">جودة التعليقات والنقاش</div>
+            <div class="bar-track"><div class="bar-fill red" data-width="30"></div></div>
+            <div class="bar-val red">30%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">الوصول العضوي (Reach)</div>
+            <div class="bar-track"><div class="bar-fill green" data-width="70"></div></div>
+            <div class="bar-val green">70%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">التحويل من تفاعل إلى رسائل</div>
+            <div class="bar-track"><div class="bar-fill red" data-width="15"></div></div>
+            <div class="bar-val red">15%</div>
+          </div>
+        </div>
+
+        <div class="insight-box red">
+          <div class="ib-icon">🎯</div>
+          <div>
+            <h4>الفجوة الكبرى: وصول بدون تحويل</h4>
+            <p>الحساب يصل لعدد جيد من الناس لكن لا يُحوّلهم لمشترين. الحل: في كل منشور ريلز، أضف سؤالاً في التعليقات يشجع على التفاعل، وأجب على كل تعليق في أول ساعة (الخوارزمية تكافئ هذا). استهدف رفع معدل الحفظ والمشاركة لأنهما أقوى مؤشر لجودة المحتوى.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Animate score number
+      const animateValue = (el, start, end, duration) => {
+        let t0 = null;
+        const step = (t) => {
+          if (!t0) t0 = t;
+          const p = Math.min((t - t0) / duration, 1);
+          const ease = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.floor(ease * (end - start) + start);
+          if (p < 1) requestAnimationFrame(step);
+          else el.textContent = end;
+        };
+        requestAnimationFrame(step);
+      };
+
+      const mainScore = document.getElementById('mainScore');
+      if (mainScore) setTimeout(() => animateValue(mainScore, 0, parseInt(mainScore.dataset.val), 2000), 400);
+
+      // Animate bars on scroll
+      const bars = document.querySelectorAll('.bar-fill[data-width]');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.style.width = e.target.dataset.width + '%';
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.3 });
+      bars.forEach(b => observer.observe(b));
+
+      // Parallax orbs
+      const orbs = document.querySelectorAll('.bg-orb');
+      window.addEventListener('scroll', () => {
+        const s = window.scrollY;
+        if (orbs[0]) orbs[0].style.transform = `translateY(${s * 0.2}px)`;
+        if (orbs[1]) orbs[1].style.transform = `translateY(${s * 0.15}px)`;
+        if (orbs[2]) orbs[2].style.transform = `translateY(${s * -0.1}px)`;
+      });
+    });
+  </script>
+  <script src="js/report-connect.js?v=2.5"></script>
+</body>
+</html>

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مركز القيادة | مختبر النمو</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-main: #060608;
+      --sidebar-bg: rgba(15, 23, 42, 0.7);
+      --glass-bg: rgba(255,255,255,0.9);
+      --glass-border: rgba(0,0,0,0.09);
+      --glass-blur: blur(24px) saturate(180%);
+      --text-dark: #0f172a;
+      --text-gray: #475569;
+      --primary: #f58e1a;
+      --primary-glow: rgba(245, 142, 26, 0.3);
+      --green: #10b981;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --blue: #3b82f6;
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    body { background-color: var(--bg-main); color: var(--body-text); display: flex; min-height: 100vh; overflow-x: hidden; }
+
+    /* Background Orbs */
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.2; }
+    .orb-1 { top: -100px; left: -100px; width: 600px; height: 600px; background: var(--purple); }
+    .orb-2 { bottom: -100px; right: -100px; width: 500px; height: 500px; background: var(--primary); opacity: 0.1; }
+
+    /* Layout */
+    .sidebar { width: 280px; background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); border-left: 1px solid var(--glass-border); display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100; }
+    .main-content { flex: 1; margin-right: 280px; padding: 0; display: flex; flex-direction: column; }
+    
+    /* Sidebar Brand & Menu */
+    .brand { padding: 32px 24px; font-size: 24px; font-weight: 900; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--glass-border); color: #fff; }
+    .brand span { color: var(--primary); }
+    .nav-group-title { padding: 24px 24px 8px; font-size: 12px; font-weight: 800; color: var(--text-gray); text-transform: uppercase; letter-spacing: 1px; }
+    .nav-menu { flex: 1; overflow-y: auto; padding-bottom: 24px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 14px; border-right: 4px solid transparent; transition: 0.3s; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; transform: translateX(-5px); }
+    .nav-item.active { color: #fff; background: linear-gradient(90deg, rgba(245, 142, 26, 0.1) 0%, transparent 100%); border-right-color: var(--primary); }
+
+    /* Topbar */
+    .topbar { display: flex; justify-content: space-between; align-items: center; padding: 24px 48px; background: rgba(6, 6, 8, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 90; }
+    .topbar-title { font-size: 24px; font-weight: 900; }
+    .topbar-actions { display: flex; gap: 16px; align-items: center; }
+    .date-filter { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; padding: 10px 16px; border-radius: 8px; font-weight: 700; outline: none; }
+    .user-profile { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; }
+
+    /* Dashboard Content Container */
+    .dashboard-body { padding: 40px 48px; display: flex; flex-direction: column; gap: 32px; }
+
+    /* Card Standard */
+    .card { background: var(--glass-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-soft); position: relative; overflow: hidden; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .card-title { font-size: 18px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; }
+
+    /* KPIs Grid */
+    .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 20px; }
+    .kpi-card { padding: 20px; border-radius: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; position: relative; overflow: hidden; transition: 0.3s; }
+    .kpi-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+    .kpi-title { font-size: 13px; color: var(--text-gray); font-weight: 700; margin-bottom: 12px; z-index: 2; }
+    .kpi-value { font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 4px; z-index: 2; }
+    .kpi-change { font-size: 12px; font-weight: 700; z-index: 2; display: inline-flex; align-items: center; gap: 4px; }
+    .kpi-change.up { color: var(--green); }
+    .kpi-change.down { color: var(--red); }
+    .kpi-icon { position: absolute; left: -10px; bottom: -10px; font-size: 60px; opacity: 0.05; z-index: 1; }
+
+    /* Internal Analytics Grid */
+    .analytics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .an-card { background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent); border: 1px solid var(--glass-border); border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 20px; }
+    .an-icon { width: 56px; height: 56px; border-radius: 12px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--primary); border: 1px solid rgba(245, 142, 26, 0.2); }
+    .an-info h4 { font-size: 14px; color: var(--text-gray); font-weight: 700; margin-bottom: 6px; }
+    .an-info div { font-size: 20px; font-weight: 900; color: #fff; }
+    .an-info span { font-size: 12px; color: var(--green); font-weight: 700; background: rgba(16, 185, 129, 0.1); padding: 2px 8px; border-radius: 4px; margin-right: 8px; }
+
+    /* Main Split (Funnel + Chart) */
+    .main-split { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+    
+    /* Sales Funnel */
+    .funnel-wrap { display: flex; flex-direction: column; gap: 12px; padding-top: 10px; }
+    .f-stage { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; position: relative; margin-bottom: 4px; transition: 0.3s; }
+    .f-stage:hover { background: rgba(255,255,255,0.05); }
+    .f-stage::before { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px; border-radius: 0 8px 8px 0; }
+    .f-1::before { background: var(--blue); } .f-2::before { background: var(--purple); } .f-3::before { background: var(--primary); } .f-4::before { background: var(--green); } .f-5::before { background: var(--yellow); }
+    .f-info { display: flex; flex-direction: column; }
+    .f-name { font-size: 14px; font-weight: 800; color: #fff; }
+    .f-conv { font-size: 11px; color: var(--text-gray); font-weight: 700; }
+    .f-val { font-size: 18px; font-weight: 900; }
+
+    /* Chart Container */
+    .chart-container { height: 300px; width: 100%; position: relative; }
+
+    /* Hot Leads Table */
+    .table-container { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: right; padding: 16px; font-size: 13px; font-weight: 800; color: var(--text-gray); border-bottom: 1px solid var(--glass-border); text-transform: uppercase; letter-spacing: 1px; }
+    td { padding: 16px; font-size: 14px; font-weight: 600; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.02); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+    .badge-red { background: rgba(239, 68, 68, 0.1); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.2); }
+    .badge-yellow { background: rgba(234, 179, 8, 0.1); color: var(--yellow); border: 1px solid rgba(234, 179, 8, 0.2); }
+    .btn-action-sm { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 13px; }
+    .btn-action-sm:hover { background: #f08310; transform: translateY(-2px); box-shadow: 0 4px 10px var(--primary-glow); }
+
+    /* Insights Grid */
+    .insights-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .insight-list { list-style: none; }
+    .insight-list li { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .insight-list li:last-child { border-bottom: none; }
+    .insight-name { font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .insight-val { font-size: 14px; font-weight: 800; color: var(--primary); background: rgba(245, 142, 26, 0.1); padding: 2px 8px; border-radius: 4px; }
+
+
+  </style>
+  <link href="../css/theme.css" rel="stylesheet">
+</style>
+</head>
+<body>
+<script>
+  // Global Fetch Interceptor for Auth
+  const originalFetch = window.fetch;
+  window.fetch = async function() {
+    const res = await originalFetch.apply(this, arguments);
+    if (res.status === 401) {
+      window.location.href = 'login.html';
+    }
+    return res;
+  };
+</script>
+
+
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <!-- Sidebar (System Management) -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      لوحة الإدارة
+    </div>
+    
+    <nav class="nav-menu">
+      <div class="nav-group-title">الرئيسية</div>
+      <a href="dashboard.html" class="nav-item active">📊 مركز القيادة (Dashboard)</a>
+      <a href="analytics.html" class="nav-item">📈 التحليلات المتقدمة</a>
+      
+      <div class="nav-group-title">إدارة النظام</div>
+      <a href="packages.html" class="nav-item">📦 إدارة الباقات والأسعار</a>
+      <a href="users.html" class="nav-item">👥 إدارة المستخدمين والعملاء</a>
+      <a href="coupons.html" class="nav-item">🎟️ كوبونات الخصم</a>
+      <a href="reports.html" class="nav-item">📄 مراجعة تقارير التحليل</a>
+
+      <div class="nav-group-title">العمليات والدعم</div>
+      <a href="vip_requests.html" class="nav-item">👑 طلبات تنفيذ VIP <span style="background: var(--red); color:#fff; padding:2px 6px; border-radius:4px; font-size:10px;">جديد 2</span></a>
+      <a href="support.html" class="nav-item">💬 تذاكر الدعم الفني</a>
+      
+      <div class="nav-group-title">الإعدادات</div>
+<a href="#" onclick="logout()" class="nav-item" style="color:var(--red); margin-top:20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:20px;">🚪 تسجيل الخروج</a>
+      <script>async function logout() { await fetch("../api/admin_logout.php"); window.location.href="login.html"; }</script>
+    </nav>
+
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">مرحباً بعودتك، مدير النظام 👋</div>
+      <div class="topbar-actions">
+        <select class="date-filter" id="dashDateFilter" onchange="loadDashboardData()">
+          <option value="0">اليوم</option>
+          <option value="7">آخر 7 أيام</option>
+          <option value="30" selected>هذا الشهر</option>
+          <option value="365">هذا العام</option>
+        </select>
+        <span id="lastUpdate" style="font-size:12px;color:var(--text-gray);margin-right:10px;"></span>
+        <button class="btn-action-sm" style="background: var(--glass-bg); border: 1px solid var(--glass-border);">تصدير تقرير CSV</button>
+        <div class="user-profile">A</div>
+      </div>
+    </header>
+
+    <div class="dashboard-body">
+
+      <!-- Row 1: Top KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">👁️</div>
+          <div class="kpi-title">إجمالي الزوار</div>
+          <div class="kpi-value">12,450</div>
+          <div class="kpi-change up">↑ 14.5%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">📝</div>
+          <div class="kpi-title">التسجيلات الجديدة</div>
+          <div class="kpi-value">3,120</div>
+          <div class="kpi-change up">↑ 8.2%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">⚙️</div>
+          <div class="kpi-title">التحليلات المنجزة</div>
+          <div class="kpi-value">1,850</div>
+          <div class="kpi-change up">↑ 12.1%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🛒</div>
+          <div class="kpi-title">إجمالي المبيعات</div>
+          <div class="kpi-value">342</div>
+          <div class="kpi-change up">↑ 22.4%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">💰</div>
+          <div class="kpi-title">الإيرادات (الشهرية)</div>
+          <div class="kpi-value" style="color: var(--primary);">$14,850</div>
+          <div class="kpi-change up">↑ 18.5%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">💎</div>
+          <div class="kpi-title">متوسط قيمة العميل</div>
+          <div class="kpi-value">$43.40</div>
+          <div class="kpi-change down">↓ 2.1%</div>
+        </div>
+      </div>
+
+      <!-- Row 2: Internal Analytics Highlights -->
+      <div class="analytics-grid">
+        <div class="an-card">
+          <div class="an-icon">🔀</div>
+          <div class="an-info">
+            <h4>معدل التحويل (مجاني لمدفوع)</h4>
+            <div>18.4% <span>معدل ممتاز</span></div>
+          </div>
+        </div>
+        <div class="an-card">
+          <div class="an-icon">🚪</div>
+          <div class="an-info">
+            <h4>أكثر صفحة خروج (Exit Page)</h4>
+            <div>/checkout <span>نسبة الخروج 22%</span></div>
+          </div>
+        </div>
+        <div class="an-card">
+          <div class="an-icon">🌐</div>
+          <div class="an-info">
+            <h4>أفضل مصدر زوار</h4>
+            <div>إعلانات Instagram <span>45% من التحويلات</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Funnel & Revenue Chart -->
+      <div class="main-split">
+        <!-- Sales Funnel -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🔻 قمع المبيعات (Sales Funnel)</h3>
+          </div>
+          <div class="funnel-wrap">
+            <div class="f-stage f-1" style="width: 100%;">
+              <div class="f-info"><span class="f-name">1. زوار الصفحة</span><span class="f-conv">100% من الإجمالي</span></div>
+              <div class="f-val">1000</div>
+            </div>
+            <div class="f-stage f-2" style="width: 85%;">
+              <div class="f-info"><span class="f-name">2. سجلوا دخولهم</span><span class="f-conv">معدل انتقال 22%</span></div>
+              <div class="f-val">220</div>
+            </div>
+            <div class="f-stage f-3" style="width: 65%;">
+              <div class="f-info"><span class="f-name">3. بدأوا التحليل</span><span class="f-conv">معدل انتقال 63%</span></div>
+              <div class="f-val">140</div>
+            </div>
+            <div class="f-stage f-4" style="width: 40%;">
+              <div class="f-info"><span class="f-name">4. اشتروا باقة</span><span class="f-conv">معدل انتقال 34%</span></div>
+              <div class="f-val" style="color: var(--green);">48</div>
+            </div>
+            <div class="f-stage f-5" style="width: 25%;">
+              <div class="f-info"><span class="f-name">5. طلبوا VIP</span><span class="f-conv">معدل انتقال 12%</span></div>
+              <div class="f-val" style="color: var(--yellow);">6</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenue Chart -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">📈 نمو الإيرادات والتسجيلات</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4: Hot Leads -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔥 العملاء الساخنين (جاهزون للتحويل)</h3>
+          <button class="btn-action-sm" style="background: transparent; border: 1px solid var(--primary); color: var(--primary);">عرض كل العملاء</button>
+        </div>
+        <p style="font-size: 13px; color: var(--text-gray); margin-top: -15px; margin-bottom: 20px;">عملاء حصلوا على التقرير المجاني ومؤشراتهم ضعيفة ولم يشتروا حتى الآن.</p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>الاسم الكريم</th>
+                <th>البريد / الواتساب</th>
+                <th>درجة الحساب</th>
+                <th>المشكلة الأساسية (التي تمنع البيع)</th>
+                <th>آخر زيارة</th>
+                <th>إجراء سريع</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" style="text-align:center;color:var(--text-gray);padding:24px">جارٍ التحميل...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Row 5: Insights Grid -->
+      <div class="insights-grid">
+        <!-- Top Fields -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">🏢 أكثر المجالات طلباً</h3></div>
+          <ul class="insight-list">
+            <li><span class="insight-name" style="color:var(--text-gray)">جارٍ التحميل...</span></li>
+          </ul>
+        </div>
+
+        <!-- Top Problems -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">⚠️ أكثر المشاكل شيوعاً بالترتيب</h3></div>
+          <ul class="insight-list">
+            <li><span class="insight-name" style="color:var(--text-gray)">جارٍ التحميل...</span></li>
+          </ul>
+        </div>
+
+        <!-- Top Packages -->
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">📦 أفضل الباقات مبيعاً</h3></div>
+          <ul class="insight-list">
+            <li><span class="insight-name" style="color:var(--text-gray)">جارٍ التحميل...</span></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    function animateNumber(el, target) {
+      let current = 0; const step = Math.max(1, Math.floor(target / 40));
+      const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current.toLocaleString('en-US');
+        if(current >= target) clearInterval(timer);
+      }, 20);
+    }
+
+    async function loadDashboardData() {
+      try {
+        const days = document.getElementById('dashDateFilter')?.value || 0;
+        const res = await fetch('../api/admin_dashboard.php?days=' + days);
+        const data = await res.json();
+        
+        if (!data.ok) { console.warn('API error:', data.error); return; }
+
+        const kv = document.querySelectorAll('.kpi-value');
+        if(kv.length >= 6) {
+          animateNumber(kv[0], data.kpis.visitors || 0);
+          animateNumber(kv[1], data.kpis.signups || 0);
+          animateNumber(kv[2], data.kpis.analyses || 0);
+          animateNumber(kv[3], data.kpis.sales || 0);
+          kv[4].textContent = '$' + (data.kpis.revenue || 0).toLocaleString('en-US');
+          kv[5].textContent = '$' + ((data.kpis.avg_value || 0).toFixed(2));
+        }
+
+        const fv = document.querySelectorAll('.f-val');
+        const fs = document.querySelectorAll('.f-stage');
+        const fc = document.querySelectorAll('.f-conv');
+        if(fv.length >= 5 && data.funnel) {
+          const v = data.funnel.visitors || 1;
+          fv[0].textContent = v.toLocaleString('en-US');
+          fv[1].textContent = (data.funnel.signups||0).toLocaleString('en-US');
+          fv[2].textContent = (data.funnel.started||0).toLocaleString('en-US');
+          fv[3].textContent = (data.funnel.bought||0).toLocaleString('en-US');
+          fv[4].textContent = (data.funnel.vip||0).toLocaleString('en-US');
+          
+          [[1,data.funnel.signups],[2,data.funnel.started],[3,data.funnel.bought],[4,data.funnel.vip]].forEach(([i,val]) => {
+            if(fs[i]) fs[i].style.width = Math.max(((val||0)/v)*100, 5) + '%';
+            if(fc[i]) fc[i].textContent = 'معدل انتقال ' + (((val||0)/v)*100).toFixed(1) + '%';
+          });
+        }
+
+        const tbody = document.querySelector('table tbody');
+        if(tbody) {
+          if(data.hot_leads && data.hot_leads.length > 0) {
+            tbody.innerHTML = data.hot_leads.map(l => {
+              const bc = l.score < 50 ? 'badge-red' : 'badge-yellow';
+              return '<tr><td>'+l.name+'</td><td dir="ltr">'+l.email+'</td><td><span class="badge '+bc+'">'+l.score+'/100</span></td><td>'+(l.problem||'').substring(0,55)+'</td><td dir="rtl">'+l.time+'</td><td><button class="btn-action-sm">إرسال عرض</button></td></tr>';
+            }).join('');
+          } else {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-gray);padding:24px">لا يوجد عملاء ساخنون حالياً</td></tr>';
+          }
+        }
+
+        const projList = document.querySelector('.insights-grid .card:nth-child(1) .insight-list');
+        if(projList && data.insights && data.insights.projects) {
+          const tot = data.insights.projects.reduce((s,p) => s+parseInt(p.count||0),0)||1;
+          projList.innerHTML = data.insights.projects.length
+            ? data.insights.projects.map(p => '<li><span class="insight-name">🏢 '+(p.project_type||'غير محدد')+'</span><span class="insight-val">'+Math.round((p.count/tot)*100)+'%</span></li>').join('')
+            : '<li><span class="insight-name" style="color:var(--text-gray)">لا توجد بيانات بعد</span></li>';
+        }
+
+        const probList = document.querySelector('.insights-grid .card:nth-child(2) .insight-list');
+        if(probList && data.insights && data.insights.problems) {
+          probList.innerHTML = data.insights.problems.length
+            ? data.insights.problems.map((p,i) => '<li><span class="insight-name"'+(i===0?' style="color:var(--red)"':'')+'>'+  (i+1)+'. '+p.name+'</span><span class="insight-val"'+(i===0?' style="background:rgba(239,68,68,.1);color:var(--red)"':'')+'>'+p.count+' حالة</span></li>').join('')
+            : '<li><span class="insight-name" style="color:var(--text-gray)">لا توجد بيانات بعد</span></li>';
+        }
+
+        const packList = document.querySelector('.insights-grid .card:nth-child(3) .insight-list');
+        if(packList && data.insights && data.insights.packages) {
+          const colors = ['var(--primary)','#fff','var(--yellow)'];
+          packList.innerHTML = data.insights.packages.length
+            ? data.insights.packages.map((p,i) => '<li><span class="insight-name" style="color:'+colors[i]+'">📦 '+p.name+'</span><span class="insight-val" style="color:'+colors[i]+'">'+p.count+' مبيعات</span></li>').join('')
+            : '<li><span class="insight-name" style="color:var(--text-gray)">لا توجد مبيعات بعد</span></li>';
+        }
+
+        const an = document.querySelectorAll('.an-card .an-info div');
+        if(an.length >= 3) {
+          const cr = data.kpis.signups > 0 ? ((data.kpis.sales/data.kpis.signups)*100).toFixed(1) : 0;
+          an[0].innerHTML = cr+'% <span>'+(cr>10?'معدل ممتاز':(cr<3?'يحتاج تحسين':'معدل طبيعي'))+'</span>';
+          an[1].innerHTML = `/checkout <span>بحاجة لربط GA</span>`;
+          an[2].innerHTML = `بحث مباشر <span>بحاجة لربط Pixel</span>`;
+        }
+
+        if(data.chart && window.revenueChart) {
+          window.revenueChart.data.labels = data.chart.labels;
+          window.revenueChart.data.datasets[0].data = data.chart.revenue;
+          window.revenueChart.data.datasets[1].data = data.chart.signups;
+          window.revenueChart.update();
+        }
+
+        const ts = document.getElementById('lastUpdate');
+        if(ts) ts.textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-SA');
+
+      } catch(e) { console.error('Dashboard load error:', e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const ctx = document.getElementById('revenueChart').getContext('2d');
+      const gRev = ctx.createLinearGradient(0,0,0,300);
+      gRev.addColorStop(0,'rgba(245,142,26,0.5)'); gRev.addColorStop(1,'rgba(245,142,26,0)');
+      const gSig = ctx.createLinearGradient(0,0,0,300);
+      gSig.addColorStop(0,'rgba(16,185,129,0.5)'); gSig.addColorStop(1,'rgba(16,185,129,0)');
+      
+      Chart.defaults.color = '#94a3b8';
+      Chart.defaults.font.family = "'Cairo', sans-serif";
+      
+      window.revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['جارٍ التحميل...'],
+          datasets: [
+            { label: 'الإيرادات ($)', data:[0], borderColor:'#f58e1a', backgroundColor:gRev, borderWidth:3, tension:0.4, fill:true, yAxisID:'y' },
+            { label: 'التسجيلات',    data:[0], borderColor:'#10b981', backgroundColor:gSig, borderWidth:3, tension:0.4, fill:true, yAxisID:'y1' }
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{legend:{position:'top',labels:{usePointStyle:true,boxWidth:8}}},
+          scales:{
+            x:{grid:{color:'rgba(255,255,255,.05)'}},
+            y:{type:'linear',position:'left',grid:{color:'rgba(255,255,255,.05)'},ticks:{callback:v=>'$'+v}},
+            y1:{type:'linear',position:'right',grid:{drawOnChartArea:false}}
+          }
+        }
+      });
+      loadDashboardData();
+      setInterval(loadDashboardData, 30000);
+    });
+  </script>
+
+  <!-- Theme Toggle -->
+  <button id="themeToggle" onclick="toggleTheme()" title="تبديل الثيم">🌙</button>
+  <script>
+    (function(){
+      if(localStorage.getItem('theme')==='light'){
+        document.body.classList.add('light-mode');
+        var b=document.getElementById('themeToggle');
+        if(b) b.textContent='☀️';
+      }
+    })();
+    function toggleTheme(){
+      document.body.classList.toggle('light-mode');
+      var isLight=document.body.classList.contains('light-mode');
+      localStorage.setItem('theme',isLight?'light':'dark');
+      var btn=document.getElementById('themeToggle');
+      if(btn) btn.textContent=isLight?'☀️':'🌙';
+    }
+  </script>
+</body>
+</html>
+

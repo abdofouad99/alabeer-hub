@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مُحاكي نمو الإعلانات | العبير</title>
+    <!-- Google Fonts: Tajawal -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js للرسوم البيانية -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>مُحاكي العائد الإعلاني الذكي 🚀</h1>
+        <p>كم من الأموال تخسر يومياً في إعلاناتك؟ أدخل أرقامك واكتشف الصدمة!</p>
+    </div>
+
+    <!-- القسم الأول: إدخال بيانات العميل -->
+    <div class="tech-card">
+        <h2 style="margin-bottom: 20px; color: var(--gold); font-size: 1.3rem;">1. بياناتك المالية الحالية</h2>
+        <div class="grid-2">
+            
+            <div class="input-group">
+                <label>الميزانية الإعلانية الشهرية</label>
+                <div class="input-wrapper">
+                    <span class="suffix">ر.س</span>
+                    <input type="number" id="monthly_budget" value="5000" min="100" step="100">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>متوسط سعر المنتج/الخدمة</label>
+                <div class="input-wrapper">
+                    <span class="suffix">ر.س</span>
+                    <input type="number" id="product_price" value="250" min="10">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>هامش الربح (الصافي بعد التكاليف)</label>
+                <div class="input-wrapper">
+                    <span class="suffix">%</span>
+                    <input type="number" id="profit_margin" value="40" min="1" max="100">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>تكلفة المبيعة الواحدة الحالية (CPA)</label>
+                <div class="input-wrapper">
+                    <span class="suffix">ر.س</span>
+                    <input type="number" id="current_cpa" value="80" min="1">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- القسم الثاني: النتيجة اللحظية -->
+    <div class="tech-card" style="background: rgba(0,0,0,0.4);">
+        <h2 style="margin-bottom: 20px; text-align: center; color: var(--text-muted);">2. التشخيص المالي الحالي</h2>
+        <div class="grid-2">
+            <div class="result-box" id="status_box">
+                <div class="result-title">صافي أرباحك الحالية (شهرياً)</div>
+                <div class="result-number" id="current_profit_val">0</div>
+                <div class="result-message" id="status_msg">جاري الحساب...</div>
+            </div>
+            
+            <div class="result-box" style="border-color: var(--border-color); background: transparent;">
+                <div class="result-title">الحد الأقصى لتكلفة المبيعة (لعدم الخسارة)</div>
+                <div class="result-number" id="breakeven_cpa_val" style="color: var(--text-main); font-size: 2rem; margin-top:20px;">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- القسم الثالث: السحر (التأثير إذا استلمت العبير الإعلانات) -->
+    <div class="tech-card" style="border-color: var(--gold); position: relative; overflow: hidden;">
+        <h2 style="margin-bottom: 10px; color: var(--gold); text-align: center; font-size: 1.5rem;">🪄 ماذا لو درنا نحن حملاتك الإعلانية؟</h2>
+        <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">اسحب المؤشر لترى كيف تتضاعف أرباحك عند تقليل تكلفة المبيعة بخبراتنا</p>
+        
+        <div style="background: rgba(15, 23, 42, 0.9); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+            <div class="slider-title" id="slider_text">سنقلل تكلفة الاستحواذ بنسبة 20%</div>
+            <input type="range" id="cpa_reduction_slider" min="0" max="60" value="20" step="5">
+            <div style="display:flex; justify-content: space-between; color: var(--text-muted); font-size: 0.8rem; margin-top: 5px;">
+                <span>نفس التكلفة (0%)</span>
+                <span>تحسين خرافي (60%)</span>
+            </div>
+        </div>
+
+        <div class="result-box" style="border-color: var(--neon-green); background: rgba(16, 185, 129, 0.05);">
+            <div class="result-title" style="color: var(--gold);">صافي الأرباح المتوقعة معنا (شهرياً)</div>
+            <div class="result-number green" id="potential_profit_val">0</div>
+            <div class="result-message">بنفس ميزانيتك الإعلانية الحالية!</div>
+        </div>
+        
+        <!-- الرسم البياني للفرق -->
+        <div style="height: 250px; margin-top: 30px;">
+            <canvas id="profitChart"></canvas>
+        </div>
+    </div>
+
+    <!-- زر CTA (اصطياد العميل) -->
+    <div class="cta-section">
+        <button class="cta-button" onclick="openModal()">🟢 أوقف النزيف وابدأ بتحقيق هذا الرقم الآن!</button>
+    </div>
+
+</div> <!-- /container -->
+
+<!-- Modal: نموذج التقاط البيانات -->
+<div class="modal-overlay" id="leadModal">
+    <div class="modal-content">
+        <h3 id="modal_title">احصل على الخطة للوصول لهذا الرقم!</h3>
+        <form id="leadForm" onsubmit="submitLead(event)">
+            <input type="text" id="full_name" class="form-input" placeholder="اسمك الكريم *" required>
+            <input type="tel" id="phone" class="form-input" placeholder="رقم الجوال (بدون مفتاح الدولة) *" required>
+            <input type="text" id="company_name" class="form-input" placeholder="اسم مشروعك">
+            <input type="url" id="website_url" class="form-input" placeholder="رابط المتجر/الموقع">
+            
+            <button type="submit" class="form-submit" id="submitBtn">🚀 أرسل بياناتي للبدء</button>
+        </form>
+        <button onclick="closeModal()" style="margin-top:15px; background:transparent; color:#94a3b8; border:none; width:100%; cursor:pointer;">إلغاء</button>
+    </div>
+</div>
+
+<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size: 0.85rem;">
+    &copy; 2026 العبير للتسويق الإلكتروني — مُحاكي الجاهزية المالية للإعلانات v1.0
+</div>
+
+<!-- SweetAlert للرسائل -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- 스كربت المحاكي (العقل المدبر) -->
+<script src="js/simulator.js"></script>
+
+</body>
+</html>

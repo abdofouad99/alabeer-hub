@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مُحلل صفحات الهبوط - Landing Page Grader</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="background-effects">
+        <div class="glow glow-1"></div>
+        <div class="glow glow-2"></div>
+        <div class="glow glow-3"></div>
+    </div>
+
+    <!-- Step 1: Input URL -->
+    <div class="premium-container active" id="step-input">
+        <div class="header">
+            <img src="https://alabeermarketing.com/wp-content/uploads/2024/09/Logo-1.png" alt="العبير للتسويق" class="logo">
+            <h1>المُحلل الخماسي لتسريب المبيعات</h1>
+            <p class="subtitle">هل تصميم صفحة منتجك يُضاعف أموالك، أم يهرّب عملاءك للمنافسين؟</p>
+        </div>
+
+        <div class="url-input-box">
+            <h3 style="color:#FFF; margin-bottom: 20px;">أدخل رابط صفحة منتجك (Landing Page) الآن:</h3>
+            <form id="urlForm">
+                <input type="url" id="targetUrl" placeholder="https://yourstore.com/product/123" required autocomplete="off">
+                <button type="submit" class="premium-btn">
+                    <i class="fa-solid fa-radar"></i> إطلاق الفحص المتقدم للصفحة
+                </button>
+            </form>
+            <p style="color:#8892B0; margin-top:20px; font-size:14px;"><i class="fa-solid fa-lock" style="color:#00F2FE;"></i> 100% آمن - لا يطلب صلاحيات، نحن نقرأ الصفحة بعين المشتري</p>
+        </div>
+    </div>
+
+    <!-- Step 2: Scanner Animation -->
+    <div class="premium-container" id="step-scanning">
+        <div class="header">
+            <h1 style="color:#00F2FE;">يتم تشريح عناصر صفحتك...</h1>
+        </div>
+        <div class="scanner-arena">
+            <div class="target-url-display" id="displayUrl" style="font-family: monospace; background:#0A192F; padding:15px; border-radius:8px; margin-bottom: 20px;">https://...</div>
+            <div class="scan-line-container" style="height: 4px; background: rgba(0, 242, 254, 0.2); border-radius: 4px; overflow: hidden; position: relative;">
+                <div class="scan-line" id="scanLine" style="height: 100%; width: 0%; background: #00F2FE; box-shadow: 0 0 10px #00F2FE; transition: width 0.3s ease;"></div>
+            </div>
+            <ul class="scan-logs" id="scanLogs" style="margin-top:20px; text-align:right; font-family:'Courier New', monospace; font-size:14px; color:#A0AABF; list-style:none; padding:0; line-height:1.8;">
+                <li><i class="fa-solid fa-terminal" style="color:#00F2FE; margin-left:10px;"></i> [الجهاز المركزي] جاري الاتصال بخوادم الويب...</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Step 3: Deep Interactive Quiz -->
+    <div class="premium-container" id="step-quiz">
+        <div class="quiz-header">
+            <div class="progress-bar-bg" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 6px; margin-bottom: 20px; overflow: hidden;">
+                <div class="progress-bar-fill" id="quizProgress" style="height: 100%; width: 0%; background: linear-gradient(90deg, #FF3366, #FF9933); transition: width 0.3s;"></div>
+            </div>
+            <h3 id="questionTitle" style="color:#FFF; font-size:22px; margin-bottom:10px;">السؤال...</h3>
+            <p id="questionDesc" style="color:#8892B0; font-size:15px; margin-bottom:25px;">وصف...</p>
+        </div>
+        
+        <div class="options-grid" id="optionsGrid" style="display:flex; flex-direction:column; gap:15px;">
+            <!-- Options injected dynamically -->
+        </div>
+    </div>
+
+    <!-- Step 4: Results -->
+    <div class="premium-container" id="step-results">
+        
+        <div class="print-header" style="text-align:center; border-bottom:1px solid #00F2FE; padding-bottom:20px; margin-bottom:30px; display:none;">
+            <h1 style="color:#00F2FE; margin:0; font-family:'Cairo';">العبير للتسويق - تقرير فحص المبيعات (Landing Page)</h1>
+            <p style="color:#8892B0; font-family:'Cairo';" id="pdfUrlDisplay">رابط الصفحة:</p>
+        </div>
+
+        <div class="header" style="margin-bottom:20px;">
+            <h1 style="font-size:32px; margin-bottom:10px; color:#FFF;">نتيجة الفحص الفني لصفحتك</h1>
+            <p class="subtitle" style="font-size:16px;">تم كشف مواضع (تسرب الأموال) بدقة</p>
+        </div>
+
+        <div id="resultContent">
+            <!-- Score Box -->
+            <div class="score-card" style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:30px; border-radius:15px; border:1px solid rgba(255,255,255,0.05); margin-bottom:30px;">
+                <div class="score-text" style="flex:1;">
+                    <h3 id="scoreTitle" style="color:#A0AABF; font-size:16px; margin-bottom:5px;">قوة التحويل النقدية المبنية على تصميمك:</h3>
+                    <div class="score-value" id="finalScoreVal" style="font-size:64px; font-weight:900; line-height:1;">0%</div>
+                    <p id="scoreMessage" style="color:#FF3366; font-weight:bold; font-size:18px; margin-top:10px;"></p>
+                </div>
+                <div class="gauge-box" style="width:200px; height:100px; position:relative;">
+                    <canvas id="gaugeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="alert-box" id="warningAlert" style="background:rgba(255,51,102,0.1); border-right:4px solid #FF3366; padding:15px; border-radius:8px; margin-bottom:30px; display:flex; align-items:center; gap:15px;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:#FF3366; font-size:24px;"></i>
+                <span style="color:#FFF;">أنت تخسر حرفياً أموال إعلاناتك، لأن العميل عندما ينقر على إعلانك ويصل لهذه الصفحة، يشعر بالتردد والارتباك ويغادر فوراً للمنافس.</span>
+            </div>
+
+            <!-- Detailed Feedback Breakdown -->
+            <h3 style="color:#00F2FE; margin-bottom:15px; font-size:20px; text-align:right;"><i class="fa-solid fa-microscope"></i> التشخيص السريري للأخطاء الفادحة:</h3>
+            <div class="feedback-grid" id="feedbackGrid" style="display:flex; flex-direction:column; gap:15px; margin-bottom:40px;">
+                <!-- JS will populate feedback boxes here based strictly on user answers -->
+            </div>
+
+            <!-- Action Area / Buttons -->
+            <div class="action-boxes" style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:30px;">
+                <!-- Lead Capture to reveal 'How to Fix' Document -->
+                <div class="premium-lead" id="leadCaptureModule" style="flex:1; background:linear-gradient(135deg, rgba(0, 242, 254, 0.1), rgba(0,0,0,0.4)); padding:30px; border-radius:15px; border:1px solid rgba(0, 242, 254, 0.3);">
+                    <h3 style="color:#FFF; text-align:center; margin-bottom:10px;">📥 احصل على خريطة (ترميم التحويل) المخصصة بملف PDF فوراً</h3>
+                    <p style="color:#A0AABF; margin-bottom:25px; text-align:center; font-size:14px;">يحتوي التقرير على ملاحظات حاسمة ستضاعف أرباحك دون زيادة ميزانية إعلاناتك. سجل لتحميله وإرسال نسخة للواتساب.</p>
+                    <form id="graderLeadForm">
+                        <div class="input-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                            <input type="text" id="leadName" placeholder="الاسم الكريم" required style="padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); color:#FFF; font-family:'Cairo';">
+                            <input type="tel" id="leadPhone" placeholder="رقم الواتساب" required minlength="8" style="padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); color:#FFF; font-family:'Cairo';">
+                        </div>
+                        <button type="submit" class="premium-btn" style="width:100%; margin-top:20px; font-size:18px;">
+                            <i class="fa-solid fa-file-pdf"></i> حمّل تقرير الأخطاء الآن بصيغة PDF
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="js/grader.js"></script>
+</body>
+</html>
