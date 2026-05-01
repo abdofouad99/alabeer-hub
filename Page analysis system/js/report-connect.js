@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const path = window.location.pathname;
   let id = urlParams.get('id');
-  
+
   // ── MOCK DATA FOR PREVIEW MODE ──
   let isMockMode = false;
   let mockData = null;
@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (href && !href.startsWith('#') && !href.startsWith('http')) {
       // If it already has the exact id parameter, skip
       if (href.includes('id=' + id)) return;
-      
+
       const separator = href.includes('?') ? '&' : '?';
       link.setAttribute('href', href + separator + 'id=' + id);
     }
@@ -158,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     if (!id || id === 'mock') return;
     let token = urlParams.get('token') || sessionStorage.getItem('last_assessment_token');
-    
+
     fetch(`api/result.php?id=${id}&token=${token || ''}`)
       .then(res => { if (!res.ok) throw new Error('Server error: ' + res.status); return res.json(); })
       .then(data => {
@@ -203,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // ── تحديث نوع الحساب والمجال (Dynamic Binding) ────────
       const typeEl  = document.getElementById('profileAccountType');
       const nicheEl = document.getElementById('profileNiche');
-      
+
       const ai = data.ai_report || {};
       if (typeEl) {
         let typeStr = ai.page_type || data.project_type || 'تجاري';
@@ -529,7 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const score = data.score || 50;
         const strList = document.getElementById('strengthsList');
         const strengths = (ai && ai.strengths && ai.strengths.length > 0) ? ai.strengths : null;
-        
+
         if (strList && strengths) {
           let html = '';
           strengths.forEach((str, i) => {
@@ -646,7 +646,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const strCircle = document.getElementById('strCircle');
         const strTitle  = document.getElementById('strTitle');
         const strDesc   = document.getElementById('strDesc');
-        
+
         if (strScore && score) {
           strScore.setAttribute('data-val', score);
           strScore.textContent = score;
@@ -815,7 +815,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const recClientName = document.getElementById('recClientName');
         const recHandle = document.getElementById('recHandle');
         const recTotalCount = document.getElementById('recTotalCount');
-        
+
         if (recClientName) recClientName.textContent = clientName;
         if (recHandle) {
           recHandle.textContent = srObj.instagram_url ? srObj.instagram_url.replace(/https?:\/\/(www\.)?instagram\.com\//, '@') : '@' + clientName.replace(/\s+/g, '_').toLowerCase();
@@ -904,6 +904,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           if (recHighList) recHighList.innerHTML = `<div style="padding:20px;color:var(--text-gray);font-weight:700;">لا توجد بيانات — تأكد من اكتمال التحليل.</div>`;
         }
+      } // ← closes `if (path.includes('recommendations.html'))` opened above (was missing — caused parse failure for the entire file)
 
       // ==========================================
       // PAGE: detailed-analysis.html (ULTIMATE AUDIT)
@@ -936,7 +937,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const urlI = document.getElementById('auditIgUrl');
         if (urlI) urlI.innerHTML = instagramUrl ? `<a href="${instagramUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${instagramUrl}</a>` : 'لم يتم العثور على حساب';
         const _gi = document.getElementById('gridInstagram'); if (!instagramUrl && _gi) _gi.classList.add('card-disabled');
-        
+
         const igData = srObj.instagram || {};
         if (document.getElementById('igFollowers') && igData.followers) {
            document.getElementById('igFollowers').textContent = parseInt(igData.followers).toLocaleString();
@@ -969,7 +970,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const score = item.score || 0;
             // Highlight random keywords for effect (e.g., english words)
             let richText = (item.reason || '').replace(/([A-Za-z]+)/g, '<span class="highlight">$1</span>');
-            
+
             diagHtml += `
               <div class="diagnosis-block">
                 <div class="diag-score">
@@ -1000,13 +1001,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (grid && data.competitor_radar && data.competitor_radar.length > 0) {
           let html = '';
           const ranks = ['1st', '2nd', '3rd', '4th', '5th'];
-          
+
           data.competitor_radar.slice(0,5).forEach((comp, i) => {
             const st1 = comp.strengths && comp.strengths[0] ? comp.strengths[0] : 'وجود قوي في السوق';
             const st2 = comp.strengths && comp.strengths[1] ? comp.strengths[1] : 'قاعدة عملاء مستقرة';
             const wk1 = comp.weaknesses && comp.weaknesses[0] ? comp.weaknesses[0] : 'خدمة عملاء بطيئة';
             const wk2 = comp.weaknesses && comp.weaknesses[1] ? comp.weaknesses[1] : 'محتوى غير متجدد';
-            
+
             html += `
               <div class="comp-card">
                 <div class="cc-header">
@@ -1016,7 +1017,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   </div>
                   <div class="cc-rank">${ranks[i] || '#'}</div>
                 </div>
-                
+
                 <div class="traits-list">
                   <div class="trait-group">
                     <span class="trait-title">نقاط تفوقه (Strengths)</span>
@@ -1029,7 +1030,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="trait-item trait-weakness">${wk2}</div>
                   </div>
                 </div>
-                
+
                 <div class="attack-plan">
                   <div class="ap-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> خطة الهجوم</div>
                   <div class="ap-desc">${comp.attack_plan || 'استغل نقاط ضعفه أعلاه للسيطرة على عملائه.'}</div>
@@ -1126,126 +1127,17 @@ document.addEventListener("DOMContentLoaded", () => {
           // البيانات موجودة — ارسم مباشرة
           renderAdsSection(data, srObj, clientName, srObj.ads_library && srObj.ads_library.ai_analysis ? srObj.ads_library.ai_analysis : null);
         }
+      } // ← closes `if (path.includes('ads.html'))` opened above (was missing — caused parse failure for the entire file)
 
       // (الكتلة المكررة لـ recommendations تم دمجها مع الأولى وإزالتها من هنا)
 
       // ==========================================
       // PAGE: journey.html
+      // ──────────────────────────────────────────
+      // Funnel rendering is AI-driven only. The single source of truth
+      // is the block farther down that consumes data.ai_report.customer_journey.
+      // No score-based fake-data fallback (no Math.random()) — see audit #2.
       // ==========================================
-      if (path.includes('journey.html')) {
-        const score = data.score || 50;
-        
-        // Base numbers based on score (simulating real funnel logic)
-        let s1 = score > 70 ? 90 : score > 40 ? 70 : 40;
-        let s2 = score > 70 ? 80 : score > 40 ? 55 : 30;
-        let s3 = score > 70 ? 75 : score > 40 ? 30 : 15;
-        let s4 = score > 70 ? 40 : score > 40 ? 10 : 2;
-        let s5 = score > 70 ? 60 : score > 40 ? 35 : 15;
-
-        // Add some random variation
-        s1 += Math.floor(Math.random() * 5);
-        s2 += Math.floor(Math.random() * 5);
-        s3 += Math.floor(Math.random() * 5);
-        s4 += Math.floor(Math.random() * 5);
-        s5 += Math.floor(Math.random() * 5);
-
-        // Update HTML
-        const journeyScore = document.getElementById('journeyScore');
-        const journeyCircle = document.getElementById('journeyCircle');
-        const journeyStatusTitle = document.getElementById('journeyStatusTitle');
-        const journeyStatusDesc = document.getElementById('journeyStatusDesc');
-        
-        const typeStr = data.project_type || (data.ai_report ? data.ai_report.page_type : '') || 'تجاري';
-        const isService = (typeStr.includes('Service') || typeStr.includes('Business') || typeStr.includes('تسويق') || typeStr.includes('شركة') || typeStr.includes('عقارات') || typeStr.includes('Influencer') || /marketing|agency|وكالة|b2b/i.test(typeStr));
-
-        if (journeyScore) {
-          journeyScore.setAttribute('data-val', score);
-          journeyScore.textContent = score;
-        }
-
-        if (journeyCircle) {
-          journeyCircle.setAttribute('data-percent', score);
-          if (score > 70) journeyCircle.setAttribute('data-color', 'var(--green)');
-          else if (score > 40) journeyCircle.setAttribute('data-color', 'var(--yellow)');
-          else journeyCircle.setAttribute('data-color', 'var(--red)');
-        }
-
-        if (journeyStatusTitle) {
-          if (score > 70) {
-            journeyStatusTitle.innerHTML = '✅ مسار احترافي';
-            journeyStatusTitle.style.color = 'var(--green)';
-            if (journeyStatusDesc) journeyStatusDesc.innerHTML = isService ? 'الزوار يتدفقون بسلاسة ويتحولون إلى عملاء متعاقدين بكفاءة عالية.' : 'الزوار يتدفقون بسلاسة ويتحولون إلى مشترين بكفاءة عالية.';
-          } else if (score > 40) {
-            journeyStatusTitle.innerHTML = '⚠️ يوجد انسداد';
-            journeyStatusTitle.style.color = 'var(--yellow)';
-            if (journeyStatusDesc) journeyStatusDesc.innerHTML = isService ? 'الكثير من الزوار، لكن <strong>قليل من يطلب الخدمة</strong> بسبب نقطة اختناق في المنتصف.' : 'الكثير من الزوار، لكن <strong>قليل من يشتري</strong> بسبب نقطة اختناق في المنتصف.';
-          } else {
-            journeyStatusTitle.innerHTML = '❌ نزيف خطير';
-            journeyStatusTitle.style.color = 'var(--red)';
-            if (journeyStatusDesc) journeyStatusDesc.innerHTML = 'مسار التحويل مكسور. أنت تدفع للزوار لكي يهربوا فوراً.';
-          }
-        }
-
-        // Update Stages Data
-        ['stage1', 'stage2', 'stage3', 'stage4', 'stage5'].forEach((id, idx) => {
-          const val = [s1, s2, s3, s4, s5][idx];
-          const scoreEl = document.getElementById(`${id}Score`);
-          const boxEl = document.getElementById(`${id}Box`);
-          const descEl = document.getElementById(`${id}Desc`);
-          
-          if (scoreEl) {
-            scoreEl.setAttribute('data-val', val);
-            scoreEl.textContent = val + '%';
-          }
-          if (boxEl) {
-            boxEl.classList.remove('stage-green', 'stage-yellow', 'stage-red');
-            if (val > 60) boxEl.classList.add('stage-green');
-            else if (val > 30) boxEl.classList.add('stage-yellow');
-            else boxEl.classList.add('stage-red');
-          }
-          
-          if (descEl) {
-            if (idx === 0) { // Awareness
-              if (val > 60) descEl.innerHTML = 'حملاتك الإعلانية تعمل بشكل ممتاز وتنجح في لفت انتباه الجمهور المستهدف. هناك تدفق صحي للزوار الجدد إلى حسابك.';
-              else descEl.innerHTML = 'الإعلانات لا تجلب زواراً كافيين. الاستهداف أو الرسالة الإعلانية الأولية بحاجة لمراجعة وتعديل عاجل.';
-            } else if (idx === 1) { // Interest
-              if (val > 60) descEl.innerHTML = isService ? 'الزوار يعجبهم التصميم العام وتلفتهم خدماتك. يقومون بتصفح بعض المنشورات، مما يعكس اهتماماً حقيقياً.' : 'الزوار يعجبهم التصميم العام وتلفتهم المنتجات. يقومون بتصفح بعض المنشورات، مما يعكس وجود اهتمام حقيقي.';
-              else descEl.innerHTML = 'الزوار يخرجون فور دخولهم الحساب. المحتوى لا يبدو مقنعاً أو غير متناسق مع ما وعدت به في الإعلان.';
-            } else if (idx === 2) { // Trust
-              if (val > 60) descEl.innerHTML = isService ? 'استطعت بناء ثقة ممتازة! مراجعات العملاء وتجاربهم واضحة، والزائر يشعر بالأمان لطلب خدماتك.' : 'استطعت بناء ثقة ممتازة! مراجعات العملاء وتجاربهم واضحة، والزائر يشعر بالأمان لإكمال الشراء.';
-              else descEl.innerHTML = 'الزائر يتردد ويغادر. لا يجد ما يطمئنه؛ غياب تجارب العملاء (Social Proof) يجعله يخشى المغامرة بماله.';
-            } else if (idx === 3) { // Conversion
-              if (val > 60) descEl.innerHTML = isService ? 'عملية التواصل وطلب الخدمة سهلة وواضحة جداً. معدل التحويل ممتاز يعكس قوة عرضك وموثوقية نشاطك.' : 'عملية الدفع سهلة وواضحة جداً. معدل التحويل ممتاز يعكس قوة عرضك وموثوقية موقعك.';
-              else descEl.innerHTML = isService ? 'عدد قليل جداً يقوم بالتواصل للطلب. قد يكون السبب تعقيد قنوات التواصل أو غياب الحافز المباشر.' : 'عدد قليل جداً يكمل عملية الدفع. قد يكون السبب تعقيد خطوات الدفع، تكلفة الشحن المخفية، أو تردد اللحظة الأخيرة.';
-            } else if (idx === 4) { // Loyalty
-              if (val > 60) descEl.innerHTML = isService ? 'خدمتك ممتازة! العملاء يعودون للتعامل معك مرة أخرى ويوصون بك، مما يعني رضاهم التام.' : 'منتجك ممتاز! العملاء يعودون للشراء مرة أخرى، مما يعني ولائهم لعلامتك التجارية ورضاهم التام.';
-              else descEl.innerHTML = isService ? 'تعامل لمرة واحدة! العميل يستفيد من الخدمة ولا يعود مجدداً. جودة الخدمة أو متابعة العملاء بحاجة لتحسين.' : 'مبيعات المرة الواحدة! العميل يشتري ولا يعود مجدداً. جودة المنتج أو تجربة ما بعد البيع بحاجة لتحسين.';
-            }
-          }
-        });
-
-        // Determine Bottleneck (Lowest conversion from previous step)
-        const s3Warning = document.getElementById('stage3Warning');
-        const s4Warning = document.getElementById('stage4Warning');
-        const s3Fix = document.getElementById('stage3FixBox');
-        const s4Fix = document.getElementById('stage4FixBox');
-
-        if (s3Warning && s4Warning) {
-          if (score < 70) {
-            // Calculate the drops to find the actual bottleneck
-            const dropToTrust = s2 - s3;
-            const dropToConversion = s3 - s4;
-            
-            if (dropToTrust >= dropToConversion) { 
-              s3Warning.style.display = 'inline-block';
-              if (s3Fix) s3Fix.style.display = 'block';
-            } else {
-              s4Warning.style.display = 'inline-block';
-              if (s4Fix) s4Fix.style.display = 'block';
-            }
-          }
-        }
-      }
 
       // ==========================================
       // PAGE: content.html
@@ -1254,24 +1146,24 @@ document.addEventListener("DOMContentLoaded", () => {
         const score = data.score || 50;
         const fb = sr.facebook || {};
         const ig = sr.instagram || {};
-        
+
         // محاولة جلب التحليل العميق (نفضل إنستجرام لأنه أدق في توزيع الأنواع عادةً)
         const da = ig.deep_analysis || fb.deep_analysis || {};
         const types = da.types_percent || { video: 33, image: 33, sidecar: 34 };
         const cta   = da.cta_percent !== undefined ? da.cta_percent : (score > 60 ? 60 : 30);
-        
+
         // 1. جودة التصميم (Visual): نربطها بوجود صورة بروفايل والدرجة العامة
         let cVisual = (ig.profile_pic || fb.profile_pic) ? (score + 15) : score;
         if (cVisual > 95) cVisual = 95;
-        
+
         // 2. قوة الرسالة (Msg): نربطها مباشرة بنسبة الـ CTA المكتشفة
         let cMsg = cta;
         if (cMsg < 30 && score > 50) cMsg = 45;
-        
+
         // 3. التفاعل (Eng): نربطه بمعدل التفاعل الحقيقي
         let realER = parseFloat(ig.engagement_rate || fb.avg_engagement || 0);
         let cEng = realER > 3 ? 90 : realER > 1.5 ? 70 : realER > 0.5 ? 50 : 30;
-        
+
         // 4. التنوع (Var): نربطه بمدى توازن الأنواع (فيديو وصور وكاروسيل)
         let typeCount = 0;
         if (types.video > 5) typeCount++;
@@ -1357,10 +1249,10 @@ document.addEventListener("DOMContentLoaded", () => {
           // Fallback: If AI fails to return content_analysis, sanitize the hardcoded mock data so it doesn't look fake
           const typeStr = ai.page_type || data.project_type || 'تجاري';
           const isService = (typeStr.includes('Service') || typeStr.includes('Business') || typeStr.includes('تسويق') || typeStr.includes('شركة') || typeStr.includes('عقارات') || typeStr.includes('Influencer') || /marketing|agency|وكالة|b2b/i.test(typeStr));
-          
+
           document.querySelectorAll('.q-answer, .q-label, .insight-box p, .insight-box h4, .bar-label, .pill, .j-card-title, .j-stat-label, .problem-desc, .f-label, .dc-sub').forEach(el => {
               let txt = el.innerHTML;
-              
+
               // Global String Sanitization (Runs on Fallback AND AI text)
               txt = txt.replace(/ناتشورال بيوتي/g, clientName);
               txt = txt.replace(/منتجات تجميل طبيعية/g, 'منتجات/خدمات مميزة');
@@ -1372,7 +1264,7 @@ document.addEventListener("DOMContentLoaded", () => {
               txt = txt.replace(/نساء سعوديات/g, 'الجمهور المستهدف');
               txt = txt.replace(/سيروم/g, 'أهم ما تقدمه');
               txt = txt.replace(/طبيعي 100%\؟ عضوي\؟ محلي\؟/g, 'توضيح الميزة التنافسية الدقيقة');
-              
+
               // إزالة العبارات التي توحي بأن النص قالب أو تخمين واستبدالها بنص تحليلي واثق
               txt = txt.replace(/صورة البروفايل واضحة ومميزة\. الغلاف \(إن وُجد\) يتناسق مع الهوية البصرية العامة — مستوى جيد\./g, 'الواجهة الرئيسية وحالة البروفايل تعكس احترافية وتتناسق بشكل ممتاز مع الهوية البصرية.');
               txt = txt.replace(/نعم من الشكل العام\. لكن التخصص الدقيق .* غير واضح بما يكفي\./g, 'النشاط واضح بشكل عام، لكن يُنصح بإبراز الميزة التنافسية الدقيقة بشكل أقوى في النبذة التعريفية.');
@@ -1384,7 +1276,7 @@ document.addEventListener("DOMContentLoaded", () => {
               txt = txt.replace(/يحتاج تحسيناً — البايو الحالي عام\./g, 'تحتاج النبذة التعريفية إلى تحسين لتكون أكثر دقة وتحديداً.');
               txt = txt.replace(/ماذا تبيع \+ لمن \+ ما الميزة الفريدة \+ كيف تطلب/g, isService ? 'نوع الخدمة + لمن + الميزة التنافسية + دعوة للحجز أو التواصل' : 'ما هو المنتج + لمن + الميزة التنافسية + دعوة للطلب');
               txt = txt.replace(/نعم — "ناتشورال بيوتي" يوحي مباشرة بالمنتجات الطبيعية والتجميل\. سهل التذكر والبحث عنه\./g, 'نعم، الاسم مناسب وسهل التذكر ويعكس مجال النشاط بوضوح، مما يسهل على الجمهور البحث عنه.');
-              
+
               txt = txt.replace(/المستهلك السعودي/g, 'المستهلك المحلي');
               txt = txt.replace(/الريلز الذي يعرض "طريقة استخدام" المنتج حصل على 3x وصول مقارنة بصور الكتالوج — إشارة واضحة لنوع المحتوى المطلوب\./g, 'المحتوى المرئي القصير الذي يقدم فائدة عملية مباشرة يتفوق في الوصول والتفاعل مقارنة بالمحتوى الترويجي الجامد.');
               txt = txt.replace(/الأفضل للنساء السعوديات: 8-10 مساءً والجمعة صباحاً\./g, 'يُنصح باختبار أوقات النشر لتحديد ذروة تواجد جمهورك المستهدف بشكل دقيق.');
@@ -1392,7 +1284,7 @@ document.addEventListener("DOMContentLoaded", () => {
               txt = txt.replace(/تحديد شريحة \(مثل: أمهات بعد الولادة، صاحبات البشرة الحساسة\) سيرفع التحويل كثيراً\./g, 'تحديد شريحة دقيقة بدلاً من مخاطبة الجميع سيرفع من معدلات التحويل بشكل ملحوظ.');
               txt = txt.replace(/"منتجات عناية طبيعية 100% \| توصيل سريع \| اطلبي الآن 👇"/g, isService ? '"خدمات متخصصة باحترافية | احجز استشارتك الآن 👇"' : '"منتجات مميزة بجودة عالية | اطلب الآن 👇"');
                   txt = txt.replace(/تبيع دون أن تبدو "محل"\./g, isService ? 'تجلب عملاء دون أن تبدو "إعلاناً تقليدياً".' : 'تبيع دون أن تبدو كـ "كتالوج جامد".');
-              
+
               if (isService) {
                   txt = txt.replace(/هناك منتجات معروضة/g, 'هناك خدمات معروضة');
                   txt = txt.replace(/تجربة الشراء/g, 'تجربة طلب الخدمة');
@@ -1406,14 +1298,14 @@ document.addEventListener("DOMContentLoaded", () => {
                   txt = txt.replace(/المنتجات/g, 'الخدمات');
                   txt = txt.replace(/للنساء السعوديات/g, 'لجمهورك المستهدف');
               }
-              
+
               txt = txt.replace(/ \(80%\)/g, '');
               txt = txt.replace(/\(نصائح عناية، مكونات، أخطاء شائعة\)/g, '(نصائح، معلومات قيمة، إجابات للجمهور)');
               txt = txt.replace(/\(عروض، منتجات، CTA واضح\)/g, '(عروض، خدمات، دعوة اتخاذ إجراء واضحة)');
               txt = txt.replace(/40% تعليمي/g, 'محتوى تعليمي');
               txt = txt.replace(/30% بناء ثقة/g, 'محتوى بناء ثقة');
               txt = txt.replace(/30% بيعي/g, 'محتوى بيعي/ترويجي');
-              
+
               if (isService) {
                   txt = txt.replace(/للبيع أو الحجز/g, 'للطلب أو التعاقد');
                   txt = txt.replace(/تجربة الشراء/g, 'تجربة الطلب/التواصل');
@@ -1428,12 +1320,12 @@ document.addEventListener("DOMContentLoaded", () => {
                   txt = txt.replace(/يبيع/g, 'يقدم');
                   txt = txt.replace(/المشترين/g, 'العملاء');
               }
-              
+
               el.innerHTML = txt;
           });
-          
+
           // تم إزالة تغيير الـ Status العشوائي لتجنب التناقض بين الأيقونة والنص المكتوب
-          
+
           // Fallback: update progress bars dynamically ONLY if AI didn't supply them
           const allBars = document.querySelectorAll('.bar-fill[data-width]');
           const barsUpdatedByAI = ca && Array.isArray(ca.q) && ca.bar_cta !== undefined;
@@ -1453,7 +1345,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
           }
-          
+
           // Update balance wheel from customer_journey stages if available (real AI data)
           const cj = data.ai_report && data.ai_report.customer_journey;
           if (cj && cj.stages) {
@@ -1525,32 +1417,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
             pillsContainer.innerHTML = pills.map(p => `<div class="pill ${p.cls}">${p.txt}</div>`).join('');
           }
-          
+
           // Fallback: Dynamic overrides based on actual technical scan
           const scan = data.scan_result || {};
-          const hasContact = scan.hasWhatsApp || scan.hasPhoneNumber || scan.hasContactForm || 
+          const hasContact = scan.hasWhatsApp || scan.hasPhoneNumber || scan.hasContactForm ||
                              (scan.social && (scan.social.has_whatsapp || scan.social.whatsapp || scan.social.has_phone || scan.social.has_contact));
           const hasCTA = scan.hasCTA || (scan.social && scan.social.has_cta_button);
-          
+
           if (hasContact) {
               const q3Answer = document.getElementById('q3_answer');
               const q3Status = document.getElementById('q3_status');
               if (q3Answer) q3Answer.textContent = 'نعم — وسائل التواصل (مثل رابط واتساب أو اتصال) موجودة وواضحة، مما يسهل على العميل الوصول إليك بسرعة.';
               if (q3Status) { q3Status.textContent = '✅'; q3Status.className = 'q-status good'; }
-              
+
               const q14Answer = document.getElementById('q14_answer');
               const q14Status = document.getElementById('q14_status');
               if (q14Answer) q14Answer.textContent = 'قنوات التواصل مريحة ومتاحة بوضوح، مما يقلل من تردد العميل ويزيد احتمالية التحويل بنجاح.';
               if (q14Status) { q14Status.textContent = '✅'; q14Status.className = 'q-status good'; }
           }
-          
+
           if (hasCTA) {
               const q2Answer = document.getElementById('q2_answer');
               const q2Status = document.getElementById('q2_status');
               if (q2Answer) q2Answer.textContent = 'نعم — توجد دعوة واضحة لاتخاذ إجراء (CTA) توجه العميل بشكل صحيح للخطوة التالية.';
               if (q2Status) { q2Status.textContent = '✅'; q2Status.className = 'q-status good'; }
           }
-          
+
           // Fallback: Dynamic Engagement Cards based on score and followers
           const ecVals = document.querySelectorAll('.ec-val');
           if (ecVals.length === 6) {
@@ -1559,14 +1451,14 @@ document.addEventListener("DOMContentLoaded", () => {
               ecVals[1].textContent = (baseER * 0.15).toFixed(1) + '%'; // Comments
               ecVals[2].textContent = (baseER * 0.25).toFixed(1) + '%'; // Shares
               ecVals[3].textContent = (baseER * 0.35).toFixed(1) + '%'; // Saves
-              
+
               const followers = scan.social?.followers || scan.followers || data.scan_result?.og?.followers || 5000;
               let reach = Math.floor(followers * (score/100) * 0.4);
               if (reach < 100) reach = Math.floor((score/100) * 1500); // fallback if followers is 0
               ecVals[4].textContent = reach > 1000 ? (reach/1000).toFixed(1) + 'K' : reach; // Reach
-              
+
               ecVals[5].textContent = (baseER * 0.08).toFixed(1) + '%'; // DMs
-              
+
               // update status colors to match the dynamic numbers
               const ecStatuses = document.querySelectorAll('.ec-status');
               if (ecStatuses.length === 6) {
@@ -1713,7 +1605,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const strCircle = document.getElementById('strCircle');
           const strTitle = document.getElementById('strTitle');
           const strDesc = document.getElementById('strDesc');
-          
+
           if (strScore) {
             strScore.setAttribute('data-val', score);
             strScore.textContent = score;
@@ -1744,7 +1636,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const strList = document.getElementById('strengthsList');
           if (strList) {
             let strengths = [];
-            
+
             if (ai.strengths && Array.isArray(ai.strengths) && ai.strengths.length > 0) {
               ai.strengths.forEach((str, index) => {
                 let parts = str.split(':');
@@ -1752,13 +1644,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 let title = rawTitle.replace(/[\*\-\#]/g, '').trim();
                 let desc = parts.length > 1 ? parts.slice(1).join(':').trim() : str;
                 desc = desc.replace(/[\*\-\#]/g, '').trim();
-                
+
                 let icon = '✨';
                 if (str.includes('محتوى') || str.includes('صور') || str.includes('هوية') || str.includes('بصري')) icon = '🎨';
                 else if (str.includes('تفاعل') || str.includes('جمهور') || str.includes('عملاء') || str.includes('متابع')) icon = '💬';
                 else if (str.includes('منتج') || str.includes('خدمة') || str.includes('عرض') || str.includes('جودة')) icon = '🛍️';
                 else if (str.includes('إعلان') || str.includes('تسويق') || str.includes('مبيعات')) icon = '🚀';
-                
+
                 strengths.push({ title: title, desc: desc, score: 95 - (index * 5), icon: icon });
               });
             } else {
@@ -1769,7 +1661,7 @@ document.addEventListener("DOMContentLoaded", () => {
               if (ws.has_checkout) strengths.push({ title: isService ? 'نظام تواصل وتسجيل واضح' : 'نظام دفع متكامل', desc: isService ? 'تتوفر لديك نقطة واضحة لاستقطاب الطلبات (Lead Generation)، مما يسهل التحويل.' : 'تتوفر لديك صفحة إتمام شراء (Checkout)، مما يسهل عملية تحصيل الأموال.', score: score + 8, icon: isService ? '📞' : '💳' });
               if (ig.followers && ig.followers > 5000) strengths.push({ title: 'قاعدة جماهيرية جيدة', desc: 'يوجد عدد جيد من المتابعين يمكن استغلاله كشريحة أولية للاختبار وبناء الثقة.', score: score + 6, icon: '👥' });
               if (fb.has_ads) strengths.push({ title: 'تواجد إعلاني نشط', desc: 'أنت تستثمر بالفعل في جلب الزيارات عبر الإعلانات، نحتاج فقط لمضاعفة العائد (ROAS).', score: score + 9, icon: '🚀' });
-              
+
               if (strengths.length < 4) {
                 strengths.push({ title: 'هوية بصرية متناسقة', desc: 'الألوان والخطوط المستخدمة تعكس طبيعة المشروع بشكل جيد ومريح للعين.', score: score + 4, icon: '🎨' });
                 strengths.push({ title: 'جودة المحتوى البصري', desc: 'الصور والفيديوهات المستخدمة ذات جودة عالية وتلفت الانتباه مبدئياً.', score: score + 2, icon: '🖼️' });
@@ -1780,7 +1672,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Sort by highest score
             strengths.sort((a, b) => b.score - a.score);
-            
+
             // --- AI Deep Analysis Box (Strengths) ---
             if (ai.strengths && Array.isArray(ai.strengths) && ai.strengths.length > 0) {
               const existingAiBox = document.querySelector('.ai-str-box');
@@ -1797,7 +1689,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 strList.parentNode.insertBefore(aiBlock, strList);
               }
             }
-            
+
             let html = '';
             strengths.slice(0, 5).forEach(s => {
               const val = Math.min(Math.round(s.score), 99);
@@ -1827,7 +1719,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const weakCircle = document.getElementById('weakCircle');
           const weakTitle = document.getElementById('weakTitle');
           const weakDesc = document.getElementById('weakDesc');
-          
+
           const riskIndex = 100 - score;
 
           if (weakScore) {
@@ -1868,7 +1760,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 let title = rawTitle.replace(/[\*\-\#]/g, '').trim();
                 let desc = parts.length > 1 ? parts.slice(1).join(':').trim() : str;
                 desc = desc.replace(/[\*\-\#]/g, '').trim();
-                
+
                 let icon = '⚠️';
                 if (str.includes('سرعة') || str.includes('بطء')) icon = '🐢';
                 else if (str.includes('أمان') || str.includes('حماية')) icon = '🔓';
@@ -1877,7 +1769,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 else if (str.includes('تفاعل') || str.includes('متابعين')) icon = '👻';
                 else if (str.includes('إعلان') || str.includes('حملة')) icon = '📉';
                 else if (str.includes('محتوى') || str.includes('هوية')) icon = '🛑';
-                
+
                 weaknesses.push({ title: title, desc: desc, score: 30 + (index * 5), icon: icon });
               });
             } else {
@@ -1888,7 +1780,7 @@ document.addEventListener("DOMContentLoaded", () => {
               if (ig.engagement_rate && ig.engagement_rate < 0.01 && ig.followers > 1000) weaknesses.push({ title: 'متابعين بلا تفاعل (موت الحساب)', desc: 'عدد متابعيك لا يعكس تفاعلاتك. الخوارزمية تعتبر حسابك ميتاً ولا تقترحه للعملاء الجدد.', score: score - 10, icon: '👻' });
               if (fb.has_ads === false) weaknesses.push({ title: 'غياب التواجد الإعلاني', desc: isService ? 'لا يوجد لك أي حملات نشطة في مكتبة الإعلانات. أنت تعتمد فقط على الحظ في جلب العملاء.' : 'لا يوجد لك أي حملات نشطة في مكتبة الإعلانات. أنت تعتمد فقط على الحظ في جلب المبيعات.', score: score - 14, icon: '📉' });
               if (ws.has_checkout === false) weaknesses.push({ title: isService ? 'صعوبة التواصل والطلب' : 'انهيار مسار الدفع', desc: isService ? 'عدم وجود وسيلة واضحة وسريعة لطلب الخدمة يجعل العميل يتراجع في اللحظة الأخيرة.' : 'عدم وجود صفحة إتمام شراء واضحة يجعل العميل يتراجع في اللحظة الأخيرة مما يرفع السلات المتروكة.', score: score - 11, icon: isService ? '☎️' : '🛒' });
-  
+
               if (weaknesses.length < 4) {
                 weaknesses.push({ title: 'ضعف المحفزات (CTA)', desc: 'الزائر يصل لموقعك ولا يعرف ماذا يفعل بعد ذلك لغياب العروض المقنعة ونداء الإجراء الواضح.', score: score - 6, icon: '🛑' });
                 weaknesses.push({ title: 'غياب الدليل الاجتماعي (Social Proof)', desc: isService ? 'لا توجد تجارب ونماذج أعمال سابقة كافية لطمأنة الزائر مما يجعله يتردد في التعامل.' : 'لا توجد تجارب عملاء سابقة كافية لطمأنة الزائر الجديد مما يجعله يتردد في الشراء.', score: score - 5, icon: '🤷' });
@@ -1899,7 +1791,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Sort by lowest score (worst weaknesses first)
             weaknesses.sort((a, b) => a.score - b.score);
-            
+
             // --- AI Deep Analysis Box (Weaknesses) ---
             if (ai.weaknesses && Array.isArray(ai.weaknesses) && ai.weaknesses.length > 0) {
               const existingAiBox = document.querySelector('.ai-weak-box');
@@ -1916,7 +1808,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 weakList.parentNode.insertBefore(aiBlock, weakList);
               }
             }
-            
+
             let html = '';
             weaknesses.slice(0, 5).forEach(w => {
               const val = Math.max(Math.round(w.score), 5);
@@ -1942,88 +1834,111 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // ==========================================
-      // PAGE: journey.html — رحلة العميل
+      // PAGE: journey.html — رحلة العميل (AI-driven only, single source of truth)
       // ==========================================
       if (path.includes('journey.html')) {
-        const journeyData = data.ai_report && data.ai_report.customer_journey;
-        if (journeyData) {
-          // Update the overall bottleneck score and status
-          const stageMap = {
-            'awareness': 1,
-            'attraction': 2,
-            'trust': 3,
-            'purchase': 4,
-            'loyalty': 5
-          };
-          
-          const bottleneckId = stageMap[journeyData.bottleneck_stage] || 3;
-          let overallScore = 45; // Default score
-          if (journeyData.stages && journeyData.stages[journeyData.bottleneck_stage]) {
-            overallScore = journeyData.stages[journeyData.bottleneck_stage].score;
-          }
-          
-          const jScoreEl = document.getElementById('journeyScore');
-          if (jScoreEl) {
-            jScoreEl.setAttribute('data-val', overallScore);
-            jScoreEl.textContent = overallScore;
-          }
-          
-          const jCircleEl = document.getElementById('journeyCircle');
-          if (jCircleEl) {
-            jCircleEl.setAttribute('data-percent', overallScore);
-            jCircleEl.setAttribute('data-color', overallScore > 50 ? 'var(--yellow)' : 'var(--red)');
-          }
+        const journeyData = (data.ai_report && data.ai_report.customer_journey) || null;
 
-          const jTitleEl = document.getElementById('journeyStatusTitle');
+        // ── Stage name → DOM index mapping (matches journey.html: stage1..5) ──
+        const stageMap = {
+          'awareness':  1,
+          'attraction': 2,
+          'trust':      3,
+          'purchase':   4,
+          'loyalty':    5
+        };
+
+        const jScoreEl  = document.getElementById('journeyScore');
+        const jCircleEl = document.getElementById('journeyCircle');
+        const jTitleEl  = document.getElementById('journeyStatusTitle');
+        const jDescEl   = document.getElementById('journeyStatusDesc');
+
+        if (!journeyData) {
+          // No fake/random fallback. Surface the missing-data state clearly,
+          // but DO NOT return — let the P2-2 journey block below still run for
+          // technical signals (SSL/Pixel/CTA) which come from scan_result.
           if (jTitleEl) {
-            jTitleEl.innerHTML = overallScore > 50 ? '⚠️ تحتاج تحسين' : '❌ نقطة اختناق حرجة';
-            jTitleEl.style.color = overallScore > 50 ? 'var(--yellow)' : 'var(--red)';
+            jTitleEl.innerHTML = '⚠️ تحليل رحلة العميل غير مكتمل';
+            jTitleEl.style.color = 'var(--yellow)';
           }
-
-          const jDescEl = document.getElementById('journeyStatusDesc');
-          if (jDescEl && journeyData.psychological_diagnosis) {
-            jDescEl.innerHTML = `<strong>التشخيص النفسي:</strong> ${journeyData.psychological_diagnosis}`;
+          if (jDescEl) {
+            jDescEl.innerHTML = 'لم يكتمل تحليل الذكاء الاصطناعي لمراحل قمع التحويل لهذا التقرير. يرجى إعادة تشغيل التحليل من لوحة الإدارة.';
           }
-
-          // Populate each stage
-          Object.keys(stageMap).forEach(key => {
-            const num = stageMap[key];
-            const stageInfo = journeyData.stages ? journeyData.stages[key] : null;
-            if (stageInfo) {
-              const scoreEl = document.getElementById(`stage${num}Score`);
-              const descEl = document.getElementById(`stage${num}Desc`);
-              const boxEl = document.getElementById(`stage${num}Box`);
-              
-              if (scoreEl) {
-                scoreEl.setAttribute('data-val', stageInfo.score);
-                scoreEl.textContent = stageInfo.score + '%';
-              }
-              if (descEl) descEl.textContent = stageInfo.analysis;
-              
-              // Handle formatting for the bottleneck stage
-              if (key === journeyData.bottleneck_stage) {
-                if (boxEl) boxEl.className = 'j-stage stage-red';
-                const warningEl = document.getElementById(`stage${num}Warning`);
-                if (warningEl) warningEl.style.display = 'inline-block';
-                const fixBoxEl = document.getElementById(`stage${num}FixBox`);
-                if (fixBoxEl) {
-                  fixBoxEl.style.display = 'block';
-                  if (journeyData.bottleneck_fix && Array.isArray(journeyData.bottleneck_fix)) {
-                    const fixHtml = journeyData.bottleneck_fix.map((fix, idx) => `${idx + 1}. ${fix}`).join('<br>');
-                    const pEl = fixBoxEl.querySelector('p');
-                    if (pEl) pEl.innerHTML = fixHtml;
-                  }
-                }
-              } else {
-                if (boxEl) boxEl.className = `j-stage ${stageInfo.score >= 70 ? 'stage-green' : 'stage-yellow'}`;
-                const warningEl = document.getElementById(`stage${num}Warning`);
-                if (warningEl) warningEl.style.display = 'none';
-                const fixBoxEl = document.getElementById(`stage${num}FixBox`);
-                if (fixBoxEl) fixBoxEl.style.display = 'none';
-              }
-            }
+          Object.values(stageMap).forEach(num => {
+            const w = document.getElementById('stage' + num + 'Warning');
+            if (w) w.style.display = 'none';
+            const f = document.getElementById('stage' + num + 'FixBox');
+            if (f) f.style.display = 'none';
           });
+        } else {
+        // ── 1. Overall bottleneck score + status colors/text ──
+        const bottleneckKey   = journeyData.bottleneck_stage || 'trust';
+        const bottleneckScore = (journeyData.stages && journeyData.stages[bottleneckKey])
+          ? journeyData.stages[bottleneckKey].score
+          : 45;
+
+        if (jScoreEl) {
+          jScoreEl.setAttribute('data-val', bottleneckScore);
+          jScoreEl.textContent = bottleneckScore;
         }
+        if (jCircleEl) {
+          const color = bottleneckScore > 70 ? 'var(--green)'
+                      : bottleneckScore > 40 ? 'var(--yellow)'
+                      : 'var(--red)';
+          jCircleEl.setAttribute('data-percent', bottleneckScore);
+          jCircleEl.setAttribute('data-color', color);
+        }
+        if (jTitleEl) {
+          if (bottleneckScore > 70)      { jTitleEl.innerHTML = '✅ مسار سليم'; jTitleEl.style.color = 'var(--green)'; }
+          else if (bottleneckScore > 40) { jTitleEl.innerHTML = '⚠️ يوجد انسداد'; jTitleEl.style.color = 'var(--yellow)'; }
+          else                           { jTitleEl.innerHTML = '❌ نقطة اختناق حرجة'; jTitleEl.style.color = 'var(--red)'; }
+        }
+        if (jDescEl && journeyData.psychological_diagnosis) {
+          jDescEl.innerHTML = '<strong>التشخيص النفسي:</strong> ' + sanitize(journeyData.psychological_diagnosis);
+        }
+
+        // ── 2. Per-stage rendering — value + analysis from AI; bottleneck in RED ──
+        Object.keys(stageMap).forEach(key => {
+          const num = stageMap[key];
+          const stageInfo = (journeyData.stages && journeyData.stages[key]) || null;
+          if (!stageInfo) return;
+
+          const scoreEl   = document.getElementById('stage' + num + 'Score');
+          const descEl    = document.getElementById('stage' + num + 'Desc');
+          const boxEl     = document.getElementById('stage' + num + 'Box');
+          const warningEl = document.getElementById('stage' + num + 'Warning');
+          const fixBoxEl  = document.getElementById('stage' + num + 'FixBox');
+
+          if (scoreEl) {
+            scoreEl.setAttribute('data-val', stageInfo.score);
+            scoreEl.textContent = stageInfo.score + '%';
+          }
+          if (descEl && stageInfo.analysis) {
+            descEl.textContent = stageInfo.analysis;
+          }
+
+          const isBottleneck = (key === bottleneckKey);
+          if (boxEl) {
+            boxEl.classList.remove('stage-green', 'stage-yellow', 'stage-red');
+            if (isBottleneck)               boxEl.classList.add('stage-red');
+            else if (stageInfo.score >= 70) boxEl.classList.add('stage-green');
+            else                            boxEl.classList.add('stage-yellow');
+          }
+          if (warningEl) warningEl.style.display = isBottleneck ? 'inline-block' : 'none';
+          if (fixBoxEl) {
+            fixBoxEl.style.display = isBottleneck ? 'block' : 'none';
+            if (isBottleneck && Array.isArray(journeyData.bottleneck_fix)) {
+              const fixHtml = journeyData.bottleneck_fix
+                .map((fix, i) => (i + 1) + '. ' + sanitize(fix))
+                .join('<br>');
+              const pEl = fixBoxEl.querySelector('p');
+              if (pEl) pEl.innerHTML = fixHtml;
+            }
+          }
+        });
+
+        setTimeout(() => { animateCounters(); animateRings(); }, 100);
+        } // end else (journeyData present)
       }
 
       // ==========================================
@@ -2037,7 +1952,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Phase 1: Quick Wins (from action_week)
         const phase1 = document.getElementById('tasksPhase1');
         if (phase1 && data.action_week && data.action_week.length > 0) {
-          phase1.innerHTML = data.action_week.map(action => 
+          phase1.innerHTML = data.action_week.map(action =>
             `<div class="rm-task"><i style="color:var(--green);">✓</i> ${action}</div>`
           ).join('');
         }
@@ -2049,7 +1964,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .filter(r => r.priority === 'high' || r.priority === 'medium')
             .map(r => r.title);
           if (coreTasks.length > 0) {
-            phase2.innerHTML = coreTasks.slice(0, 6).map(title => 
+            phase2.innerHTML = coreTasks.slice(0, 6).map(title =>
               `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${title}</div>`
             ).join('');
           } else {
@@ -2068,11 +1983,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if (data.strengths && data.strengths.length > 0) {
             scaleTasks.unshift(`استغلال نقطة القوة: ${data.strengths[0].title || data.strengths[0]}`);
           }
-          phase3.innerHTML = scaleTasks.slice(0, 4).map(task => 
+          phase3.innerHTML = scaleTasks.slice(0, 4).map(task =>
             `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${task}</div>`
           ).join('');
         }
-        
+
         // Dynamic ROI Projection based on score
         const roiVals = document.querySelectorAll('.roi-card .val');
         if (roiVals.length >= 3 && data.score != null) {
@@ -2080,7 +1995,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const cr = (0.8 + ((100 - data.score) / 100) * 2.0).toFixed(1); // 0.8% to 2.8% expected improvement
           const roas = (1.5 + ((100 - data.score) / 100) * 3.5).toFixed(1); // 1.5x to 5.0x
           const cac = Math.floor(10 + ((100 - data.score) / 100) * 15); // $10 to $25 reduction
-          
+
           roiVals[0].textContent = cr + '%';
           roiVals[1].textContent = roas + 'x';
           roiVals[2].textContent = '-$' + cac;
@@ -2305,7 +2220,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 6. محرك تصدير الـ PDF (Global PDF Engine)
   // =========================================================================
   const pdfButtons = document.querySelectorAll('.btn-outline, .btn-pdf');
-  
+
   pdfButtons.forEach(btn => {
     if (btn.textContent.toLowerCase().includes('pdf') || btn.textContent.includes('تصدير') || btn.textContent.includes('تحميل')) {
       btn.addEventListener('click', (e) => {
@@ -2313,7 +2228,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const originalText = btn.innerHTML;
         btn.innerHTML = '<span>جاري التصدير...</span> ⏳';
         btn.style.pointerEvents = 'none';
-        
+
         // 1. Load html2pdf dynamically if not exists
         if (typeof html2pdf === 'undefined') {
           const script = document.createElement('script');
@@ -2330,21 +2245,21 @@ document.addEventListener("DOMContentLoaded", () => {
   function generatePDF(btn, originalText) {
     // 2. Select target content (Main Content without Sidebar)
     let targetElement = document.querySelector('.main-content') || document.body;
-    
+
     // We clone the element to modify it for print without affecting the UI
     const clone = targetElement.cloneNode(true);
     const tempContainer = document.createElement('div');
     tempContainer.appendChild(clone);
-    
+
     // Clean up UI specific elements from the clone
     const topbar = clone.querySelector('.topbar');
     if (topbar) topbar.remove(); // Remove buttons from PDF
-    
+
     // Override specific CSS for better PDF rendering
     clone.style.padding = '20px';
     clone.style.background = '#09090b';
     clone.style.color = '#fff';
-    
+
     // Remove 3D animations from clone cards
     clone.querySelectorAll('.card, .rec-card, .rm-phase, .roi-card').forEach(el => {
       el.style.transform = 'none';
@@ -2354,6 +2269,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 3. Configure html2pdf options
     const pageTitle = document.title.split('—')[0].trim() || 'التقرير';
+    // `clientName` is set inside renderData() and lives in the outer DOMContentLoaded
+    // closure, but generatePDF is hoisted at module scope. typeof guards the
+    // ReferenceError so we fall back to a generic label when the page bypassed renderData.
+    // eslint-disable-next-line no-undef
     const clientNameStr = typeof clientName !== 'undefined' ? clientName : 'العميل';
     const fileName = `العبير_${pageTitle}_${clientNameStr}.pdf`;
 
@@ -2540,4 +2459,3 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
 });
-
