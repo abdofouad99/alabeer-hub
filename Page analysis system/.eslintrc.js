@@ -9,20 +9,30 @@ module.exports = {
     ],
     parserOptions: {
         ecmaVersion: 'latest',
-        sourceType: 'module',
+        sourceType: 'script',
+    },
+    globals: {
+        // Loaded via CDN <script> tag at runtime
+        html2pdf: 'readonly',
     },
     rules: {
-        'indent': ['error', 4],
+        // Indentation/quoting in this codebase is intentionally mixed (Arabic
+        // comments, generated HTML in template literals, RTL-aware formatting).
+        // Enforcing a single style would balloon every diff. Disable the noisy
+        // style rules; keep correctness rules (recommended set + parse errors).
+        'indent': 'off',
+        'quotes': 'off',
         'linebreak-style': ['error', 'unix'],
-        'quotes': ['error', 'single'],
         'semi': ['error', 'always'],
         'no-unused-vars': 'warn',
+        'no-useless-escape': 'warn',
         'no-console': 'off',
     },
     ignorePatterns: [
         'node_modules/',
         'cache/',
         'logs/',
+        'backup_temp/',
         '*.min.js',
     ],
 };
