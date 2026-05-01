@@ -1,0 +1,36 @@
+# ============================================================
+# api/admin/.htaccess — يستثني نقاط الأدمن من default-DENY الأبوي
+# سبب الوجود: الـ .htaccess الأبوي في api/ يطبّق deny-by-default على
+# كل ملفات .php عبر <FilesMatch "\.php$">. هذا يحجب أيضاً ملفات
+# الـ subdirectory هنا لأن FilesMatch يطابق على الاسم لا على المسار.
+# الحل: نعيد السماح للـ 4 endpoints الأدمن (auth/list/stats/lead)
+# ونُبقي middleware.php محجوباً (هو include داخلي وليس endpoint).
+# ============================================================
+
+# ── 1) السماح بالـ 4 endpoints الأدمن من أي مصدر ───────────
+# الأمان الفعلي تطبّقه requireAdmin() داخل كل ملف (session-based).
+# auth.php لا يحتوي requireAdmin() لأنه نقطة تسجيل الدخول نفسها.
+<FilesMatch "^(auth|list|stats|lead)\.php$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Allow from all
+    </IfModule>
+</FilesMatch>
+
+# ── 2) منع صريح لـ middleware.php (إنه include داخلي فقط) ──
+# نتركه يرث الـ DENY من api/.htaccess الأبوي — هذا التذكير توثيقي.
+<FilesMatch "^middleware\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ── 3) منع index listing ───────────────────────────────────
+Options -Indexes
