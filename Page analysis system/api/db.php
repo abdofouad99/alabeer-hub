@@ -49,8 +49,17 @@ function getDB(): PDO {
         }
     }
 
-    // All strategies failed — return helpful error
-    jsonError('Database connection failed. Please check that Local by Flywheel is running. Error: ' . $lastError, 500);
+    // All strategies failed:
+    //  - log التفاصيل الكاملة في error_log (يقرأها admin server-side فقط)
+    //  - أرجِع للعميل رسالة عامة (بدون كشف user/db/host)
+    error_log('[DB] Connection failed after all strategies: ' . $lastError);
+
+    $isDebug = ($cfg['app']['debug'] ?? false) === true;
+    $clientMsg = $isDebug
+        ? ('Database connection failed (debug): ' . $lastError)
+        : 'Database temporarily unavailable. Please try again in a moment.';
+
+    jsonError($clientMsg, 503);
 }
 
 
