@@ -7,7 +7,7 @@
 
 // ── 1) محاولة تحميل .env (parse_ini_file آمن، لا يحتاج dotenv lib) ──
 $envPath = __DIR__ . '/../.env';
-$env     = file_exists($envPath) ? (parse_ini_file($envPath) ?: []) : [];
+$env     = file_exists($envPath) ? (parse_ini_file($envPath, false, INI_SCANNER_RAW) ?: []) : [];
 
 // helper: env file > env var > default (returns string)
 $get = function (string $key, string $default = '') use ($env): string {
