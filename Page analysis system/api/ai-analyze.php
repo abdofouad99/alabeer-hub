@@ -264,7 +264,7 @@ function callGemini(string $prompt, array $data, array $cfg): array {
             logError("Gemini Rate Limit/No Response", ['httpCode' => $httpCode, 'response' => $response]);
             continue; // rate limit — جرّب المفتاح التالي
         }
-        
+
         // إذا كان النموذج غير موجود (404)، حاول العودة إلى 1.5
         if ($httpCode === 404 && strpos($model, '2.0') !== false) {
             $model = 'gemini-1.5-flash';
@@ -514,7 +514,7 @@ function callNvidia(string $prompt, array $data, array $cfg): array {
 
     $decoded = json_decode($response, true);
     $text    = $decoded['choices'][0]['message']['content'] ?? '';
-    
+
     // Clean JSON markdown if present
     $text    = preg_replace('/^```json\s*|^```\s*|```\s*$/m', '', trim($text));
     $aiData  = json_decode($text, true);
@@ -563,7 +563,7 @@ function callQwen(string $prompt, array $data, array $cfg): array {
 
     $decoded = json_decode($response, true);
     $text    = $decoded['choices'][0]['message']['content'] ?? '';
-    
+
     // Clean JSON markdown if present
     $text    = preg_replace('/^```json\s*|^```\s*|```\s*$/m', '', trim($text));
     $aiData  = json_decode($text, true);
@@ -611,7 +611,7 @@ function callGPTOSS(string $prompt, array $data, array $cfg): array {
 
     $decoded = json_decode($response, true);
     $text    = $decoded['choices'][0]['message']['content'] ?? '';
-    
+
     // Clean JSON markdown if present
     $text    = preg_replace('/^```json\s*|^```\s*|```\s*$/m', '', trim($text));
     $aiData  = json_decode($text, true);
@@ -951,6 +951,9 @@ function parseAIResponse(array $aiData, string $source, array $rawData = []): ar
         'content_strategy'     => $aiData['content_strategy']     ?? null,
         // ── content_analysis مبني من البيانات الفعلية ─────────
         'content_analysis'     => !empty($rawData) ? buildContentAnalysis($rawData) : ($aiData['content_analysis'] ?? null),
+        // ── حقول جديدة مضافة لقالب JSON لتغذية الواجهة ─────────
+        'ads_analysis'         => $aiData['ads_analysis']         ?? null,
+        'competitor_radar'     => $aiData['competitor_radar']     ?? [],
     ];
 }
 
@@ -1611,10 +1614,78 @@ function buildPrompt(array $data): string {
       "time_to_implement": "شهر أو أكثر"
     }
   ],
+  "customer_journey": {
+    "stages": {
+      "awareness":  {"score": 0, "analysis": "← تحليل من البيانات الفعلية (Followers + Reach + Ads) في 1-2 جملة"},
+      "attraction": {"score": 0, "analysis": "← تحليل مبني على معدل التفاعل + توزيع المحتوى + أبرز المنشورات"},
+      "trust":      {"score": 0, "analysis": "← تحليل مبني على Social Proof + الأقدمية + التقييمات + Schema/HTTPS"},
+      "purchase":   {"score": 0, "analysis": "← تحليل مبني على CTA + Pixel + سهولة الشراء + Checkout"},
+      "loyalty":    {"score": 0, "analysis": "← تحليل مبني على Email/SMS + تكرار النشر + برامج الولاء"}
+    },
+    "bottleneck_stage": "← اسم المرحلة (awareness|attraction|trust|purchase|loyalty) ذات أدنى score — ويجب أن تتطابق مع weaknesses[0]",
+    "psychological_diagnosis": "← جملة واحدة تربط أدنى مرحلة بالـ weaknesses[0] المكتشف وتشرح لماذا يتوقف العميل هنا تحديداً",
+    "bottleneck_fix": [
+      "← خطوة 1 مطابقة لـ recommendations[0].bullets[0] (نفس العلاج للاختناق)",
+      "← خطوة 2 ملموسة بالأداة المحددة",
+      "← خطوة 3 قابلة للقياس خلال 7 أيام"
+    ]
+  },
+  "quick_wins": [
+    "← انتصار سريع 1 مبني على ثغرة حقيقية مكتشفة (≤ 24 ساعة تنفيذ)",
+    "← انتصار سريع 2 (≤ 24 ساعة تنفيذ)",
+    "← انتصار سريع 3 (≤ 48 ساعة تنفيذ)"
+  ],
+  "kpis_to_track": [
+    "← KPI 1 مناسب لنوع النشاط المكتشف (مثال: ROAS، CPA، معدل التحويل)",
+    "← KPI 2",
+    "← KPI 3",
+    "← KPI 4"
+  ],
+  "platform_strategy": {
+    "facebook":  "← استراتيجية مخصصة بناءً على بيانات Facebook في scanInfo، أو null إذا لا يوجد حساب",
+    "instagram": "← استراتيجية مخصصة بناءً على بيانات Instagram، أو null",
+    "tiktok":    "← استراتيجية مخصصة بناءً على بيانات TikTok، أو null"
+  },
+  "action_week": [
+    "← إجراء فوري 1 (يوم 1-2) — الأولوية القصوى من recommendations[0]",
+    "← إجراء فوري 2 (يوم 3-5) — من recommendations[1]"
+  ],
+  "content_analysis": {
+    "bar_brand":  0,
+    "bar_visual": 0,
+    "bar_cta":    0,
+    "bar_value":  0,
+    "q": [
+      {"question": "هل المحتوى متوازن (تعليمي/مبيعي)؟", "status": "good|warn|bad", "answer": "← من types_percent المكتشف"},
+      {"question": "هل توجد CTAs في المنشورات؟", "status": "good|warn|bad", "answer": "← من has_cta_in_posts"},
+      {"question": "هل الهاشتاقات مناسبة للجمهور؟", "status": "good|warn|bad", "answer": "← من top_hashtags"}
+    ]
+  },
+  "ads_analysis": {
+    "score":  0,
+    "status": "← من بيانات ads_library (نشط/متوقف/يحتاج تطوير)",
+    "desc":   "← تحليل الإعلانات النشطة وأهدافها وCTA",
+    "has_active_ads": false,
+    "metrics": [
+      {"label": "إجمالي الإعلانات", "value": "← total_ads"},
+      {"label": "الإعلانات النشطة", "value": "← active_ads"},
+      {"label": "تنوع CTA", "value": "← عدد CTAs المختلفة"}
+    ]
+  },
+  "competitor_radar": [
+    {"name": "← اسم منافس حقيقي 1 من scanInfo", "url": "← url", "strengths": ["نقطة قوة 1", "نقطة قوة 2"], "weaknesses": ["نقطة ضعف 1"], "attack_plan": "← خطة هجوم محددة بالأرقام"}
+  ],
   "competitor_analysis": [
     {"name": "اسم منافس", "strength": "نقطة قوته", "weakness": "نقطة ضعفه", "how_to_beat": "كيفية التفوق عليه"}
   ]
 }
+
+⚠️ قواعد إضافية للحقول الجديدة:
+- customer_journey.bottleneck_stage يجب أن يكون اسم المرحلة (awareness|attraction|trust|purchase|loyalty) صاحبة أدنى stages.<key>.score.
+- customer_journey.bottleneck_fix يجب أن يكون مطابقاً تماماً لـ recommendations[0].bullets (نفس العلاج، ليس نصائح عامة).
+- customer_journey.psychological_diagnosis يجب أن يربط صراحةً بين أدنى مرحلة و weaknesses[0] المكتشف.
+- platform_strategy: ضع null للمنصة غير الموجودة في scanInfo، لا تخترع بيانات.
+- content_analysis.bar_*: أرقام من 0 إلى 100 مستنبطة من البيانات (لا تخترعها عشوائياً).
 PROMPT;
 
     return $prompt;
