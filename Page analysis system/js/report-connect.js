@@ -517,7 +517,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
               </div>
             </div>`;
-          }).join('') + `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${recs.length} إجراء)</a></div>`;
+          }).join('');
+          // ── العدد المعروض في رابط "عرض كل التوصيات" ──
+          // يستخدم recommendations_total_count (العدد الأصلي قبل الـ slice في الباقة المجانية)
+          // وليس recs.length (الذي قد يكون 3 فقط بعد البوابة في الـ Backend).
+          const totalRecs = data.recommendations_total_count != null ? data.recommendations_total_count : recs.length;
+          resultRecsList.innerHTML += `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${totalRecs} إجراء)</a></div>`;
         }
       }
 
