@@ -198,7 +198,6 @@
 
     const urlParams   = new URLSearchParams(window.location.search);
     const targetUrl   = urlParams.get('url') || '';
-    const leadDataRaw = sessionStorage.getItem('lead_data');
 
     const bar         = document.getElementById('progressBar');
     const pct         = document.getElementById('progressPct');
@@ -268,83 +267,14 @@
     }
 
     // ── Redirect guard ──
-    if (!targetUrl && !urlParams.get('id')) {
-      window.location.href = 'scan.html';
-    }
-
-    // ── Phase 1: Submit & Register ─────────────────────────────
-    async function phase1_submit() {
-      activateStep(1);
-      setProgress(8);
-      msg.innerHTML = 'جاري تسجيل طلبك وبدء الفحص...';
-
-      // Build lead object from sessionStorage
-      let lead = {
-        url:             targetUrl,
-        full_name:       'زائر',
-        phone:           '000',
-        email:           '',
-        website_url:     '',
-        instagram_url:   '',
-        facebook_url:    '',
-        tiktok_url:      '',
-        twitter_url:     '',
-        objective:       '',
-        project_type:    '',
-        target_audience: '',
-        ad_budget:       '',
-        country:         ''
-      };
-
-      if (leadDataRaw) {
-        try { Object.assign(lead, JSON.parse(leadDataRaw)); } catch(e) {}
-      }
-
-      // Normalize URL fields
-      if (!lead.website_url && !lead.facebook_url && !lead.instagram_url && !lead.tiktok_url && !lead.twitter_url) {
-        if (targetUrl.includes('instagram.com'))                               lead.instagram_url = targetUrl;
-        else if (targetUrl.includes('facebook.com') || targetUrl.includes('fb.com')) lead.facebook_url = targetUrl;
-        else if (targetUrl.includes('tiktok.com'))                             lead.tiktok_url   = targetUrl;
-        else if (targetUrl.includes('twitter.com') || targetUrl.includes('x.com')) lead.twitter_url = targetUrl;
-        else                                                                   lead.website_url  = targetUrl;
-      }
-
-      try {
-        activateStep(2);
-        setProgress(15);
-        msg.innerHTML = `يتم الآن فحص: <small style="color:#94a3b8">${decodeURIComponent(targetUrl)}</small>`;
-
-        const resp = await fetch('api/submit.php', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ lead, answers: {} })
-        });
-
-        const data = await resp.json();
-
-        if (data.error) { showError(data.error); return; }
-
-        assessmentId = data.assessment_id || data.id;
-        if (!assessmentId) { showError('لم يتم إنشاء معرّف التقييم. حاول مجدداً.'); return; }
-
-        // Save id to sessionStorage for recovery
-        sessionStorage.setItem('last_assessment_id', assessmentId);
-
-        // If analysis already done (fast path)
-        if (data.score != null && data.tier) {
-          showPartialResult(data.score);
-        }
-
-        // تشغيل التحليل في الخلفية (نطلب من السيرفر أن يبدأ التحليل الطويل)
-        // لا نستخدم await لكي لا نعلق المتصفح
-        fetch('api/run.php?id=' + assessmentId).catch(e => console.log('Run triggered', e));
-
-        // Phase 2: Start polling
-        phase2_poll();
-
-      } catch(err) {
-        showError('تعذّر الاتصال بالخادم: ' + err.message);
-      }
+    // analyzing.html يجب أن تُفتح فقط بـ ?id=... (بعد إرسال scan.html → submit.php
+    // → result.html). الدخول بدون id كان يُنشئ assessment وهمي بـ full_name='زائر'
+    // و phone='000' (يلوّث leads/assessments). نُجبر العميل للعودة لـ scan.html.
+    if (!urlParams.get('id')) {
+      const fallback = targetUrl
+        ? 'scan.html?url=' + encodeURIComponent(targetUrl)
+        : 'scan.html';
+      window.location.href = fallback;
     }
 
     // ── Phase 2: Real Polling ───────────────────────────────────
@@ -427,11 +357,11 @@
     }
 
     // ── Start ──────────────────────────────────────────────────
+    // الـ id مضمون موجود لأن الـ Redirect guard أعلاه أعاد التوجيه لـ scan.html
+    // لو كان غير موجود. هنا فقط نبدأ polling.
     if (urlParams.get('id')) {
       assessmentId = urlParams.get('id');
       phase2_poll();
-    } else {
-      phase1_submit();
     }
   </script>
 

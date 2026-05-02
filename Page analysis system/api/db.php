@@ -79,6 +79,8 @@ function jsonError(string $msg, int $code = 400) {
 function setCors(): void {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
+    // X-CSRF-Token مطلوب لـ submit.php (يصدره csrf.php). إضافته هنا تمنع
+    // فشل preflight لو أصبح الموقع cross-origin مستقبلاً.
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 }

@@ -20,7 +20,7 @@
 </FilesMatch>
 
 # ── 3) WHITELIST: Public endpoints (يُستدعون من JS) ─────────
-<FilesMatch "^(submit|analyze|status|result|page-scan|get-assessment|scan|health|run|ads-fetch)\.php$">
+<FilesMatch "^(submit|analyze|status|result|page-scan|get-assessment|scan|health|run|ads-fetch|csrf)\.php$">
     <IfModule mod_authz_core.c>
         Require all granted
     </IfModule>

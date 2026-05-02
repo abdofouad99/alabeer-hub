@@ -28,6 +28,26 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once __DIR__ . '/db.php';
 
+// ── CSRF validation ────────────────────────────────────────
+// الـ token مُنشأ في api/csrf.php وموجود في $_SESSION. js/quiz.js يرسله
+// كـ X-CSRF-Token header. لو غير موجود/مختلف → 403 (مش 500) لأنه طلب
+// مرفوض من ناحية أمنية، ليس عطل خادم.
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$incomingToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+$sessionToken  = $_SESSION['csrf_token'] ?? '';
+if ($sessionToken === '' || !is_string($incomingToken) || !hash_equals($sessionToken, $incomingToken)) {
+    logWarning('CSRF token mismatch on submit', [
+        'ip'        => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        'has_token' => $incomingToken !== '',
+    ]);
+    ob_end_clean();
+    http_response_code(403);
+    echo json_encode(['error' => 'انتهت صلاحية الجلسة. يرجى تحديث الصفحة وإعادة الإرسال.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // ── التحقق من Rate Limiting ────────────────────────────────
 if (!checkApiRateLimit('submit_analysis')) {
     logWarning('Rate limit exceeded for submit analysis', ['ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown']);
@@ -114,6 +134,27 @@ foreach ($requiredFields as $field) {
     }
 }
 
+// ── تحقق من تنسيق الهاتف (يمنع 'phone=000' و bot submissions) ──
+// نُبقي فقط الأرقام و '+'؛ نطلب 7-16 رقم (E.164 max=15 + '+').
+$normalizedPhone = preg_replace('/[^\d+]/', '', (string)$leadData['phone']);
+if ($normalizedPhone === null) $normalizedPhone = '';
+$digitsOnly = preg_replace('/[^\d]/', '', $normalizedPhone);
+if (strlen($digitsOnly) < 7 || strlen($digitsOnly) > 15) {
+    ob_end_clean();
+    http_response_code(400);
+    echo json_encode(['error' => 'رقم الهاتف غير صالح'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+$leadData['phone'] = $normalizedPhone;
+
+// ── تحقق من تنسيق البريد (إن وُجد) ──
+if (!empty($leadData['email']) && !filter_var($leadData['email'], FILTER_VALIDATE_EMAIL)) {
+    ob_end_clean();
+    http_response_code(400);
+    echo json_encode(['error' => 'البريد الإلكتروني غير صالح'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // التحقق من وجود رابط منصة واحد على الأقل
 $urlFields = ['website_url', 'facebook_url', 'instagram_url', 'tiktok_url', 'twitter_url', 'youtube_url'];
 $hasUrl = false;
@@ -142,9 +183,14 @@ logInfo('Analysis submission started', [
 try {
     $db = getDB();
 } catch (\Throwable $e) {
+    logError('[submit.php] DB connection failed: ' . $e->getMessage());
     ob_end_clean();
-    http_response_code(500);
-    echo json_encode(['error' => 'DB Error: ' . $e->getMessage()]);
+    $isDebug = ($config['app']['debug'] ?? false) === true;
+    $msg = $isDebug
+        ? ('DB Error (debug): ' . $e->getMessage())
+        : 'الخدمة متوقفة مؤقتاً. حاول بعد دقيقة.';
+    http_response_code(503);
+    echo json_encode(['error' => $msg], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -194,12 +240,13 @@ try {
 }
 
 // ── 2) INSERT assessment ──────────────────────────────────────
+// scan_step=0 صريحاً (defensive؛ migrate.php يضع DEFAULT 0 لكن نضمنه).
 $token = bin2hex(random_bytes(16));
 try {
-    $db->prepare("INSERT INTO assessments (lead_id, status, report_token) VALUES (?,?,?)")
+    $db->prepare("INSERT INTO assessments (lead_id, status, report_token, scan_step) VALUES (?,?,?,0)")
        ->execute([$leadId, 'submitted', $token]);
 } catch (\Throwable $e) {
-    $db->prepare("INSERT INTO assessments (lead_id, status) VALUES (?,?)")
+    $db->prepare("INSERT INTO assessments (lead_id, status, scan_step) VALUES (?,?,0)")
        ->execute([$leadId, 'submitted']);
 }
 $assessmentId = (int)$db->lastInsertId();
