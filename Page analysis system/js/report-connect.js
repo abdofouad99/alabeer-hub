@@ -12,6 +12,24 @@ function sanitize(str) {
   return temp.innerHTML;
 }
 
+// ── extractText: استخراج نص من قيمة قد تكون string أو object ──
+// يحل مشكلة [object Object] في بطاقات strengths/weaknesses عندما يُرجع
+// الـ AI كائنات بمفاتيح متباينة (title, name, point, text, label, ...).
+function extractText(item, fallback = '—') {
+  if (item == null) return fallback;
+  if (typeof item === 'string') return item;
+  if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+  if (typeof item === 'object') {
+    const keys = ['title', 'name', 'point', 'text', 'heading', 'label', 'item', 'desc', 'description', 'task'];
+    for (const k of keys) {
+      const v = item[k];
+      if (typeof v === 'string' && v.trim()) return v;
+    }
+    return fallback;
+  }
+  return String(item);
+}
+
 function sanitizeRelaxed(str) {
   if (typeof str !== 'string') return String(str || '');
   const div = document.createElement('div');
@@ -356,14 +374,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (resultStrList && ai.strengths && ai.strengths.length > 0) {
           resultStrList.innerHTML = ai.strengths.slice(0, 5).map(s => {
-            const title = typeof s === 'string' ? s.split(':')[0] : (s.title || String(s));
+            const raw = extractText(s, 'نقطة قوة');
+            const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
             return `<li><span style="color:var(--green);">✔</span> ${sanitize(title)}</li>`;
           }).join('');
         }
 
         if (resultWksList && ai.weaknesses && ai.weaknesses.length > 0) {
           resultWksList.innerHTML = ai.weaknesses.slice(0, 5).map(w => {
-            const title = typeof w === 'string' ? w.split(':')[0] : (w.title || String(w));
+            const raw = extractText(w, 'نقطة ضعف');
+            const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
             return `<li><span style="color:var(--red);">✖</span> ${sanitize(title)}</li>`;
           }).join('');
         }
