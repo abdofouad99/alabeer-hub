@@ -67,11 +67,15 @@ patch_*.php
 repair-*.php
 repair_*.php
 hotfix-*.php
+hotfix_*.php
 api/check_braces.php
 api/check-*.php
 
 # ============================================================
-# Backup directories created by manual/script restore
+# Backup directories and archives — never commit binary backups
 # ============================================================
 backup_temp/
 _backups/
+backup_*.zip
+*_Backup_*.zip
+System_Backup_*.zip
