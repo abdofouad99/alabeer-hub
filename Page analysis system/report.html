@@ -10,35 +10,35 @@
       --bg-main: #09090b;
       --sidebar-bg: rgba(15, 23, 42, 0.6);
       --sidebar-border: rgba(255, 255, 255, 0.05);
-      
+
       --glass-bg: rgba(255, 255, 255, 0.03);
       --glass-border: rgba(255, 255, 255, 0.08);
       --glass-blur: blur(24px) saturate(180%);
-      
+
       --text-dark: #f8fafc;
       --text-gray: #94a3b8;
-      
+
       --primary: #f58e1a;
       --primary-glow: rgba(245, 142, 26, 0.3);
       --green: #10b981;
       --red: #ef4444;
       --yellow: #eab308;
       --purple: #8b5cf6;
-      
+
       --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
       --shadow-hover: 0 20px 40px -10px rgba(245, 142, 26, 0.15);
       --radius: 20px;
-      
+
       --card-bg: rgba(15, 23, 42, 0.4);
       --card-border: rgba(255, 255, 255, 0.05);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
-    
-    body { 
-      background-color: var(--bg-main); 
-      color: var(--text-dark); 
-      display: flex; 
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-dark);
+      display: flex;
       min-height: 100vh;
       position: relative;
       overflow-x: hidden;
@@ -54,7 +54,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
-    .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; } 
+    .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; }
     .delay-3 { animation-delay: 0.3s; } .delay-4 { animation-delay: 0.4s; }
 
     .sidebar {
@@ -62,12 +62,12 @@
       border-left: 1px solid var(--sidebar-border);
       display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100;
     }
-    .brand { 
-      padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px; 
+    .brand {
+      padding: 32px 24px; font-size: 26px; font-weight: 900; display: flex; align-items: center; gap: 12px;
       border-bottom: 1px solid var(--sidebar-border); background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
     }
     .brand span { color: var(--primary); text-shadow: 0 0 20px var(--primary-glow); }
-    
+
     .nav-menu { flex: 1; padding: 24px 0; overflow-y: auto; }
     .nav-item {
       display: flex; align-items: center; gap: 14px; padding: 14px 32px;
@@ -112,9 +112,9 @@
     }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 15px 35px var(--primary-glow); background: #f08310; }
 
-    .card { 
+    .card {
       background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
-      border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-soft); 
+      border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-soft);
       border: 1px solid var(--glass-border); transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
       transform-style: preserve-3d;
     }
@@ -126,7 +126,7 @@
     .header-date { color: var(--text-gray); font-size: 15px; font-weight: 700; margin-top: 8px; }
 
     .row-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px; }
-    
+
     .score-card { display: flex; align-items: center; justify-content: space-between; gap: 40px; background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)); }
     .score-circle-wrap { position: relative; width: 160px; height: 160px; flex-shrink: 0; filter: drop-shadow(0 15px 25px rgba(0,0,0,0.3)); transform: translateZ(30px); }
     .score-circle {
@@ -141,11 +141,11 @@
     }
     .score-num { font-size: 56px; font-weight: 900; line-height: 1; color: var(--text-dark); letter-spacing: -2px; }
     .score-text { font-size: 14px; font-weight: 800; color: var(--text-gray); }
-    
+
     .score-details { flex: 1; transform: translateZ(15px); }
     .score-status { display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 142, 26, 0.1); color: var(--primary); padding: 8px 16px; border-radius: 99px; font-weight: 900; font-size: 18px; margin-bottom: 12px; border: 1px solid rgba(245, 142, 26, 0.2); }
     .score-desc { font-size: 16px; color: var(--text-gray); line-height: 1.6; margin-bottom: 24px; font-weight: 600; }
-    
+
     .competitor-bar-wrap { background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
     .comp-title { font-size: 14px; font-weight: 800; margin-bottom: 12px; color: var(--text-dark); }
     .comp-bar { width: 100%; height: 10px; border-radius: 5px; background: linear-gradient(to left, var(--green), var(--yellow), var(--red)); position: relative; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
@@ -163,7 +163,7 @@
     .axis-card:hover { background: rgba(255,255,255,0.05); transform: translateY(-5px) translateZ(20px); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
     .axis-icon { font-size: 28px; margin-bottom: 16px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); transform: translateZ(15px); }
     .axis-name { font-size: 14px; font-weight: 900; margin-bottom: 20px; color: var(--text-dark); height: 40px; display: flex; align-items: center; justify-content: center; transform: translateZ(5px); }
-    
+
     .mini-ring {
       width: 70px; height: 70px; border-radius: 50%; margin: 0 auto 16px;
       display: flex; align-items: center; justify-content: center; position: relative; box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
@@ -179,7 +179,7 @@
     .status-red { background: rgba(239, 68, 68, 0.1); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.2); }
 
     .row-3 { display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; margin-bottom: 24px; }
-    
+
     .lose-list { display: flex; flex-direction: column; gap: 16px; }
     .lose-item { display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; background: rgba(0,0,0,0.2); transition: 0.3s; transform: translateZ(10px); }
     .lose-item:hover { background: rgba(255,255,255,0.05); box-shadow: 0 10px 20px rgba(0,0,0,0.2); transform: translateZ(15px); }
@@ -189,22 +189,22 @@
 
     /* New Pro Max Funnel Styles */
     .funnel-container { display: flex; gap: 40px; align-items: center; transform: translateZ(15px); padding: 10px 0; }
-    
-    .funnel-v-wrap { 
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; position: relative; 
+
+    .funnel-v-wrap {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; position: relative;
     }
-    
+
     .funnel-v-wrap::before {
       content: ''; position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
       width: 2px; background: rgba(255,255,255,0.1); z-index: 0;
     }
 
-    .f-stage { 
+    .f-stage {
       width: 0%; /* Starts at 0 for JS animation */
-      transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1); 
-      z-index: 1; display: flex; justify-content: center; 
+      transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1; display: flex; justify-content: center;
     }
-    
+
     .f-bar {
       width: 100%; height: 56px; border-radius: 16px;
       display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
@@ -214,7 +214,7 @@
       transition: transform 0.3s;
     }
     .f-bar:hover { transform: scale(1.05); filter: brightness(1.2); z-index: 5; }
-    
+
     .f-label { font-weight: 800; font-size: 16px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px; }
     .f-val { font-weight: 900; font-size: 16px; color: #fff; background: rgba(0,0,0,0.4); padding: 4px 12px; border-radius: 10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); letter-spacing: 1px; }
 
@@ -238,7 +238,7 @@
       0% { transform: scale(1); opacity: 0.8; }
       100% { transform: scale(1.05); opacity: 0; }
     }
-    
+
     .funnel-desc { width: 260px; padding: 24px; background: rgba(0,0,0,0.3); border-radius: 16px; font-size: 14px; line-height: 1.7; font-weight: 700; color: var(--text-dark); border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: center; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); }
     .funnel-desc .fix-box { margin-top: 20px; background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); }
     .fix-box-title { color: var(--primary); font-weight: 900; font-size: 14px; margin-bottom: 12px; text-align: center; }
@@ -263,8 +263,8 @@
     .step-desc { font-size: 14px; color: var(--text-gray); font-weight: 600; line-height: 1.6; margin-bottom: 20px; transform: translateZ(10px); }
     .step-arrow { position: absolute; left: -25px; top: 50%; transform: translateY(-50%) translateZ(0); font-size: 32px; color: var(--text-gray); z-index: 10; font-weight: 900; opacity: 0.5; }
 
-    .growth-card { 
-      background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.05)); color: white; text-align: center; 
+    .growth-card {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.05)); color: white; text-align: center;
       padding: 32px 20px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3); border: 1px solid rgba(139, 92, 246, 0.3);
       position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; transform-style: preserve-3d;
     }
@@ -285,13 +285,13 @@
     .locked-banner::before { content: ''; position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, rgba(245, 142, 26, 0.2) 0%, transparent 70%); top: -100px; right: -100px; filter: blur(40px); }
     .lock-icon-huge { font-size: 100px; line-height: 1; filter: drop-shadow(0 15px 25px rgba(0,0,0,0.5)); position: relative; z-index: 2; transition: transform 0.5s; }
     .locked-banner:hover .lock-icon-huge { transform: scale(1.1) rotate(5deg); }
-    
+
     .locked-content-wrap { flex: 1; position: relative; z-index: 2; }
     .locked-content-wrap h3 { font-size: 24px; font-weight: 900; margin-bottom: 20px; color: var(--text-dark); }
     .locked-list { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; list-style: none; font-size: 16px; font-weight: 700; color: var(--text-gray); }
     .locked-list li { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.2); padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); }
     .locked-list li::before { content: '✔'; color: var(--primary); font-weight: 900; font-size: 18px; }
-    
+
     .locked-action { text-align: center; min-width: 320px; background: rgba(0,0,0,0.3); padding: 32px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); position: relative; z-index: 2; }
     .locked-action h4 { font-size: 22px; font-weight: 900; margin-bottom: 10px; color: var(--text-dark); }
     .locked-action p { font-size: 15px; color: var(--text-gray); margin-bottom: 24px; font-weight: 600; }
@@ -301,7 +301,7 @@
       box-shadow: 0 10px 25px var(--primary-glow); transition: 0.3s;
     }
     .btn-unlock-large:hover { background: #f08310; transform: translateY(-3px); box-shadow: 0 15px 35px var(--primary-glow); }
-    
+
     .locked-footer { text-align: center; font-size: 13px; color: var(--text-gray); margin-top: 24px; font-weight: 700; }
 
     /* ── Platform Cards ── */
@@ -336,7 +336,7 @@
     @media(max-width:768px){ .deep-grid { grid-template-columns: 1fr; } }
     .deep-box { background: rgba(255,255,255,0.03); border-radius: 16px; padding: 20px; border: 1px solid rgba(255,255,255,0.05); }
     .deep-sub-title { font-size: 14px; color: var(--text-gray); margin-bottom: 16px; border-right: 3px solid var(--purple); padding-right: 10px; }
-    
+
     .type-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
     .t-bar-row { display: flex; align-items: center; gap: 12px; }
     .t-label { width: 80px; font-size: 12px; font-weight: 700; color: var(--text-gray); }
@@ -352,7 +352,7 @@
 
     .hashtag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
     .h-tag { background: rgba(168,85,247,0.1); color: var(--purple); border: 1px solid rgba(168,85,247,0.2); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-    
+
     .deep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
     @media (max-width: 900px) { .deep-grid { grid-template-columns: 1fr; } }
 
@@ -380,7 +380,7 @@
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
       <div>العبير<div style="font-size: 12px; color: var(--text-gray); font-weight: 700; text-shadow: none; letter-spacing: 0;">بصمة النمو الرقمي</div></div>
     </div>
-    
+
     <nav class="nav-menu">
       <a href="result.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
       <a href="strengths.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
@@ -406,7 +406,7 @@
 
   <!-- Main Content -->
   <main class="main-content">
-    
+
     <!-- Topbar -->
     <div class="topbar animate-up delay-1">
       <button class="btn-outline"><span>مشاركة النتيجة</span> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
@@ -423,20 +423,20 @@
 
     <!-- Row 1: Score & Problem -->
     <div class="row-1 animate-up delay-2">
-      
+
       <div class="card score-card">
         <div class="score-details">
           <h3 class="card-title" style="text-align:right; margin-bottom:16px;">تقييم حسابك العام</h3>
           <div class="score-status" id="resultScoreStatus">😊 التقييم: جيد</div>
           <p class="score-desc" id="resultScoreDesc">لديك أساس ممتاز للعمل عليه، لكننا اكتشفنا <strong>عوائق حقيقية</strong> تمنعك من مضاعفة أرباحك.</p>
-          
+
           <div class="competitor-bar-wrap">
             <div class="comp-title">موقعك مقارنة بمتوسط المنافسين ⚔️</div>
             <div class="comp-bar"><div class="comp-pin" id="compPin" style="left: 100%;"></div></div>
             <div class="comp-labels"><span>أضعف</span><span>متوسط المجال</span><span>أقوى</span></div>
           </div>
         </div>
-        
+
         <div class="score-circle-wrap">
           <div class="score-circle" data-color="var(--primary)" data-percent="72" id="mainScoreRing">
             <div class="score-inner">
@@ -460,7 +460,7 @@
     <div class="card animate-up delay-3" style="margin-bottom: 24px; padding: 32px 24px;">
       <h3 class="card-title" style="margin-bottom: 28px;">📊 تفصيل درجات المحاور الأساسية</h3>
       <div class="axes-grid">
-        
+
         <div class="axis-card">
           <div class="axis-icon">🎯</div>
           <div class="axis-name">الرسالة التسويقية</div>
@@ -469,7 +469,7 @@
           </div>
           <div class="axis-status status-yellow">متوسط</div>
         </div>
-        
+
         <div class="axis-card">
           <div class="axis-icon">🎨</div>
           <div class="axis-name">الهوية والملف</div>
@@ -478,7 +478,7 @@
           </div>
           <div class="axis-status status-green">جيد جداً</div>
         </div>
-        
+
         <div class="axis-card">
           <div class="axis-icon">📝</div>
           <div class="axis-name">المحتوى</div>
@@ -487,7 +487,7 @@
           </div>
           <div class="axis-status status-yellow">متوسط</div>
         </div>
-        
+
         <div class="axis-card">
           <div class="axis-icon">🛡️</div>
           <div class="axis-name">بناء الثقة</div>
@@ -496,7 +496,7 @@
           </div>
           <div class="axis-status status-red">ضعيف</div>
         </div>
-        
+
         <div class="axis-card">
           <div class="axis-icon">🛒</div>
           <div class="axis-name">التحويل والبيع</div>
@@ -520,7 +520,7 @@
 
     <!-- Row 3: Lose & Funnel -->
     <div class="row-3 animate-up delay-4">
-      
+
       <div class="card">
         <h3 class="card-title" style="color:var(--red);">📉 ماذا تخسر الآن بسبب هذا النزيف؟</h3>
         <div class="lose-list">
@@ -548,35 +548,35 @@
         <h3 class="card-title">🔍 مسار رحلة العميل (Funnel)</h3>
         <div class="funnel-container">
           <div class="funnel-v-wrap">
-            
+
             <div class="f-stage" data-width="100%" id="resultFStage1">
               <div class="f-bar f-green">
                  <span class="f-label">الوعي</span>
                  <span class="f-val" id="resultFVal1">80% <small style="font-size:12px; font-weight:normal; opacity:0.8;">ممتاز</small></span>
               </div>
             </div>
-            
+
             <div class="f-stage" data-width="85%" id="resultFStage2">
               <div class="f-bar f-green-dark">
                  <span class="f-label">الجذب</span>
                  <span class="f-val" id="resultFVal2">65% <small style="font-size:12px; font-weight:normal; opacity:0.8;">جيد</small></span>
               </div>
             </div>
-            
+
             <div class="f-stage" data-width="60%" id="resultFStage3">
               <div class="f-bar f-red pulse-red" style="z-index: 10;" id="resultFBar3">
                  <span class="f-label">الثقة <span id="resultBottleneckBadge" style="font-size:11px; background:var(--red); padding:2px 6px; border-radius:4px; margin-right:8px; display:none;">نقطة الاختناق</span></span>
                  <span class="f-val" id="resultFVal3">40%</span>
               </div>
             </div>
-            
+
             <div class="f-stage" data-width="45%" id="resultFStage4">
               <div class="f-bar f-red-dark">
                  <span class="f-label">الشراء</span>
                  <span class="f-val" id="resultFVal4">25% <small style="font-size:12px; font-weight:normal; opacity:0.8;">ضعيف</small></span>
               </div>
             </div>
-            
+
             <div class="f-stage" data-width="30%" id="resultFStage5">
               <div class="f-bar f-yellow">
                  <span class="f-label">الولاء</span>
@@ -585,7 +585,7 @@
             </div>
 
           </div>
-          
+
           <div class="funnel-desc" id="resultFunnelDesc">
             يتوقف معظم العملاء في <strong>مرحلة الثقة</strong> مما يمنعهم من الوصول لقرار الشراء بالرغم من وعيهم بالخدمة.
             <div class="fix-box" id="resultFixBox">
@@ -605,7 +605,7 @@
 
     <!-- Row 4: Strengths & Weaknesses -->
     <div class="row-4 animate-up delay-4">
-      
+
       <div class="card list-box strengths">
         <h3 class="card-title">نقاط القوة لديك 🚀</h3>
         <div class="sw-flex">
@@ -855,14 +855,14 @@
     ══════════════════════════════════════════════════════ -->
     <div class="card animate-up delay-4" id="deepAnatomySection" style="display:none; margin-bottom:28px;">
       <h3 class="card-title" style="color:var(--purple); margin-bottom: 30px;">🧠 تشريح المحتوى العميق والمقارنة الذكية</h3>
-      
+
       <div class="deep-grid">
         <!-- Facebook Deep Analysis -->
         <div class="deep-box" id="fbDeepSection" style="border-right: 4px solid #3b82f6;">
           <h4 class="deep-sub-title" style="color:#3b82f6;">📘 تحليل فيسبوك</h4>
           <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;opacity:0.8">📊 توزيع أنواع المحتوى</div>
           <div class="type-bars" id="fbTypeBars"></div>
-          
+
           <div class="hero-posts-section" style="margin-top:24px;">
             <h4 style="font-size:0.9rem; font-weight:900; margin-bottom:12px;">🏆 المحتوى البطل (FB)</h4>
             <div class="hero-posts-list" id="fbHeroPosts"></div>
@@ -874,7 +874,7 @@
           <h4 class="deep-sub-title" style="color:#ec4899;">📸 تحليل انستجرام</h4>
           <div style="font-size:0.85rem;font-weight:700;margin-bottom:12px;opacity:0.8">📊 توزيع أنواع المحتوى</div>
           <div class="type-bars" id="typeBars"></div>
-          
+
           <div class="hero-posts-section" style="margin-top:24px;">
             <h4 style="font-size:0.9rem; font-weight:900; margin-bottom:12px;">🏆 المحتوى البطل (IG)</h4>
             <div class="hero-posts-list" id="heroPosts"></div>
@@ -893,7 +893,7 @@
     <div class="card animate-up delay-4" style="margin-bottom: 24px; padding: 0; overflow: hidden; background: transparent; border: none; box-shadow: none;">
       <h3 class="card-title" style="margin: 12px 0 24px; font-size: 24px;">🔥 أهم 3 خطوات استراتيجية عليك تنفيذها الآن</h3>
       <div class="row-5">
-        
+
         <div class="step-card">
           <div class="step-num" style="background: var(--primary);">1</div>
           <div class="step-title">تطوير الرسالة التسويقية</div>
@@ -933,7 +933,7 @@
     <!-- Row 6: Unlocked Section (For Development/Building Phase) -->
     <div class="locked-banner animate-up delay-4" style="border-color: var(--green);">
       <div class="lock-icon-huge">🔓</div>
-      
+
       <div class="locked-content-wrap">
         <h3 style="color: var(--green);">تم فتح التقرير التفصيلي (وضع البناء)</h3>
         <ul class="locked-list" id="unlockedLinks">
@@ -953,7 +953,7 @@
         <div style="margin-top:12px; font-weight:800; color:var(--text-gray); font-size:14px;">وضع التطوير النشط</div>
       </div>
     </div>
-    
+
     <div class="locked-footer animate-up delay-4">
       ملاحظة: هذه النتائج الأولية مبنية على تحليل الذكاء الاصطناعي للبيانات المتاحة وقت الفحص، وقد تختلف النتائج الإيجابية بناءً على سرعة تطبيق التحسينات.
     </div>
@@ -1012,7 +1012,7 @@
           // Update client name in header (Priority: Scraped Title -> Entered Name)
           const scrapedName = (data.scan_result && data.scan_result.title) ? data.scan_result.title : '';
           const clientName = scrapedName || data.full_name || data.company_name || '';
-          
+
           if (clientName) {
             const headerTitle = document.querySelector('.header-title');
             if (headerTitle) headerTitle.innerHTML = '<div class="check-icon">✔</div> تحليل حساب: ' + clientName;
@@ -1071,13 +1071,34 @@
             });
           }
 
+          // ── Helper: استخراج نص من string أو object (يحل [object Object]) ──
+          // الـ AI قد يُرجع كائنات بمفاتيح متباينة (title, name, point, text, label, ...)
+          // وليس فقط strings. لا بد من المحاولة عبر سلسلة مفاتيح قبل الاستسلام.
+          const __extractText = (item, fallback) => {
+            if (item == null) return fallback;
+            if (typeof item === 'string') return item;
+            if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+            if (typeof item === 'object') {
+              const keys = ['title','name','point','text','heading','label','item','desc','description','task'];
+              for (const k of keys) {
+                const v = item[k];
+                if (typeof v === 'string' && v.trim()) return v;
+              }
+              return fallback;
+            }
+            return String(item);
+          };
+          const __escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
           // Update Strengths list
           if (data.strengths && data.strengths.length > 0) {
             const swBox = document.querySelector('.list-box.strengths ul');
             if (swBox) {
-              swBox.innerHTML = data.strengths.slice(0, 5).map(s =>
-                '<li><span style="color:var(--green);">✔</span> ' + s + '</li>'
-              ).join('');
+              swBox.innerHTML = data.strengths.slice(0, 5).map(s => {
+                const raw = __extractText(s, 'نقطة قوة');
+                const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
+                return '<li><span style="color:var(--green);">✔</span> ' + __escapeHtml(title) + '</li>';
+              }).join('');
             }
           }
 
@@ -1085,9 +1106,11 @@
           if (data.weaknesses && data.weaknesses.length > 0) {
             const wwBox = document.querySelector('.list-box.weaknesses ul');
             if (wwBox) {
-              wwBox.innerHTML = data.weaknesses.slice(0, 5).map(w =>
-                '<li><span style="color:var(--red);">✖</span> ' + w + '</li>'
-              ).join('');
+              wwBox.innerHTML = data.weaknesses.slice(0, 5).map(w => {
+                const raw = __extractText(w, 'نقطة ضعف');
+                const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
+                return '<li><span style="color:var(--red);">✖</span> ' + __escapeHtml(title) + '</li>';
+              }).join('');
             }
           }
 
@@ -1102,7 +1125,7 @@
               if (document.getElementById('webTitle')) document.getElementById('webTitle').textContent = w.title || '—';
               if (document.getElementById('webSpeed')) document.getElementById('webSpeed').textContent = w.load_time_s ? w.load_time_s + 's' : (w.loadTime ? w.loadTime + 's' : '4.6s');
               if (document.getElementById('webSSL')) document.getElementById('webSSL').textContent = w.has_ssl ? 'مفعّل' : (w.hasSSL ? 'مفعّل' : 'مفقود');
-              
+
               const badge = document.getElementById('webBadge');
               if (badge) {
                 const hasPix = w.has_fb_pixel || w.hasPixel;
@@ -1179,7 +1202,7 @@
               // ── التحليل العميق للمنشورات ──
               if (f.deep_analysis && Object.keys(f.deep_analysis).length > 0 && f.deep_analysis.posts_analyzed > 0) {
                 const fd = f.deep_analysis;
-                
+
                 // Show deep sections
                 const deepSection = document.getElementById('deepAnatomySection');
                 if (deepSection) deepSection.style.display = 'block';
@@ -1217,7 +1240,7 @@
                         </div>
                       </div>
                     </div>`).join('');
-                  
+
                   if (fbHeroPosts) fbHeroPosts.innerHTML = postsHtml;
 
                   // Populate hashtags
@@ -1370,7 +1393,7 @@
 
           // ─── 🚀 NEW AI REPORT INJECTION ──────────────────────────────
           const ai = data.ai_report || {};
-          
+
           // 1. Update Pain Points (ماذا تخسر الآن)
           if (ai.pain_points && ai.pain_points.length > 0) {
             const loseList = document.querySelector('.lose-list');
@@ -1394,7 +1417,7 @@
           // 3. Inject Ultra-Detailed AI Report Sections
           const mainContent = document.querySelector('.main-content');
           if (mainContent && Object.keys(ai).length > 0) {
-            
+
             // الفرصة السوقية
             if (ai.market_opportunity) {
               const oppCard = document.createElement('div');
@@ -1470,7 +1493,7 @@
               monthCard.style.marginTop = '24px';
               let mHtml = `<h3 class="card-title" style="color:var(--primary);">🗓️ خطة العمل التفصيلية (30 يوم)</h3>
                            <p style="opacity:0.8; margin-bottom:20px;">هذه الخطة مخصصة تماماً لوضعك الحالي وستأخذك خطوة بخطوة نحو الهدف.</p>`;
-              
+
               ['week1', 'week2', 'week3', 'week4'].forEach(w => {
                 if(ai.action_month[w]) {
                   mHtml += `<div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:12px; margin-bottom:16px; border-right:3px solid var(--primary);">
@@ -1500,7 +1523,7 @@
           // Trigger animations
           runAnimations();
 
-          
+
         } catch(e) {
           console.error(e);
           runAnimations(); // Run with mock data if fetch fails
@@ -1542,7 +1565,7 @@
             const percent = parseInt(ring.getAttribute('data-percent'));
             const color = ring.getAttribute('data-color');
             let currentPercent = 0;
-            
+
             const animateRing = () => {
               currentPercent += (percent - currentPercent) * 0.08;
               ring.style.background = `conic-gradient(${color} ${currentPercent}%, rgba(255,255,255,0.1) 0)`;

@@ -952,6 +952,42 @@ function normalizeStrengthWeakness(array $items): array {
     }, $items)));
 }
 
+// ── Normalizer: action_week قد يأتي كـ strings أو objects بحقل 'task' ──
+// نضمن إرجاع array of strings للـ frontend.
+//
+// ⚠️ NOT to be applied to action_month — الـ AI أحياناً يُرجع action_month
+// كـ structured weekly plan {week1: {theme, goals, tasks}, week2: ...}
+// ويعتمد عليه report.html:1490-1503. التطبيع يدمّر هذا الشكل.
+function normalizeActionItems(array $items): array {
+    return array_values(array_filter(array_map(function($item) {
+        if (is_string($item)) {
+            $trimmed = trim($item);
+            return $trimmed !== '' ? $trimmed : null;
+        }
+        if (is_array($item)) {
+            $candidates = ['task','title','text','action','description','desc'];
+            foreach ($candidates as $k) {
+                if (!empty($item[$k]) && is_string($item[$k]) && trim($item[$k]) !== '') {
+                    return trim($item[$k]);
+                }
+            }
+        }
+        return null;
+    }, $items)));
+}
+
+// ── Helper: action_month قد يأتي بشكلين: ──
+//   (أ) flat list of strings  → نطبّعه كما action_week
+//   (ب) structured weekly plan {week1, week2, week3, week4} → نتركه كما هو
+// نُكتشف عبر وجود مفتاح 'week1' (associative array).
+function normalizeActionMonth($items) {
+    if (!is_array($items) || empty($items)) return [];
+    if (isset($items['week1'])) {
+        return $items;
+    }
+    return normalizeActionItems($items);
+}
+
 // ── Parser موحّد لجميع مزودي AI ─────────────────────────────
 function parseAIResponse(array $aiData, string $source, array $rawData = []): array {
     return [
@@ -964,8 +1000,8 @@ function parseAIResponse(array $aiData, string $source, array $rawData = []): ar
         'strengths'            => normalizeStrengthWeakness($aiData['strengths']  ?? []),
         'weaknesses'           => normalizeStrengthWeakness($aiData['weaknesses'] ?? []),
         'recommendations'      => $aiData['recommendations']      ?? [],
-        'action_week'          => $aiData['action_week']          ?? [],
-        'action_month'         => $aiData['action_month']         ?? [],
+        'action_week'          => normalizeActionItems($aiData['action_week']  ?? []),
+        'action_month'         => normalizeActionMonth($aiData['action_month'] ?? []),
         'competitor_analysis'  => $aiData['competitor_analysis']  ?? [],
         'score_insight'        => $aiData['score_insight']        ?? '',
         'competitor_note'      => $aiData['competitor_note']      ?? '',

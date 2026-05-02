@@ -1,10 +1,62 @@
 <?php
 // ============================================================
-// api/result.php — جلب نتيجة تقييم معين (v4.0)
+// api/result.php — جلب نتيجة تقييم معين (v4.1)
 // GET /api/result.php?id=123
+//
+// v4.1 (PR #9): طبقة تطبيع دفاعية للبيانات المخزّنة في قاعدة البيانات.
+// تُكمل التطبيع الذي يحدث في api/ai-analyze.php (PR #8) لكن تنطبق على
+// السجلات القديمة المخزّنة قبل #8 (strengths/weaknesses كـ kalimat).
 // ============================================================
 require_once __DIR__ . '/db.php';
 setCors();
+
+// ── طبقة تطبيع دفاعية: مكافِئ للـ normalizeStrengthWeakness في ai-analyze.php ──
+// تضمن وجود مفتاح 'title' في كل عنصر strengths/weaknesses قبل إرساله للواجهة.
+// لا تضع 'score' في الـ object المُحوَّل من نص؛ الـ frontend يختار الـ default
+// المناسب لكل صفحة (95-i*5 للقوة، 30+i*5 للضعف).
+$__normalizeItemsForRender = static function(array $items): array {
+    $altKeys = ['title', 'name', 'point', 'text', 'heading', 'label', 'item', 'desc', 'description'];
+    return array_values(array_filter(array_map(static function($item) use ($altKeys) {
+        if (is_string($item)) {
+            $trimmed = trim($item);
+            return $trimmed !== '' ? ['title' => $trimmed, 'desc' => ''] : null;
+        }
+        if (is_array($item)) {
+            if (empty($item['title']) || !is_string($item['title'])) {
+                foreach ($altKeys as $k) {
+                    if (!empty($item[$k]) && is_string($item[$k])) {
+                        $item['title'] = $item[$k];
+                        break;
+                    }
+                }
+            }
+            if (empty($item['title']) || !is_string($item['title'])) {
+                return null;
+            }
+            return $item;
+        }
+        return null;
+    }, $items)));
+};
+
+// ── مطَبِّع لـ action_week: قد يُرجع الـ AI strings أو objects بحقل 'task' ──
+$__normalizeActionItemsForRender = static function(array $items): array {
+    return array_values(array_filter(array_map(static function($item) {
+        if (is_string($item)) {
+            $trimmed = trim($item);
+            return $trimmed !== '' ? $trimmed : null;
+        }
+        if (is_array($item)) {
+            $candidates = ['task','title','text','action','description','desc'];
+            foreach ($candidates as $k) {
+                if (!empty($item[$k]) && is_string($item[$k]) && trim($item[$k]) !== '') {
+                    return trim($item[$k]);
+                }
+            }
+        }
+        return null;
+    }, $items)));
+};
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$id) jsonError('معرّف التقييم غير صالح');
@@ -94,6 +146,30 @@ if (!empty($row['recommendations']) && empty($row['ai_report']['recommendations'
 // ── حقول موحدة للـ Frontend ──────────────────────────────────
 $row['url']       = $row['website_url'] ?: $row['facebook_url'] ?: $row['instagram_url'] ?: $row['tiktok_url'] ?: $row['twitter_url'] ?: '';
 $row['full_name'] = $row['full_name']   ?: $row['company_name'] ?: '';
+
+// ── طبقة تطبيع دفاعية (PR #9): تنطبق على البيانات بعد جمعها وقبل الإرسال ──
+// تحمي من سجلات DB قديمة كانت محفوظة قبل تطبيع PR #8 في api/ai-analyze.php.
+// آمنة على البيانات المُطبَّعة فعلاً (فهي idempotent).
+if (!empty($row['ai_report']['strengths']) && is_array($row['ai_report']['strengths'])) {
+    $row['ai_report']['strengths']  = $__normalizeItemsForRender($row['ai_report']['strengths']);
+}
+if (!empty($row['ai_report']['weaknesses']) && is_array($row['ai_report']['weaknesses'])) {
+    $row['ai_report']['weaknesses'] = $__normalizeItemsForRender($row['ai_report']['weaknesses']);
+}
+// تكرار للحقول في الجذر (يستهلكها الـ inline script في report.html بعد إصلاح PR #9)
+if (!empty($row['strengths']) && is_array($row['strengths'])) {
+    $row['strengths']  = $__normalizeItemsForRender($row['strengths']);
+}
+if (!empty($row['weaknesses']) && is_array($row['weaknesses'])) {
+    $row['weaknesses'] = $__normalizeItemsForRender($row['weaknesses']);
+}
+// action_week: نتأكد من أنها strings (مش objects)
+if (!empty($row['action_week']) && is_array($row['action_week'])) {
+    $row['action_week'] = $__normalizeActionItemsForRender($row['action_week']);
+}
+if (!empty($row['ai_report']['action_week']) && is_array($row['ai_report']['action_week'])) {
+    $row['ai_report']['action_week'] = $__normalizeActionItemsForRender($row['ai_report']['action_week']);
+}
 
 // ── package_tier: مجاني (3 توصيات) أم مدفوع (القائمة الكاملة) ──
 // المصدر: assessments.is_unlocked (TINYINT(1)) — يُضبط على 1 من قِبل الإدارة
