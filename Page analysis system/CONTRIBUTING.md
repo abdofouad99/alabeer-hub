@@ -171,6 +171,42 @@ composer test
 - إصلاح خطأ في X
 ```
 
+## ⚠️ ممنوع: سكريبتات الإصلاح/الحقن أثناء التشغيل
+
+**القاعدة:** لا تكتب سكريبت PHP يقرأ ملف إنتاج (مثل `report.html` أو `ai-analyze.php`) ويعدّله أثناء التشغيل لإصلاح خلل.
+
+### لماذا؟
+كل أنماط مثل:
+```php
+// ❌ ممنوع — مثال على سكريبت إنجكشن
+$content = file_get_contents('../report.html');
+$start = strpos($content, 'marker_string');
+$end   = strpos($content, '</script>', $start) + strlen('</script>');
+if ($start !== false && $end !== false) {  // ⚠️ false + 9 = 9
+    file_put_contents($file, ...);
+}
+```
+
+تعاني من **bugs خطيرة بطبيعتها:**
+1. `strpos(...) + strlen(...)` ينتج `9` عندما `strpos` يُرجع `false` (لأن PHP تحوّل false → 0).
+2. لا توجد آلية idempotent — تشغيل السكريبت مرتين يُضاعف المحتوى.
+3. لا rollback عند الفشل الجزئي.
+4. لا تحقّق من encoding، RTL، أو HTML validity.
+5. تخريب صامت: قد يبدو السكريبت يعمل لكن النتيجة فاسدة.
+
+### البديل الصحيح
+- عدّل الملف المصدر مباشرة في محرر النصوص (VS Code).
+- ارفع التعديل في commit + PR.
+- لو احتجت تعديلاً ديناميكياً (مثل version cache busting)، استخدم build step (Webpack/Gulp) لا runtime PHP.
+
+### ما يُحظَر تحديداً (مُدرَج في `.gitignore`)
+- `fix-*.php`, `fix_*.php`, `api/fix.php`, `api/fix-*.php`
+- `inject-*.php`, `api/inject*.php`
+- `patch-*.php`, `repair-*.php`, `hotfix-*.php`
+- `api/check_braces.php`, `api/check-*.php`
+
+لو وجدت ملفاً منها على نظامك، **احذفه فوراً** (لا ترفعه).
+
 ## الترخيص
 
 بمساهمتك، توافق على أن مساهمتك ستكون مرخصة تحت نفس الترخيص الخاص بالمشروع (MIT).

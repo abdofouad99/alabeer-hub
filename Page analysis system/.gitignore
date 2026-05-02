@@ -45,3 +45,37 @@ Thumbs.db
 # ملفات الاختبار المؤقتة
 test-*.php
 debug-*.php
+
+# ============================================================
+# سكريبتات الإصلاح/الحقن المؤقتة — ممنوع رفعها
+# ============================================================
+# هذه الأنماط تمنع رفع سكريبتات تعدّل ملفات الإنتاج أثناء التشغيل
+# (مثل سكريبت يقرأ report.html ثم يحقن فيه <script> tag).
+# هذه السكريبتات هشة بطبيعتها (أخطاء coercion في PHP، duplicate insert،
+# تخريب encoding) وقد تسبّب فساد ملفات لا يمكن إصلاحه.
+# الإصلاحات الحقيقية تتم بتعديل الملف المصدر ورفعه عبر PR.
+fix-*.php
+fix_*.php
+api/fix.php
+api/fix-*.php
+api/fix_*.php
+inject-*.php
+inject_*.php
+api/inject*.php
+patch-*.php
+patch_*.php
+repair-*.php
+repair_*.php
+hotfix-*.php
+hotfix_*.php
+api/check_braces.php
+api/check-*.php
+
+# ============================================================
+# Backup directories and archives — never commit binary backups
+# ============================================================
+backup_temp/
+_backups/
+backup_*.zip
+*_Backup_*.zip
+System_Backup_*.zip
