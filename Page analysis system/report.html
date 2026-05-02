@@ -1337,9 +1337,33 @@
 
             if (sr.ads_library || sr.ads) {
               const a = sr.ads_library || sr.ads;
-              if (document.getElementById('adsTotal')) document.getElementById('adsTotal').textContent = a.total_ads || '0';
-              if (document.getElementById('adsActive')) document.getElementById('adsActive').textContent = a.active_ads || '0';
-              if (document.getElementById('adsStatus')) document.getElementById('adsStatus').textContent = a.is_running_ads ? 'نشط 🔥' : 'متوقف ❄️';
+              const totalAds  = Number(a.total_ads  || 0);
+              const activeAds = Number(a.active_ads || 0);
+              // اشتقاق الحالة من active_ads فقط (طبقة دفاعية: لو الـ backend
+              // أرسل is_running_ads=true مع active_ads=0 — وهو خلل سابق — نتجاهل
+              // الحقل الخاطئ ونحسبها من الأرقام الفعلية).
+              const isActive = activeAds > 0;
+              if (document.getElementById('adsTotal'))  document.getElementById('adsTotal').textContent  = totalAds;
+              if (document.getElementById('adsActive')) document.getElementById('adsActive').textContent = activeAds;
+              if (document.getElementById('adsStatus')) {
+                let label;
+                if (isActive)        label = 'نشط 🔥';
+                else if (totalAds)   label = 'متوقف ❄️ (إعلانات سابقة)';
+                else                 label = 'متوقف ❄️';
+                document.getElementById('adsStatus').textContent = label;
+              }
+              // تحديث الـ badge العلوي للكارت
+              const adsBadge = document.getElementById('adsBadge');
+              if (adsBadge) {
+                adsBadge.textContent = isActive ? 'نشط' : 'متوقف';
+                adsBadge.style.background = isActive ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)';
+                adsBadge.style.color      = isActive ? '#10b981' : '#94a3b8';
+              }
+              // مزامنة كارت فيسبوك أيضاً (هو يعرض ads_running/ads_count من سحب FB)
+              // مع الحالة الحقيقية من Apify Ads Library — حتى لا يتناقض مع كارت
+              // الحملات الإعلانية أعلاه.
+              if (document.getElementById('fbAdsStatus')) document.getElementById('fbAdsStatus').textContent = isActive ? 'نشط 🔥' : 'متوقف ❄️';
+              if (document.getElementById('fbAdsCount'))  document.getElementById('fbAdsCount').textContent  = activeAds;
             }
 
             // 5. TikTok Card
@@ -1362,16 +1386,31 @@
             }
 
             // 6. Twitter Card
-            if ((sr.twitter && (sr.twitter.success || sr.twitter.followers != null)) || data.twitter_url) {
+            if ((sr.twitter && (sr.twitter.success || sr.twitter.followers != null || sr.twitter.error)) || data.twitter_url) {
               const tw = sr.twitter || {};
               const card = document.getElementById('platTwitter');
               if (card) {
                 card.style.display = 'block';
-                const formatNum = (v) => v != null ? (typeof v === 'number' ? v.toLocaleString() : v) : '0';
+                const formatNum = (v) => v != null ? (typeof v === 'number' ? v.toLocaleString() : v) : '—';
+                const ok = (tw.success === true) || tw.followers != null;
                 if (document.getElementById('twUsername')) document.getElementById('twUsername').textContent = tw.username ? '@' + tw.username : '—';
-                if (document.getElementById('twFollowers')) document.getElementById('twFollowers').textContent = formatNum(tw.followers);
-                if (document.getElementById('twPosts')) document.getElementById('twPosts').textContent = formatNum(tw.posts_count);
-                if (document.getElementById('twLocation')) document.getElementById('twLocation').textContent = tw.location || '—';
+                if (document.getElementById('twFollowers')) document.getElementById('twFollowers').textContent = ok ? formatNum(tw.followers) : '—';
+                if (document.getElementById('twPosts'))     document.getElementById('twPosts').textContent     = ok ? formatNum(tw.posts_count) : '—';
+                if (document.getElementById('twLocation'))  document.getElementById('twLocation').textContent  = tw.location || '—';
+                // شارة "نشط/تعذّر الجلب" بدلاً من "نشط" دائماً
+                const twBadge = document.getElementById('twBadge');
+                if (twBadge) {
+                  if (ok) {
+                    twBadge.textContent = 'نشط';
+                    twBadge.style.background = 'rgba(16,185,129,0.2)';
+                    twBadge.style.color = '#10b981';
+                  } else {
+                    twBadge.textContent = 'تعذّر الجلب';
+                    twBadge.style.background = 'rgba(245,158,11,0.2)';
+                    twBadge.style.color = '#f59e0b';
+                    twBadge.title = tw.error || 'لم يتم جلب البيانات';
+                  }
+                }
               }
             }
           }
@@ -1519,6 +1558,153 @@
             const projected = Math.min(100, data.score + Math.round((100 - data.score) * 0.45));
             if (gNew) gNew.setAttribute('data-val', projected);
           }
+
+          // ════════════════════════════════════════════════════════════
+          // مؤشرات الجودة السريعة (kept showing "جاري التحقق..." لأنها لم
+          // تكن مرتبطة بأي JS). نشتقّها من scan_result + breakdown هنا.
+          // ════════════════════════════════════════════════════════════
+          (function fillQuickChecks() {
+            const sr = data.scan_result || {};
+            const fb = sr.facebook || {};
+            const ig = sr.instagram || {};
+            const w  = sr.website_scan || {};
+            const ads = sr.ads_library || sr.ads || {};
+            const b  = data.breakdown || {};
+
+            const setCheck = (iconId, valId, status, text) => {
+              // status: 'good' | 'warn' | 'bad'
+              const palette = {
+                good: { icon: '✅', color: 'var(--green)' },
+                warn: { icon: '⚠️', color: 'var(--yellow)' },
+                bad:  { icon: '❌', color: 'var(--red)'   },
+              };
+              const p = palette[status] || palette.warn;
+              const iconEl = document.getElementById(iconId);
+              const valEl  = document.getElementById(valId);
+              if (iconEl) iconEl.textContent = p.icon;
+              if (valEl) {
+                valEl.textContent = text;
+                valEl.style.color = p.color;
+                valEl.style.fontWeight = '800';
+              }
+            };
+
+            // ── نقاط القوة ──
+            // 1) الحساب مرتب: ملف فيسبوك له صورة/تصنيف/معلومات أساسية
+            const orgScore =
+              (fb.is_verified ? 1 : 0) +
+              (fb.category    ? 1 : 0) +
+              (fb.phone || fb.whatsapp || fb.email ? 1 : 0) +
+              (fb.website     ? 1 : 0);
+            if (orgScore >= 3)      setCheck('strCheckOrg',   'strCheckOrgVal',   'good', 'مرتب وكامل');
+            else if (orgScore >= 1) setCheck('strCheckOrg',   'strCheckOrgVal',   'warn', 'بحاجة تحسين');
+            else                    setCheck('strCheckOrg',   'strCheckOrgVal',   'bad',  'ناقص');
+
+            // 2) الهوية: نفس الاسم على FB + IG (تطابق هوية)
+            const fbHandle = (fb.page_name || fb.username || '').toString().toLowerCase().trim();
+            const igHandle = (ig.username  || '').toString().toLowerCase().trim();
+            if (fbHandle && igHandle && (fbHandle === igHandle || fbHandle.includes(igHandle) || igHandle.includes(fbHandle)))
+              setCheck('strCheckIdent', 'strCheckIdentVal', 'good', 'متّسقة عبر المنصات');
+            else if (fbHandle || igHandle)
+              setCheck('strCheckIdent', 'strCheckIdentVal', 'warn', 'تحتاج توحيد');
+            else
+              setCheck('strCheckIdent', 'strCheckIdentVal', 'bad', 'غير واضحة');
+
+            // 3) الجمهور: مجموع المتابعين على FB + IG
+            const totalFollowers = Number(fb.followers || 0) + Number(ig.followers || 0);
+            if (totalFollowers >= 5000)      setCheck('strCheckAud', 'strCheckAudVal', 'good', totalFollowers.toLocaleString() + ' متابع');
+            else if (totalFollowers >= 500)  setCheck('strCheckAud', 'strCheckAudVal', 'warn', totalFollowers.toLocaleString() + ' متابع');
+            else                             setCheck('strCheckAud', 'strCheckAudVal', 'bad',  totalFollowers.toLocaleString() + ' متابع — منخفض');
+
+            // 4) رسالة تحفيزية
+            const motivBox = document.getElementById('strMotivation');
+            const motivTxt = document.getElementById('strMotivationText');
+            if (motivBox && motivTxt) {
+              const score = Number(data.score || 0);
+              let msg;
+              if (score >= 70)      msg = 'وضعك ممتاز! ركّز على التوسّع والتحويل.';
+              else if (score >= 40) msg = 'أساس جيد — ٣٠ يوم من العمل المركّز ترفعك لمستوى احترافي.';
+              else                  msg = 'فرصة كبيرة للنمو السريع — التحسينات الأساسية ستضاعف نتائجك.';
+              motivTxt.textContent = msg;
+              motivBox.style.display = 'block';
+            }
+
+            // ── نقاط الضعف ──
+            // 1) CTA: وجود وسيلة تواصل واضحة على الموقع
+            const hasCta = w.has_whatsapp || w.hasWhatsApp || w.has_phone || w.hasPhone;
+            if (hasCta) setCheck('wkCheckCTA', 'wkCheckCTAVal', 'good', 'واضح ومتاح');
+            else        setCheck('wkCheckCTA', 'wkCheckCTAVal', 'bad',  'مفقود — خسارة عملاء');
+
+            // 2) المحتوى: هل هناك نشاط حديث (آخر منشور خلال 30 يوم)
+            const lastPostDays = Number(fb.last_post_days ?? ig.last_post_days ?? 999);
+            if (lastPostDays <= 7)        setCheck('wkCheckContent', 'wkCheckContentVal', 'good', 'منتظم وحديث');
+            else if (lastPostDays <= 30)  setCheck('wkCheckContent', 'wkCheckContentVal', 'warn', 'متباطئ — ' + lastPostDays + ' يوم منذ آخر نشاط');
+            else                          setCheck('wkCheckContent', 'wkCheckContentVal', 'bad',  'متوقف — أكثر من 30 يوم');
+
+            // 3) الإعلانات: هل في إعلانات نشطة الآن (يطابق منطق الـ ads card)
+            const activeAdsForCheck = Number(ads.active_ads || 0);
+            const totalAdsForCheck  = Number(ads.total_ads  || 0);
+            if (activeAdsForCheck > 0)        setCheck('wkCheckAds', 'wkCheckAdsVal', 'good', activeAdsForCheck + ' إعلان نشط');
+            else if (totalAdsForCheck > 0)    setCheck('wkCheckAds', 'wkCheckAdsVal', 'warn', 'متوقفة (سابقاً ' + totalAdsForCheck + ')');
+            else                              setCheck('wkCheckAds', 'wkCheckAdsVal', 'bad',  'لا توجد إعلانات');
+
+            // 4) التتبع التقني: pixel + ga
+            const hasPixel = w.has_fb_pixel || w.hasPixel;
+            const hasGa    = w.has_ga      || w.hasGA;
+            if (hasPixel && hasGa)      setCheck('wkCheckPixel', 'wkCheckPixelVal', 'good', 'Pixel + GA4 مفعّلان');
+            else if (hasPixel || hasGa) setCheck('wkCheckPixel', 'wkCheckPixelVal', 'warn', hasPixel ? 'Pixel فقط — GA4 مفقود' : 'GA4 فقط — Pixel مفقود');
+            else                        setCheck('wkCheckPixel', 'wkCheckPixelVal', 'bad',  'لا تتبّع — قراراتك بلا بيانات');
+
+            // 5) التفاعل: avg_engagement على FB أو IG
+            const eng = Number(fb.avg_engagement ?? ig.engagement_rate ?? 0);
+            if (eng >= 3)        setCheck('wkCheckEng', 'wkCheckEngVal', 'good', eng.toFixed(1) + '% — جيد');
+            else if (eng >= 1)   setCheck('wkCheckEng', 'wkCheckEngVal', 'warn', eng.toFixed(1) + '% — ضعيف');
+            else if (eng > 0)    setCheck('wkCheckEng', 'wkCheckEngVal', 'bad',  eng.toFixed(2) + '% — حرج');
+            else                 setCheck('wkCheckEng', 'wkCheckEngVal', 'bad',  'منخفض جداً');
+          })();
+
+          // ════════════════════════════════════════════════════════════
+          // قائمة "أهم الإجراءات العاجلة" (#resultRecsList)
+          // كانت تعرض "⏳ جاري تحميل التوصيات..." حتى بعد اكتمال التحليل
+          // لأن JS كان يحدّث .step-card فقط (في الأعلى من الصفحة) ولا يلمس
+          // هذا الـ container.
+          // ════════════════════════════════════════════════════════════
+          (function fillTopRecs() {
+            const box = document.getElementById('resultRecsList');
+            if (!box) return;
+            const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+            const top = recs.slice(0, 3);
+
+            if (top.length === 0) {
+              box.innerHTML =
+                '<div style="padding:18px; color:var(--text-gray); text-align:center; font-weight:700;">' +
+                'لم تُصدر توصيات بعد — قد تظهر بعد إعادة التحليل.' +
+                '</div>';
+              return;
+            }
+
+            const escapeHtml = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+            const palette = ['var(--red)', 'var(--yellow)', 'var(--green)'];
+            box.innerHTML = top.map((rec, i) => {
+              const title   = escapeHtml(rec.title || (typeof rec === 'string' ? rec : 'إجراء مقترح'));
+              const desc    = escapeHtml(rec.description || rec.desc || '');
+              const bullets = Array.isArray(rec.bullets) ? rec.bullets : (Array.isArray(rec.steps) ? rec.steps : []);
+              const accent  = palette[i] || 'var(--primary)';
+              const bulletsHtml = bullets.length
+                ? '<ul style="margin:8px 0 0 0; padding-right:20px; opacity:0.85; font-size:13px; line-height:1.7;">' +
+                  bullets.slice(0, 3).map(b => '<li>' + escapeHtml(b) + '</li>').join('') +
+                  '</ul>'
+                : '';
+              return (
+                '<div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-right:3px solid ' + accent + '; ' +
+                'padding:16px 18px; border-radius:12px;">' +
+                '<div style="font-weight:900; font-size:15px; margin-bottom:6px;">' + (i+1) + '. ' + title + '</div>' +
+                (desc ? '<div style="opacity:0.85; font-size:13px; line-height:1.6;">' + desc + '</div>' : '') +
+                bulletsHtml +
+                '</div>'
+              );
+            }).join('');
+          })();
 
           // Trigger animations
           runAnimations();

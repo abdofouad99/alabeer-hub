@@ -238,7 +238,7 @@ function applyScanBoosts(array &$breakdown, array $scanResult): void {
 function genInsights(array $breakdown, array $map, array $scanResult = []): array {
     $strengths = $weaknesses = [];
     $urlType = $scanResult['url_type']    ?? 'website';
-    
+
     // استخدم بيانات المنصة المحددة إذا توفرت، وإلا استخدم social العام
     $social = [];
     if (in_array($urlType, ['facebook', 'instagram'])) {
@@ -246,7 +246,7 @@ function genInsights(array $breakdown, array $map, array $scanResult = []): arra
     } else {
         $social = $scanResult['facebook'] ?? $scanResult['instagram'] ?? $scanResult['social'] ?? [];
     }
-    
+
     $ads     = $scanResult['ads_library'] ?? [];
     $isSocial = in_array($urlType, ['facebook', 'instagram']);
 
@@ -378,9 +378,9 @@ function genDetailedBreakdown(array $scores, array $scan): array {
         $score = $scores[$key] ?? 0;
         $max = ($key === 'analytics') ? 10 : (($key === 'brand' || $key === 'presence') ? 15 : 20);
         $percent = ($score / $max) * 100;
-        
+
         $tier = ($percent >= 80) ? 'high' : (($percent >= 40) ? 'med' : 'low');
-        
+
         $detailed[] = [
             'axis'   => $axis,
             'score'  => (int)$percent,
@@ -531,7 +531,7 @@ function buildActionWeek(int $score, ?array $scan, array $map): array {
 // ============================================================
 function runAnalysis(int $assessmentId): array {
     logInfo('Starting analysis run', ['assessment_id' => $assessmentId]);
-    
+
     ini_set('max_execution_time', 600); // P0-3: رفع الـ Timeout إلى 10 دقائق
     set_time_limit(600);
     $db  = getDB();
@@ -587,14 +587,14 @@ function runAnalysis(int $assessmentId): array {
     $cacheKey = 'scan_' . md5($primaryUrl);
     $scanResult = cacheRemember($cacheKey, function() use ($primaryUrl, $cfg, $assessmentId, $db, $updateStep) {
         logInfo('Starting page scan', ['url' => $primaryUrl, 'assessment_id' => $assessmentId]);
-        
+
         try {
             // تحديث حالة assessment الى running
             $db->prepare("UPDATE assessments SET status='running' WHERE id=?")->execute([$assessmentId]);
-            
+
             $result = runPageScan($primaryUrl, $cfg);
             $updateStep(2); // step 2: اكتمل فحص الموقع واكتُشفت المنصات
-            
+
             logInfo('Page scan completed', ['url' => $primaryUrl, 'success' => $result['success'] ?? false]);
             return $result;
         } catch (\Throwable $e) {
@@ -621,7 +621,7 @@ function runAnalysis(int $assessmentId): array {
         }
     }
 
-    
+
     // تخمين إنستقرام من الفيسبوك إذا لم نكتشفه بعد
     if (!$detectedIgUrl && $detectedFbUrl) {
         preg_match('/facebook\.com\/([^\/\?#]+)/i', $detectedFbUrl, $m);
@@ -650,7 +650,7 @@ function runAnalysis(int $assessmentId): array {
                         $scanResult['facebook'] = $apifyFb;
                     }
                     $saveScanProgress('facebook', $scanResult['facebook']); // ✅ حفظ فوري
-                    
+
                     // اكتشاف روابط انستقرام والموقع من داخل بيانات فيسبوك (مهم إذا كان الإدخال فيسبوك فقط)
                     if (empty($detectedIgUrl) && !empty($apifyFb['instagram'])) {
                         $detectedIgUrl = $apifyFb['instagram'];
@@ -661,7 +661,7 @@ function runAnalysis(int $assessmentId): array {
                         $ws = _fetchAndScanWebsite($newWebUrl, $cfg);
                         $scanResult['website'] = $newWebUrl;
                         $scanResult['website_scan'] = $ws;
-                        
+
                         // محاولة اكتشاف انستقرام من الموقع إذا لم يكن موجوداً في صفحة الفيسبوك مباشرة
                         if (empty($detectedIgUrl) && !empty($ws['instagram_url'])) {
                             $detectedIgUrl = $ws['instagram_url'];
@@ -742,10 +742,26 @@ function runAnalysis(int $assessmentId): array {
                         $scanResult['website'] = $newWebUrl;
                         $scanResult['website_scan'] = $ws;
                     }
+                } else {
+                    // احفظ الفشل أيضاً ليعرض الفرونت "تعذّر جلب بيانات تويتر"
+                    // بدل الأصفار. (المستخدم أبلغ عن "0/—" بدون أي إشارة لخطأ.)
+                    $scanResult['twitter'] = $r + ['url' => $twUrlFinal];
+                    $saveScanProgress('twitter', $scanResult['twitter']);
+                    logError('Twitter scrape returned failure', [
+                        'url'   => $twUrlFinal,
+                        'error' => $r['error'] ?? 'unknown',
+                    ]);
                 }
             }
         } catch (\Throwable $e) {
-            logError('Twitter scrape failed', ['url' => $twUrlFinal, 'error' => $e->getMessage()]);
+            $scanResult['twitter'] = [
+                'success'  => false,
+                'platform' => 'twitter',
+                'url'      => $twUrlFinal,
+                'error'    => 'تعذّر جلب بيانات تويتر — استثناء داخلي.',
+            ];
+            $saveScanProgress('twitter', $scanResult['twitter']);
+            logError('Twitter scrape exception', ['url' => $twUrlFinal, 'error' => $e->getMessage()]);
         }
     }
 
@@ -759,7 +775,7 @@ function runAnalysis(int $assessmentId): array {
         $adsPageId = $apifyFb['page_id'] ?? $scanResult['social']['page_id'] ?? $scanResult['og']['page_id'] ?? '';
         // الأولوية 2: Page Name
         $adsQuery = $apifyFb['page_name'] ?? $scanResult['social']['page_name'] ?? '';
-        
+
         if (!$adsQuery && !$adsPageId) {
             if ($detectedFbUrl) {
                 preg_match('/facebook\.com\/([^\/\?#]+)/i', $detectedFbUrl, $m);
@@ -769,7 +785,7 @@ function runAnalysis(int $assessmentId): array {
                 $adsQuery = $m[1] ?? '';
             }
         }
-        
+
         // الأولوية 3: اسم الشركة أو النطاق
         if (!$adsQuery && !$adsPageId) {
             $adsQuery = $leadData['company_name'] ?? '';
@@ -1031,4 +1047,3 @@ function runAnalysis(int $assessmentId): array {
         'ai_report'       => $aiResult,
     ];
 }
-
