@@ -952,6 +952,26 @@ function normalizeStrengthWeakness(array $items): array {
     }, $items)));
 }
 
+// ── Normalizer: action_week / action_month قد يأتيان كـ strings أو objects ──
+// نضمن إرجاع array of strings للـ frontend (plan.html, journey.html).
+function normalizeActionItems(array $items): array {
+    return array_values(array_filter(array_map(function($item) {
+        if (is_string($item)) {
+            $trimmed = trim($item);
+            return $trimmed !== '' ? $trimmed : null;
+        }
+        if (is_array($item)) {
+            $candidates = ['task','title','text','action','description','desc'];
+            foreach ($candidates as $k) {
+                if (!empty($item[$k]) && is_string($item[$k]) && trim($item[$k]) !== '') {
+                    return trim($item[$k]);
+                }
+            }
+        }
+        return null;
+    }, $items)));
+}
+
 // ── Parser موحّد لجميع مزودي AI ─────────────────────────────
 function parseAIResponse(array $aiData, string $source, array $rawData = []): array {
     return [
@@ -964,8 +984,8 @@ function parseAIResponse(array $aiData, string $source, array $rawData = []): ar
         'strengths'            => normalizeStrengthWeakness($aiData['strengths']  ?? []),
         'weaknesses'           => normalizeStrengthWeakness($aiData['weaknesses'] ?? []),
         'recommendations'      => $aiData['recommendations']      ?? [],
-        'action_week'          => $aiData['action_week']          ?? [],
-        'action_month'         => $aiData['action_month']         ?? [],
+        'action_week'          => normalizeActionItems($aiData['action_week']  ?? []),
+        'action_month'         => normalizeActionItems($aiData['action_month'] ?? []),
         'competitor_analysis'  => $aiData['competitor_analysis']  ?? [],
         'score_insight'        => $aiData['score_insight']        ?? '',
         'competitor_note'      => $aiData['competitor_note']      ?? '',
