@@ -295,5 +295,7 @@ flush();
 if (function_exists('fastcgi_finish_request')) {
     fastcgi_finish_request();
 }
-// لا نقوم بتشغيل التحليل هنا لمنع تعليق المتصفح.
-// واجهة المستخدم (analyzing.html) ستقوم بطلب api/run.php بشكل منفصل.
+// لا نشغّل التحليل هنا لتجنّب timeout الطويل على المتصفح.
+// المسؤولية على العميل: analyzing.html يستدعي api/run.php?id=…
+// في الخلفية مباشرة بعد أن يستلم استجابة submit.php (راجع
+// analyzing.html → phase1_submit → fetch('api/run.php?id=…')).

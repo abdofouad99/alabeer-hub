@@ -198,6 +198,7 @@
 
     const urlParams   = new URLSearchParams(window.location.search);
     const targetUrl   = urlParams.get('url') || '';
+    const leadDataRaw = sessionStorage.getItem('lead_data');
 
     const bar         = document.getElementById('progressBar');
     const pct         = document.getElementById('progressPct');
@@ -267,14 +268,90 @@
     }
 
     // ── Redirect guard ──
-    // analyzing.html يجب أن تُفتح فقط بـ ?id=... (بعد إرسال scan.html → submit.php
-    // → result.html). الدخول بدون id كان يُنشئ assessment وهمي بـ full_name='زائر'
-    // و phone='000' (يلوّث leads/assessments). نُجبر العميل للعودة لـ scan.html.
-    if (!urlParams.get('id')) {
+    // analyzing.html تُفتح بأحد مسارين فقط:
+    //   1) ?id=…              → استئناف Polling لتقييم موجود
+    //   2) ?url=…&sessionStorage[lead_data]   → إرسال جديد جاء من scan.html
+    // الدخول المباشر بدون أحدهما كان يُنشئ assessment وهمياً بـ full_name='زائر'
+    // و phone='000'. نمنع ذلك بإعادة التوجيه لـ scan.html.
+    if (!urlParams.get('id') && (!leadDataRaw || !targetUrl)) {
       const fallback = targetUrl
         ? 'scan.html?url=' + encodeURIComponent(targetUrl)
         : 'scan.html';
       window.location.href = fallback;
+    }
+
+    // ── Phase 1: Submit & Register ─────────────────────────────
+    // يُستدعى عند الدخول من scan.html (sessionStorage فيه lead_data).
+    // مع طبقة CSRF: نجلب التوكن أولاً ثم نضيفه كـ X-CSRF-Token header.
+    async function phase1_submit() {
+      activateStep(1);
+      setProgress(8);
+      msg.innerHTML = 'جاري تسجيل طلبك وبدء الفحص...';
+
+      // ابنِ كائن lead من sessionStorage (المصدر الوحيد للحقيقة).
+      // لا توجد قيم افتراضية وهمية: لو ما فيه lead_data، الـ Redirect guard أعلاه
+      // كان قد أعاد التوجيه لـ scan.html قبل الوصول هنا.
+      let lead;
+      try {
+        lead = JSON.parse(leadDataRaw);
+      } catch (e) {
+        showError('بيانات الجلسة تالفة. <a href="scan.html" style="color:#f58e1a">ارجع لصفحة الفحص</a>');
+        return;
+      }
+      if (!lead || !lead.full_name || !lead.phone) {
+        showError('بيانات ناقصة. <a href="scan.html" style="color:#f58e1a">ارجع لصفحة الفحص</a>');
+        return;
+      }
+      // تأكد من وجود url (للـ scan)
+      if (!lead.url) lead.url = targetUrl;
+
+      try {
+        // 1) اجلب CSRF token
+        const csrfResp = await fetch('api/csrf.php', { credentials: 'same-origin' });
+        if (!csrfResp.ok) throw new Error('CSRF endpoint غير متاح');
+        const csrfData = await csrfResp.json();
+        const csrfToken = csrfData.csrf_token || '';
+        if (!csrfToken) throw new Error('لم يصل CSRF token');
+
+        activateStep(2);
+        setProgress(15);
+        msg.innerHTML = `يتم الآن فحص: <small style="color:#94a3b8">${decodeURIComponent(targetUrl)}</small>`;
+
+        // 2) أرسل submit.php مع التوكن
+        const resp = await fetch('api/submit.php', {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'X-CSRF-Token':  csrfToken,
+          },
+          credentials: 'same-origin',
+          body:    JSON.stringify({ lead, answers: {} })
+        });
+
+        const data = await resp.json();
+        if (data.error) { showError(data.error); return; }
+
+        assessmentId = data.assessment_id || data.id;
+        if (!assessmentId) { showError('لم يتم إنشاء معرّف التقييم. حاول مجدداً.'); return; }
+
+        // احفظ الـ id لاسترجاع لاحق لو حدث reload
+        sessionStorage.setItem('last_assessment_id', assessmentId);
+
+        // عرض النتيجة الأولية لو وصلت
+        if (data.score != null && data.tier) {
+          showPartialResult(data.score);
+        }
+
+        // 3) شغّل التحليل العميق في الخلفية (لا await — لئلا يعلّق المتصفح)
+        fetch('api/run.php?id=' + assessmentId, { credentials: 'same-origin' })
+          .catch(e => console.log('Run triggered (background)', e));
+
+        // 4) ابدأ polling
+        phase2_poll();
+
+      } catch(err) {
+        showError('تعذّر الاتصال بالخادم: ' + err.message);
+      }
     }
 
     // ── Phase 2: Real Polling ───────────────────────────────────
@@ -357,11 +434,15 @@
     }
 
     // ── Start ──────────────────────────────────────────────────
-    // الـ id مضمون موجود لأن الـ Redirect guard أعلاه أعاد التوجيه لـ scan.html
-    // لو كان غير موجود. هنا فقط نبدأ polling.
+    // ثلاث حالات (تم فلترتها بالـ Redirect guard أعلاه):
+    //   1) ?id=…                → استئناف polling لتقييم موجود
+    //   2) ?url=… + sessionStorage.lead_data → إرسال جديد عبر phase1_submit
+    //   3) أي شيء آخر          → الـ Redirect guard أعاد التوجيه لـ scan.html
     if (urlParams.get('id')) {
       assessmentId = urlParams.get('id');
       phase2_poll();
+    } else if (leadDataRaw && targetUrl) {
+      phase1_submit();
     }
   </script>
 
