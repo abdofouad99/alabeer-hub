@@ -1655,8 +1655,15 @@
             else if (hasPixel || hasGa) setCheck('wkCheckPixel', 'wkCheckPixelVal', 'warn', hasPixel ? 'Pixel فقط — GA4 مفقود' : 'GA4 فقط — Pixel مفقود');
             else                        setCheck('wkCheckPixel', 'wkCheckPixelVal', 'bad',  'لا تتبّع — قراراتك بلا بيانات');
 
-            // 5) التفاعل: avg_engagement على FB أو IG
-            const eng = Number(fb.avg_engagement ?? ig.engagement_rate ?? 0);
+            // 5) التفاعل: نسبة %
+            // ملاحظة: ig.engagement_rate نسبة بالفعل، لكن fb.avg_engagement
+            // متوسط مطلق (likes+comments)/post وليس %. نشتقّ النسبة لـ FB من
+            // avg_engagement / followers × 100. لو ما عندنا أرقام FB كاملة
+            // نلجأ للـ IG.
+            let eng = Number(ig.engagement_rate ?? 0);
+            if (!eng && fb.avg_engagement != null && Number(fb.followers) > 0) {
+              eng = Number(((Number(fb.avg_engagement) / Number(fb.followers)) * 100).toFixed(2));
+            }
             if (eng >= 3)        setCheck('wkCheckEng', 'wkCheckEngVal', 'good', eng.toFixed(1) + '% — جيد');
             else if (eng >= 1)   setCheck('wkCheckEng', 'wkCheckEngVal', 'warn', eng.toFixed(1) + '% — ضعيف');
             else if (eng > 0)    setCheck('wkCheckEng', 'wkCheckEngVal', 'bad',  eng.toFixed(2) + '% — حرج');

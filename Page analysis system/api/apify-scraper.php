@@ -715,15 +715,28 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
             continue;
         }
 
-        $parsed = _parseTwitterProfile($profile, $username);
-        // اعتبره ناجحاً فقط لو فيه على الأقل username أو followers
-        if (!empty($parsed['username']) || $parsed['followers'] > 0) {
-            logInfo("Twitter scrape successful", ['username' => $parsed['username'], 'actor' => $actorId]);
-            return $parsed;
+        // Validate against the RAW profile, not the parsed result. The parser
+        // falls back to $username for the username field, so checking
+        // !empty($parsed['username']) would always pass and short-circuit the
+        // multi-actor retry. Instead, require that the raw response contains
+        // at least one recognizable Twitter profile field.
+        $knownTwitterKeys = [
+            'userName', 'screenName', 'screen_name', 'handle', 'username',
+            'followersCount', 'followers_count', 'followerCount', 'followers',
+            'statusesCount', 'statuses_count', 'tweetCount', 'tweet_count', 'tweetsCount',
+            'name', 'displayName', 'display_name', 'fullName',
+        ];
+        $hasRecognizedField = !empty(array_intersect_key($profile, array_flip($knownTwitterKeys)));
+        if (!$hasRecognizedField) {
+            logError("Twitter actor returned data without identifiable fields; trying next actor", [
+                'actor' => $actorId, 'sample_keys' => array_slice(array_keys($profile), 0, 10),
+            ]);
+            continue;
         }
-        logError("Twitter actor returned data without identifiable fields; trying next actor", [
-            'actor' => $actorId, 'sample_keys' => array_slice(array_keys($profile), 0, 10),
-        ]);
+
+        $parsed = _parseTwitterProfile($profile, $username);
+        logInfo("Twitter scrape successful", ['username' => $parsed['username'], 'actor' => $actorId]);
+        return $parsed;
     }
 
     logError("All Twitter actors failed", ['username' => $username, 'tried' => $candidates]);
