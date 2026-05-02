@@ -117,8 +117,8 @@ function scrapeAdsLibrary(
         if (!empty($m[1])) $cleanQuery = trim($m[1]);
     }
 
-    $urlToSearch = str_starts_with($pageIdentifier, 'http') 
-        ? $pageIdentifier 
+    $urlToSearch = str_starts_with($pageIdentifier, 'http')
+        ? $pageIdentifier
         : "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&q=" . urlencode($cleanQuery) . "&search_type=keyword_unordered";
 
     $input = [
@@ -163,13 +163,17 @@ function scrapeAdsLibrary(
         return $fallbackReturn;
     }
 
+    // is_running_ads = "هل توجد إعلانات نشطة الآن؟" يجب أن يُشتق من active_ads
+    // وليس من إجمالي الإعلانات (وإلا تظهر "نشط" مع "إعلانات نشطة: 0").
+    $activeCount = count(array_filter($ads, fn($a) => !empty($a['is_active'])));
+
     return [
         'success'        => true,
         'source'         => 'apify_actor',
         'total_ads'      => count($ads),
-        'active_ads'     => count(array_filter($ads, fn($a) => $a['is_active'])),
+        'active_ads'     => $activeCount,
         'ads'            => array_slice($ads, 0, 30),
-        'is_running_ads' => count($ads) > 0,
+        'is_running_ads' => $activeCount > 0,
     ];
 }
 
@@ -294,7 +298,7 @@ function _apifyStartRun(string $actorId, string $inputJson, string $token): ?str
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $res = json_decode($body, true);
     curl_close($ch);
-    
+
     if ($code !== 201 && $code !== 200) {
         logError("Apify Start Run Failed", [
             "actor" => $actorId,
@@ -304,7 +308,7 @@ function _apifyStartRun(string $actorId, string $inputJson, string $token): ?str
         ]);
         return null;
     }
-    
+
     return $res['data']['id'] ?? null;
 }
 
@@ -375,15 +379,15 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
     if ($isPostsScraper) {
         // Actor الجديد يرجع مصفوفة من المنشورات، أول عنصر يحتوي على معلومات الصفحة
         if (empty($result)) return ['success' => false, 'error' => 'لا يوجد منشورات للتحليل (أو الصفحة مغلقة)'];
-        
+
         $firstItem = $result[0];
         $posts = $result; // كل عنصر هو منشور
-        
+
         $followers = $firstItem['followers'] ?? $firstItem['followersCount'] ?? $firstItem['fans'] ?? null;
         $likes     = $firstItem['likes']     ?? $firstItem['likesCount']     ?? $followers;
         $pageName  = $firstItem['title']     ?? $firstItem['pageName']       ?? $firstItem['name'] ?? '';
         $pageId    = $firstItem['facebookId'] ?? $firstItem['pageId']         ?? $firstItem['id']   ?? '';
-        
+
         $phone = '';
         $email = '';
         $whatsapp = '';
@@ -391,15 +395,15 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         $igUrl = '';
         $category = '';
         $is_verified = false;
-        
+
         // جلب الإعلانات من المنشور الأول
         $adLib = $firstItem['pageAdLibrary'] ?? [];
         $adsActive = !empty($adLib['is_business_page_active']);
         $adsCount = 0;
-        
+
         // تعيين $page ليكون $firstItem لاستخدامه في الحقول المشتركة بالأسفل
         $page = $firstItem;
-        
+
         // محاولة استخراج المزيد من البيانات من الحقول المتاحة في الـ Actor الجديد
         $phone     = $page['phone']        ?? $page['phoneNumber']    ?? '';
         $whatsapp  = $page['whatsappNumber'] ?? '';
@@ -427,7 +431,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
                     $phone     = $ap['phone'] ?? $ap['phoneNumber'] ?? $phone;
                     $whatsapp  = $ap['wa_number'] ?? $ap['whatsapp_number'] ?? $ap['whatsapp'] ?? $whatsapp;
                     $email     = $ap['email'] ?? ($ap['emails'][0] ?? $email);
-                    
+
                     $ws = $ap['website'] ?? '';
                     if (empty($ws) && !empty($ap['websites'])) {
                         $wsArray = $ap['websites'];
@@ -437,14 +441,14 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
 
                     $category  = $ap['category'] ?? ($ap['categories'][0] ?? ($ap['categoryName'] ?? $category));
                     $is_verified = !empty($ap['verified']) || !empty($ap['isVerified']) || ($ap['verifiedStatus'] ?? '') === 'BLUE_VERIFIED' || $is_verified;
-                    
+
                     // استخدام صورة الغلاف والشخصية إذا توفرت
                     $page['cover'] = $ap['cover'] ?? $page['cover'] ?? null;
                     $page['profilePic'] = $ap['profilePic'] ?? $page['profilePic'] ?? null;
                 }
             }
         }
-        
+
     } else {
         // Actor القديم يرجع كائن واحد للصفحة وداخله المنشورات
         $page = $result[0] ?? [];
@@ -468,7 +472,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         $is_verified = !empty($page['verified']) || !empty($page['isVerified']) || ($page['verifiedStatus'] ?? '') === 'BLUE_VERIFIED';
         $pageName = $page['title'] ?? $page['pageName'] ?? $page['name'] ?? '';
         $pageId = $page['pageId'] ?? $page['facebookId'] ?? $page['id'] ?? '';
-        
+
         $adLib = $page['pageAdLibrary'] ?? [];
         $adsActive = !empty($adLib['is_business_page_active']) || (($adLib['ad_count'] ?? 0) > 0);
         $adsCount = (int)($adLib['ad_count'] ?? 0);
@@ -648,61 +652,134 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
 // Twitter (X) Scraper
 // ============================================================
 function scrapeTwitter(string $url, string $token, array $cfg): array {
-    $actorId = $cfg['apis']['apify_actor_twitter'] ?? 'quacker~twitter-url-scraper';
+    // ملاحظة: قائمة الـ Apify actors لتويتر تتغير بسرعة (التحول من twitter.com → x.com
+    // أوقف عدة actors). نحاول أكثر من actor تلقائياً قبل الإعلان عن الفشل، وندعم
+    // عدة أشكال output schemas (camelCase, snake_case, ومختلطة).
+    $primaryActor = $cfg['apis']['apify_actor_twitter'] ?? '';
+    $candidates = array_values(array_unique(array_filter([
+        $primaryActor,
+        'apidojo~twitter-scraper-lite',
+        'quacker~twitter-url-scraper',
+    ])));
 
-    // استخراج username (يدعم: user, twitter.com/user, x.com/user)
+    // ── استخراج username (يدعم: user, @user, twitter.com/user, x.com/user) ──
     if (!str_contains($url, 'twitter.com') && !str_contains($url, 'x.com')) {
         $username = ltrim($url, '@');
     } else {
         preg_match('/(?:twitter|x)\.com\/([^\/\?#]+)/i', $url, $m);
         $username = $m[1] ?? '';
     }
+    $username = trim($username);
 
-    if (!$username) return ['success' => false, 'error' => 'لم يتم استخراج Twitter username'];
-
-    logInfo("Starting Twitter scrape", ["username" => $username, "actor" => $actorId]);
-    $input = json_encode([
-        'startUrls' => [$url],
-        'twitterHandles' => [$username],
-        'maxItems' => 1,
-        'getFollowers' => true,
-        'getFollowing' => true,
-        'getAbout' => true
-    ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
-    
-    $runId = _apifyStartRun($actorId, $input, $token);
-    if (!$runId) {
-        logError("Failed to start Twitter run", ["actor" => $actorId]);
-        return ['success' => false, 'error' => 'فشل تشغيل Twitter Scraper'];
+    if (!$username) {
+        return [
+            'success'  => false,
+            'platform' => 'twitter',
+            'error'    => 'لم يتم استخراج Twitter username من الرابط',
+            'url'      => $url,
+        ];
     }
 
-    $result = _apifyWaitAndFetch($runId, $token, 90);
-    if (!$result) {
-        logError("Twitter scrape timeout or failed", ["run_id" => $runId]);
-        return ['success' => false, 'error' => 'انتهت مهلة Twitter Scraper'];
+    $normalizedUrl = 'https://twitter.com/' . $username;
+
+    foreach ($candidates as $actorId) {
+        logInfo("Starting Twitter scrape attempt", ["username" => $username, "actor" => $actorId]);
+        $input = json_encode([
+            'startUrls'      => [$normalizedUrl, $url],
+            'twitterHandles' => [$username],
+            'handles'        => [$username],     // apidojo schema
+            'maxItems'       => 1,
+            'maxTweets'      => 0,                // نريد البروفايل فقط
+            'getFollowers'   => true,
+            'getFollowing'   => true,
+            'getAbout'       => true,
+        ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
+
+        $runId = _apifyStartRun($actorId, $input, $token);
+        if (!$runId) {
+            logError("Failed to start Twitter run; trying next actor", ["actor" => $actorId]);
+            continue;
+        }
+
+        $result = _apifyWaitAndFetch($runId, $token, 90);
+        if (!$result) {
+            logError("Twitter scrape timeout; trying next actor", ["run_id" => $runId, "actor" => $actorId]);
+            continue;
+        }
+
+        $profile = $result[0] ?? [];
+        if (empty($profile)) {
+            logError("Twitter scrape returned empty; trying next actor", [
+                'run_id' => $runId, 'actor' => $actorId,
+            ]);
+            continue;
+        }
+
+        // Validate against the RAW profile, not the parsed result. The parser
+        // falls back to $username for the username field, so checking
+        // !empty($parsed['username']) would always pass and short-circuit the
+        // multi-actor retry. Instead, require that the raw response contains
+        // at least one recognizable Twitter profile field.
+        $knownTwitterKeys = [
+            'userName', 'screenName', 'screen_name', 'handle', 'username',
+            'followersCount', 'followers_count', 'followerCount', 'followers',
+            'statusesCount', 'statuses_count', 'tweetCount', 'tweet_count', 'tweetsCount',
+            'name', 'displayName', 'display_name', 'fullName',
+        ];
+        $hasRecognizedField = !empty(array_intersect_key($profile, array_flip($knownTwitterKeys)));
+        if (!$hasRecognizedField) {
+            logError("Twitter actor returned data without identifiable fields; trying next actor", [
+                'actor' => $actorId, 'sample_keys' => array_slice(array_keys($profile), 0, 10),
+            ]);
+            continue;
+        }
+
+        $parsed = _parseTwitterProfile($profile, $username);
+        logInfo("Twitter scrape successful", ['username' => $parsed['username'], 'actor' => $actorId]);
+        return $parsed;
     }
 
-    $profile = $result[0] ?? [];
-    if (empty($profile)) {
-        logError("Twitter scrape returned no data", ["run_id" => $runId, "result" => $result]);
-        return ['success' => false, 'error' => 'لا بيانات Twitter'];
-    }
+    logError("All Twitter actors failed", ['username' => $username, 'tried' => $candidates]);
+    return [
+        'success'  => false,
+        'platform' => 'twitter',
+        'username' => $username,
+        'url'      => $normalizedUrl,
+        'error'    => 'تعذّر جلب بيانات تويتر — حاول المنصة لاحقاً.',
+    ];
+}
 
-    logInfo("Twitter scrape successful", ["username" => $username]);
+/**
+ * Normalize Twitter profile from various Apify actors (camelCase, snake_case, mixed).
+ * Different actors return different field names — we try them all.
+ */
+function _parseTwitterProfile(array $p, string $usernameFallback): array {
+    $first = static function (array $haystack, array $keys, $default = null) {
+        foreach ($keys as $k) {
+            if (array_key_exists($k, $haystack) && $haystack[$k] !== null && $haystack[$k] !== '') {
+                return $haystack[$k];
+            }
+        }
+        return $default;
+    };
+    $intOr0 = static function ($v): int {
+        if (is_numeric($v)) return (int)$v;
+        return 0;
+    };
 
     return [
         'success'    => true,
         'platform'   => 'twitter',
-        'username'   => $profile['screenName'] ?? $profile['userName'] ?? $username,
-        'full_name'  => $profile['name'] ?? '',
-        'followers'  => $profile['followersCount'] ?? 0,
-        'following'  => $profile['friendsCount'] ?? $profile['followingCount'] ?? 0,
-        'posts_count'=> $profile['statusesCount'] ?? $profile['tweetCount'] ?? 0,
-        'bio'        => $profile['description'] ?? '',
-        'location'   => $profile['location'] ?? '',
-        'is_verified'=> $profile['verified'] ?? false,
-        'website'    => $profile['url'] ?? $profile['external_url'] ?? '',
-        'avatar'     => $profile['profileImageUrlHttps'] ?? $profile['profile_image_url_https'] ?? '',
+        'username'   => (string)$first($p, ['userName','screenName','screen_name','handle','username'], $usernameFallback),
+        'full_name'  => (string)$first($p, ['name','displayName','display_name','fullName','full_name'], ''),
+        'followers'  => $intOr0($first($p, ['followers','followersCount','followers_count','followerCount'], 0)),
+        'following'  => $intOr0($first($p, ['following','followingCount','following_count','friendsCount','friends_count'], 0)),
+        'posts_count'=> $intOr0($first($p, ['statusesCount','statuses_count','tweetCount','tweet_count','tweetsCount','postsCount','posts_count'], 0)),
+        'bio'        => (string)$first($p, ['description','bio','about'], ''),
+        'location'   => (string)$first($p, ['location','place'], ''),
+        'is_verified'=> (bool)$first($p, ['verified','isVerified','is_verified','isBlueVerified'], false),
+        'website'    => (string)$first($p, ['url','external_url','externalUrl','website'], ''),
+        'avatar'     => (string)$first($p, ['profileImageUrlHttps','profile_image_url_https','profileImageUrl','profile_image_url','avatar'], ''),
     ];
 }
 
@@ -796,18 +873,18 @@ function calcLastPostDays(array $posts): ?int {
 // ── المحلل العميق (Deep Content Analyzer) ───────────────
 function analyzeDeepContent(array $posts): array {
     if (empty($posts)) return [];
-    
+
     $total = count($posts);
     $types = ['video' => 0, 'image' => 0, 'carousel' => 0];
     $hashtags = [];
     $totalWords = 0;
     $ctaCount = 0;
-    
+
     // الكلمات التي لو وجدت بالنص تدل على دعوة لإجراء
     $ctaKeywords = ['رابط', 'بايو', 'bio', 'link', 'تواصل', 'واتساب', 'رسالة', 'اشتري', 'احجز', 'سجل', 'خصم', 'الآن', 'تخفيض', 'اتصل', 'موقعنا'];
-    
+
     $parsed_posts = [];
-    
+
     foreach ($posts as $p) {
         $text = $p['caption'] ?? $p['text'] ?? $p['message'] ?? '';
         $type = strtolower($p['type'] ?? $p['mediaType'] ?? '');
@@ -822,7 +899,7 @@ function analyzeDeepContent(array $posts): array {
         if (empty($img) && !empty($p['thumbnail'])) $img = $p['thumbnail'];
         $likes = (int)($p['likesCount'] ?? $p['likes'] ?? 0);
         $comments = (int)($p['commentsCount'] ?? $p['comments'] ?? 0);
-        
+
         // 1. فرز الأنواع
         if (str_contains($type, 'video') || str_contains($type, 'reel')) {
             $types['video']++;
@@ -831,12 +908,12 @@ function analyzeDeepContent(array $posts): array {
         } else {
             $types['image']++;
         }
-        
+
         // 2. كيمياء النصوص
         $wordArray = preg_split('/\s+/', trim($text));
         $wordsCount = empty(trim($text)) ? 0 : count($wordArray);
         $totalWords += $wordsCount;
-        
+
         // 3. بناء سحابة الهاشتاج
         preg_match_all('/#([\p{L}\p{N}_]+)/u', $text, $matches);
         foreach ($matches[1] as $ht) {
@@ -851,7 +928,7 @@ function analyzeDeepContent(array $posts): array {
                 }
             }
         }
-        
+
         // 4. فحص الـ CTA
         $hasCta = false;
         foreach ($ctaKeywords as $cta) {
@@ -860,7 +937,7 @@ function analyzeDeepContent(array $posts): array {
             }
         }
         if ($hasCta) $ctaCount++;
-        
+
         // 5. تجميع بيانات المنشورات للأفضل
         $parsed_posts[] = [
             'url' => $url,
@@ -871,15 +948,15 @@ function analyzeDeepContent(array $posts): array {
             'comments' => $comments,
         ];
     }
-    
+
     // استخراج أفضل 5 منشورات
     usort($parsed_posts, fn($a, $b) => $b['engagement'] - $a['engagement']);
     $top5 = array_slice($parsed_posts, 0, 5);
-    
+
     // ترتيب الهاشتاجات بأكثرها تكراراً
     arsort($hashtags);
     $topHashtags = array_slice(array_keys($hashtags), 0, 10);
-    
+
     return [
         'posts_analyzed' => $total,
         'types_percent' => [
@@ -902,11 +979,11 @@ function scrapeWebsiteApify(string $url, string $token, array $cfg): ?string {
 
     // نستخدم puppeteer-scraper لاستخراج الكود بعد الجافاسكربت
     // الانتظار 3.5 ثوانٍ يضمن لـ Google Tag manager والبيكسلات أن تحقن نفسها
-    $pageFunction = "async function pageFunction(context) { 
+    $pageFunction = "async function pageFunction(context) {
         await new Promise(r => setTimeout(r, 3500));
-        return { 
+        return {
             html: await context.page.content()
-        }; 
+        };
     }";
 
     $input = json_encode([
@@ -920,7 +997,7 @@ function scrapeWebsiteApify(string $url, string $token, array $cfg): ?string {
     if (!$runId) return null;
 
     // أقصى انتظار 45 ثانية لأن المواقع قد تختلف في الاستجابة
-    $result = _apifyWaitAndFetch($runId, $token, 45); 
-    
+    $result = _apifyWaitAndFetch($runId, $token, 45);
+
     return $result[0]['html'] ?? null;
 }
