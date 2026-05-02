@@ -919,6 +919,39 @@ function buildContentAnalysis(array $data): array {
     ];
 }
 
+// ── Normalizer: يضمن أن كل عنصر في strengths/weaknesses له مفتاح 'title' ──
+// لمنع ظهور [object Object] في الواجهة عندما يُرجع الـ AI كائنات بمفاتيح
+// مختلفة (name, point, text, label, ...). يحافظ على بقية الحقول كما هي
+// (desc, bullets, action, metric, score, type) ولا يدمّر شكل البيانات.
+function normalizeStrengthWeakness(array $items): array {
+    $altKeys = ['title', 'name', 'point', 'text', 'heading', 'label', 'item', 'desc', 'description'];
+    return array_values(array_filter(array_map(function($item) use ($altKeys) {
+        // string بسيطة → object بـ title فقط (لا نضع score: لكي يأخذ الـ frontend
+        // الافتراضي المناسب لكل صفحة — strengths: 95-i*5، weaknesses: 30+i*5)
+        if (is_string($item)) {
+            $trimmed = trim($item);
+            return $trimmed !== '' ? ['title' => $trimmed, 'desc' => ''] : null;
+        }
+        // object → تأكد من وجود title (ابحث في المفاتيح البديلة)
+        if (is_array($item)) {
+            if (empty($item['title']) || !is_string($item['title'])) {
+                foreach ($altKeys as $k) {
+                    if (!empty($item[$k]) && is_string($item[$k])) {
+                        $item['title'] = $item[$k];
+                        break;
+                    }
+                }
+            }
+            // لو ما زال بدون title بعد البحث → أسقط العنصر
+            if (empty($item['title']) || !is_string($item['title'])) {
+                return null;
+            }
+            return $item;
+        }
+        return null;
+    }, $items)));
+}
+
 // ── Parser موحّد لجميع مزودي AI ─────────────────────────────
 function parseAIResponse(array $aiData, string $source, array $rawData = []): array {
     return [
@@ -928,8 +961,8 @@ function parseAIResponse(array $aiData, string $source, array $rawData = []): ar
         'page_type_signals'    => $aiData['signals_used']         ?? [],
         'page_type_reasoning'  => $aiData['reasoning']            ?? '',
         'summary'              => $aiData['summary']              ?? ($aiData['final_report'] ?? ''),
-        'strengths'            => $aiData['strengths']            ?? [],
-        'weaknesses'           => $aiData['weaknesses']           ?? [],
+        'strengths'            => normalizeStrengthWeakness($aiData['strengths']  ?? []),
+        'weaknesses'           => normalizeStrengthWeakness($aiData['weaknesses'] ?? []),
         'recommendations'      => $aiData['recommendations']      ?? [],
         'action_week'          => $aiData['action_week']          ?? [],
         'action_month'         => $aiData['action_month']         ?? [],

@@ -12,6 +12,24 @@ function sanitize(str) {
   return temp.innerHTML;
 }
 
+// ── extractText: استخراج نص من قيمة قد تكون string أو object ──
+// يحل مشكلة [object Object] في بطاقات strengths/weaknesses عندما يُرجع
+// الـ AI كائنات بمفاتيح متباينة (title, name, point, text, label, ...).
+function extractText(item, fallback = '—') {
+  if (item == null) return fallback;
+  if (typeof item === 'string') return item;
+  if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+  if (typeof item === 'object') {
+    const keys = ['title', 'name', 'point', 'text', 'heading', 'label', 'item', 'desc', 'description', 'task'];
+    for (const k of keys) {
+      const v = item[k];
+      if (typeof v === 'string' && v.trim()) return v;
+    }
+    return fallback;
+  }
+  return String(item);
+}
+
 function sanitizeRelaxed(str) {
   if (typeof str !== 'string') return String(str || '');
   const div = document.createElement('div');
@@ -356,14 +374,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (resultStrList && ai.strengths && ai.strengths.length > 0) {
           resultStrList.innerHTML = ai.strengths.slice(0, 5).map(s => {
-            const title = typeof s === 'string' ? s.split(':')[0] : (s.title || String(s));
+            const raw = extractText(s, 'نقطة قوة');
+            const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
             return `<li><span style="color:var(--green);">✔</span> ${sanitize(title)}</li>`;
           }).join('');
         }
 
         if (resultWksList && ai.weaknesses && ai.weaknesses.length > 0) {
           resultWksList.innerHTML = ai.weaknesses.slice(0, 5).map(w => {
-            const title = typeof w === 'string' ? w.split(':')[0] : (w.title || String(w));
+            const raw = extractText(w, 'نقطة ضعف');
+            const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
             return `<li><span style="color:var(--red);">✖</span> ${sanitize(title)}</li>`;
           }).join('');
         }
@@ -1652,19 +1672,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (ai.strengths && Array.isArray(ai.strengths) && ai.strengths.length > 0) {
               ai.strengths.forEach((str, index) => {
-                let parts = str.split(':');
-                let rawTitle = parts.length > 1 ? parts[0] : str.split(' ').slice(0, 4).join(' ');
+                // ── حفظ شكل الـ object الكامل لو موجود + اشتقاق نص للبحث/الـ split ──
+                const isObj = (str && typeof str === 'object');
+                const text  = extractText(str, '');
+                let parts = text.split(':');
+                let rawTitle = (isObj && typeof str.title === 'string' && str.title.trim())
+                  ? str.title
+                  : (parts.length > 1 ? parts[0] : text.split(' ').slice(0, 4).join(' '));
                 let title = rawTitle.replace(/[\*\-\#]/g, '').trim();
-                let desc = parts.length > 1 ? parts.slice(1).join(':').trim() : str;
+                let desc = (isObj && typeof str.desc === 'string' && str.desc.trim())
+                  ? str.desc
+                  : (parts.length > 1 ? parts.slice(1).join(':').trim() : text);
                 desc = desc.replace(/[\*\-\#]/g, '').trim();
 
                 let icon = '✨';
-                if (str.includes('محتوى') || str.includes('صور') || str.includes('هوية') || str.includes('بصري')) icon = '🎨';
-                else if (str.includes('تفاعل') || str.includes('جمهور') || str.includes('عملاء') || str.includes('متابع')) icon = '💬';
-                else if (str.includes('منتج') || str.includes('خدمة') || str.includes('عرض') || str.includes('جودة')) icon = '🛍️';
-                else if (str.includes('إعلان') || str.includes('تسويق') || str.includes('مبيعات')) icon = '🚀';
+                if (text.includes('محتوى') || text.includes('صور') || text.includes('هوية') || text.includes('بصري')) icon = '🎨';
+                else if (text.includes('تفاعل') || text.includes('جمهور') || text.includes('عملاء') || text.includes('متابع')) icon = '💬';
+                else if (text.includes('منتج') || text.includes('خدمة') || text.includes('عرض') || text.includes('جودة')) icon = '🛍️';
+                else if (text.includes('إعلان') || text.includes('تسويق') || text.includes('مبيعات')) icon = '🚀';
 
-                strengths.push({ title: title, desc: desc, score: 95 - (index * 5), icon: icon });
+                // لو الـ object يحمل score خاص نستعمله، وإلا نشتق من الترتيب
+                const score = (isObj && typeof str.score === 'number') ? str.score : (95 - (index * 5));
+                strengths.push({ title: title, desc: desc, score: score, icon: icon });
               });
             } else {
               if (srObj.hasSSL) strengths.push({ title: isService ? 'بيئة آمنة وموثوقة' : 'بيئة شراء آمنة', desc: isService ? 'موقعك محمي بشهادة SSL فعالة، مما يمنع رسائل (غير آمن) ويزيد من ثقة العميل في التعامل معك.' : 'متجرك محمي بشهادة SSL فعالة، مما يمنع رسائل (غير آمن) ويزيد من ثقة العميل بالشراء.', score: score + 12, icon: '🔒' });
@@ -1693,7 +1722,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const aiBlock = document.createElement('div');
                 aiBlock.className = 'ai-str-box';
                 aiBlock.style.cssText = 'background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 24px; border-radius: 16px; margin-bottom: 24px;';
-                let aiListHtml = ai.strengths.map(s => `<li style="margin-bottom:12px; display:flex; gap:10px; align-items:start;"><span style="color:var(--green); font-size:18px;">✨</span> <span>${s}</span></li>`).join('');
+                let aiListHtml = ai.strengths.map(s => `<li style="margin-bottom:12px; display:flex; gap:10px; align-items:start;"><span style="color:var(--green); font-size:18px;">✨</span> <span>${sanitize(extractText(s, 'نقطة قوة'))}</span></li>`).join('');
                 aiBlock.innerHTML = `
                   <h4 style="color:var(--green); margin-bottom:12px; font-size:18px; display:flex; align-items:center; gap:8px;"><span>🧠</span> التحليل العميق (AI Diagnostics)</h4>
                   <p style="color:var(--text-gray); font-size:15px; margin-bottom:16px;"><strong>ما الذي يميز حسابك ويمكن البناء عليه؟</strong></p>
@@ -1768,22 +1797,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (ai.weaknesses && Array.isArray(ai.weaknesses) && ai.weaknesses.length > 0) {
               ai.weaknesses.forEach((str, index) => {
-                let parts = str.split(':');
-                let rawTitle = parts.length > 1 ? parts[0] : str.split(' ').slice(0, 4).join(' ');
+                // ── حفظ شكل الـ object الكامل لو موجود + اشتقاق نص للبحث/الـ split ──
+                const isObj = (str && typeof str === 'object');
+                const text  = extractText(str, '');
+                let parts = text.split(':');
+                let rawTitle = (isObj && typeof str.title === 'string' && str.title.trim())
+                  ? str.title
+                  : (parts.length > 1 ? parts[0] : text.split(' ').slice(0, 4).join(' '));
                 let title = rawTitle.replace(/[\*\-\#]/g, '').trim();
-                let desc = parts.length > 1 ? parts.slice(1).join(':').trim() : str;
+                let desc = (isObj && typeof str.desc === 'string' && str.desc.trim())
+                  ? str.desc
+                  : (parts.length > 1 ? parts.slice(1).join(':').trim() : text);
                 desc = desc.replace(/[\*\-\#]/g, '').trim();
 
                 let icon = '⚠️';
-                if (str.includes('سرعة') || str.includes('بطء')) icon = '🐢';
-                else if (str.includes('أمان') || str.includes('حماية')) icon = '🔓';
-                else if (str.includes('تتبع') || str.includes('بيكسل') || str.includes('بيانات')) icon = '👁️‍🗨️';
-                else if (str.includes('دفع') || str.includes('طلب') || str.includes('سلة')) icon = '🛒';
-                else if (str.includes('تفاعل') || str.includes('متابعين')) icon = '👻';
-                else if (str.includes('إعلان') || str.includes('حملة')) icon = '📉';
-                else if (str.includes('محتوى') || str.includes('هوية')) icon = '🛑';
+                if (text.includes('سرعة') || text.includes('بطء')) icon = '🐢';
+                else if (text.includes('أمان') || text.includes('حماية')) icon = '🔓';
+                else if (text.includes('تتبع') || text.includes('بيكسل') || text.includes('بيانات')) icon = '👁️‍🗨️';
+                else if (text.includes('دفع') || text.includes('طلب') || text.includes('سلة')) icon = '🛒';
+                else if (text.includes('تفاعل') || text.includes('متابعين')) icon = '👻';
+                else if (text.includes('إعلان') || text.includes('حملة')) icon = '📉';
+                else if (text.includes('محتوى') || text.includes('هوية')) icon = '🛑';
 
-                weaknesses.push({ title: title, desc: desc, score: 30 + (index * 5), icon: icon });
+                // لو الـ object يحمل score خاص نستعمله، وإلا نشتق من الترتيب
+                const wScore = (isObj && typeof str.score === 'number') ? str.score : (30 + (index * 5));
+                weaknesses.push({ title: title, desc: desc, score: wScore, icon: icon });
               });
             } else {
               if (srObj.hasSSL === false) weaknesses.push({ title: 'ثغرة أمنية (SSL مفقود)', desc: isService ? 'الزوار يتلقون رسالة (الموقع غير آمن) ويغادرون فوراً قبل التعرف على خدماتك.' : 'كارثة حقيقية: الزوار يتلقون رسالة (الموقع غير آمن) من المتصفح ويغادرون فوراً قبل رؤية منتجاتك.', score: score - 20, icon: '🔓' });
@@ -1812,7 +1850,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const aiBlock = document.createElement('div');
                 aiBlock.className = 'ai-weak-box';
                 aiBlock.style.cssText = 'background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 24px; border-radius: 16px; margin-bottom: 24px;';
-                let aiListHtml = ai.weaknesses.map(s => `<li style="margin-bottom:12px; display:flex; gap:10px; align-items:start;"><span style="color:var(--red); font-size:18px;">⚠️</span> <span>${s}</span></li>`).join('');
+                let aiListHtml = ai.weaknesses.map(s => `<li style="margin-bottom:12px; display:flex; gap:10px; align-items:start;"><span style="color:var(--red); font-size:18px;">⚠️</span> <span>${sanitize(extractText(s, 'نقطة ضعف'))}</span></li>`).join('');
                 aiBlock.innerHTML = `
                   <h4 style="color:var(--red); margin-bottom:12px; font-size:18px; display:flex; align-items:center; gap:8px;"><span>🧠</span> التحليل العميق (AI Diagnostics)</h4>
                   <p style="color:var(--text-gray); font-size:15px; margin-bottom:16px;"><strong>ما هي نقاط الاختناق الحرجة التي تستنزف ميزانيتك؟</strong></p>
