@@ -926,10 +926,11 @@ function buildContentAnalysis(array $data): array {
 function normalizeStrengthWeakness(array $items): array {
     $altKeys = ['title', 'name', 'point', 'text', 'heading', 'label', 'item', 'desc', 'description'];
     return array_values(array_filter(array_map(function($item) use ($altKeys) {
-        // string بسيطة → object بـ title فقط
+        // string بسيطة → object بـ title فقط (لا نضع score: لكي يأخذ الـ frontend
+        // الافتراضي المناسب لكل صفحة — strengths: 95-i*5، weaknesses: 30+i*5)
         if (is_string($item)) {
             $trimmed = trim($item);
-            return $trimmed !== '' ? ['title' => $trimmed, 'desc' => '', 'score' => 80] : null;
+            return $trimmed !== '' ? ['title' => $trimmed, 'desc' => ''] : null;
         }
         // object → تأكد من وجود title (ابحث في المفاتيح البديلة)
         if (is_array($item)) {
