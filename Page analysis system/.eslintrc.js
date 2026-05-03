@@ -27,6 +27,9 @@ module.exports = {
         'no-unused-vars': 'warn',
         'no-useless-escape': 'warn',
         'no-console': 'off',
+        // الكثير من try/catch على JSON.parse / URL.parse مع تجاهل متعمد للخطأ.
+        // نسمح بالـ catch الفارغ لكن نُبقي no-empty على باقي الـ blocks.
+        'no-empty': ['error', { 'allowEmptyCatch': true }],
     },
     ignorePatterns: [
         'node_modules/',

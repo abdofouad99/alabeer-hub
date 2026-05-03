@@ -90,7 +90,10 @@ CREATE TABLE IF NOT EXISTS `rate_limits` (
   KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ── مستخدم أدمن افتراضي (تُحدَّث عبر setup.php) ─────────────
--- password = Admin@2026 (bcrypt 12 rounds)
-INSERT IGNORE INTO `admin_users` (`email`, `password_hash`) VALUES
-('admin@alabeer.com', '$2y$12$LRwGEuFi/GOkBGNB3L4H4OpDAtHGEnpHX2iFELsMRaMdCkjzrBirm');
+-- ⚠️ ملاحظة أمنية مهمة:
+-- لم نعد نُدرج مستخدم أدمن افتراضي مع كلمة مرور ثابتة.
+-- بعد استيراد هذا الملف، شغّل `api/setup.php` مرة واحدة من المتصفح
+-- لإنشاء أول حساب أدمن بكلمة مرور قوية يختارها المسؤول.
+--
+-- لا تُضِف INSERT لحساب أدمن في هذا الملف لأي سبب — كلمات المرور الثابتة
+-- في الـ git history تُعدّ تسريباً أمنياً دائماً حتى بعد حذفها لاحقاً.

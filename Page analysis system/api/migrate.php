@@ -6,7 +6,8 @@
 // ============================================================
 
 // منع التشغيل المتكرر عبر lock file
-$lockFile = __DIR__ . '/../cache/db_migrated_v3.lock';
+// نُحدِّث الإصدار إلى v3_1 لأننا أضفنا CREATE TABLE admin_users
+$lockFile = __DIR__ . '/../cache/db_migrated_v3_1.lock';
 
 if (file_exists($lockFile)) {
     // الـ Migration اكتمل مسبقاً — لا تفعل شيئاً
@@ -21,6 +22,19 @@ if (!is_dir(__DIR__ . '/../cache')) {
 try {
     require_once __DIR__ . '/db.php';
     $db = getDB();
+
+    // ─── admin_users (يجب أن يُنشأ قبل أي شيء — لوحة التحكم تعتمد عليه) ─
+    // ملاحظة: لا نُدرج أي حساب أدمن افتراضي هنا. أول حساب يُنشأ عبر api/setup.php
+    // ليتأكد المسؤول من اختيار كلمة مرور قوية بنفسه.
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+            email         VARCHAR(191)  NOT NULL UNIQUE,
+            password_hash VARCHAR(255)  NOT NULL,
+            created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 
     // ─── leads ────────────────────────────────────────────────
     $existLeadCols = $db->query("SHOW COLUMNS FROM leads")->fetchAll(PDO::FETCH_COLUMN);

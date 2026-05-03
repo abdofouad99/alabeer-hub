@@ -20,7 +20,7 @@
 </FilesMatch>
 
 # ── 3) WHITELIST: Public endpoints (يُستدعون من JS) ─────────
-<FilesMatch "^(submit|analyze|status|result|page-scan|get-assessment|scan|health|run|ads-fetch)\.php$">
+<FilesMatch "^(submit|analyze|status|result|page-scan|get-assessment|scan|health|run|ads-fetch|csrf)\.php$">
     <IfModule mod_authz_core.c>
         Require all granted
     </IfModule>
@@ -30,8 +30,20 @@
     </IfModule>
 </FilesMatch>
 
-# ── 4) DEBUG / ADMIN endpoints: localhost only ──────────────
-<FilesMatch "^(clear-cache|debug-data|debug-pipeline|maintenance|rerun-ai|migrate|db-migrate|db-test|init|fix_corrupted|check_braces|admin_dashboard|dump|dump-latest)\.php$">
+# ── 3b) AUTH-PROTECTED admin endpoints (الـ PHP يفرض requireAdmin بنفسه) ─
+# تحتاج تكون متاحة لنفس الـ origin لكي تستطيع لوحة التحكم استدعاءها بعد تسجيل الدخول.
+<FilesMatch "^(admin_dashboard|setup)\.php$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Allow from all
+    </IfModule>
+</FilesMatch>
+
+# ── 4) DEBUG endpoints: localhost only ──────────────────────
+<FilesMatch "^(clear-cache|debug-data|debug-pipeline|maintenance|rerun-ai|migrate|db-migrate|db-test|init|fix_corrupted|check_braces|dump|dump-latest)\.php$">
     <IfModule mod_authz_core.c>
         Require local
     </IfModule>
@@ -45,7 +57,7 @@
 </FilesMatch>
 
 # ── 5) منع امتدادات حساسة + النسخ الاحتياطية ────────────────
-<FilesMatch "\.(env|ini|log|sh|sql|bak|backup|swp|orig)$">
+<FilesMatch "\.(env|ini|log|sh|sql|bak|backup|swp|orig|json)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
