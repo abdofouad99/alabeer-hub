@@ -9,6 +9,14 @@ cache/
 # ملفات التكوين الحساسة
 config.local.php
 .env
+*.env
+config/*.php
+api/config.local.php
+api/secrets.php
+
+# ملفات أُنشئت في وقت التشغيل وقد تحوي توكينات حساسة
+cache/setup_token.txt
+cache/*.lock
 
 # ملفات قاعدة البيانات
 *.sql
@@ -70,6 +78,12 @@ hotfix-*.php
 hotfix_*.php
 api/check_braces.php
 api/check-*.php
+
+# ============================================================
+# نسخ احتياطية للـ PHP لا يجب أن تُرفع للـ Git
+# ============================================================
+api/*_backup.php
+api/*.backup-*.php
 
 # ============================================================
 # Backup directories and archives — never commit binary backups

@@ -323,8 +323,11 @@ function renderStep() {
   const _sb = document.getElementById('stepBadge'); if (_sb) _sb.innerHTML = `الخطوة <b>${step}</b> / 4`;
   const _sl = document.getElementById('stepLabel'); if (_sl) _sl.textContent = STEP_LABELS[step - 1];
   document.getElementById('btnBack').textContent  = step === 1 ? '🗑️ مسح البيانات' : '← السابق';
-  document.getElementById('btnNext').textContent  = step === 4 ? '🚀 استخرج تقريري الآن!' : 'التالي ←';
-  if (_bn) _bn.className = step === 4 ? 'btn btn-gold' : 'btn';
+  const _bn = document.getElementById('btnNext');
+  if (_bn) {
+    _bn.textContent = step === 4 ? '🚀 استخرج تقريري الآن!' : 'التالي ←';
+    _bn.className = step === 4 ? 'btn btn-gold' : 'btn';
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -439,13 +442,27 @@ async function submitQuiz() {
   answerKeys.forEach(k => { if (state[k] !== undefined) answers[k] = state[k]; });
 
   try {
-    const csrfResp = await fetch('api/csrf.php');
-    const csrfData = await csrfResp.json();
+    // TODO: دمج PR #10 لتفعيل CSRF كاملاً.
+    // حتى ذلك الحين نحاول جلب التوكن، ولو فشل نتابع الإرسال بدونه
+    // (السيرفر في الـ main لا يفرض CSRF بعد، فالعطل وحيد الجانب: غياب الملف يكسر إرسال الاستبيان كله).
+    let csrfToken = '';
+    try {
+      const csrfResp = await fetch('api/csrf.php');
+      if (csrfResp.ok) {
+        const csrfData = await csrfResp.json().catch(() => ({}));
+        csrfToken = (csrfData && csrfData.csrf_token) || '';
+      } else {
+        console.warn('[quiz] api/csrf.php returned ' + csrfResp.status + ' — continuing without CSRF (PR #10 not merged yet).');
+      }
+    } catch (csrfErr) {
+      console.warn('[quiz] CSRF endpoint unavailable — continuing without token (PR #10 not merged yet).', csrfErr);
+    }
+
     const res = await fetch('api/submit.php', {
       method:  'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfData.csrf_token || ''
+        'X-CSRF-Token': csrfToken
       },
       body:    JSON.stringify({lead, answers}),
     });
@@ -458,7 +475,8 @@ async function submitQuiz() {
     if (!data.assessment_id) throw new Error(data.error || 'خطأ غير معروف');
     localStorage.removeItem(LS_KEY);
     stopScanAnimation();
-    window.location.href = `result.html?id=${data.assessment_id}`;
+    // result.html تمت إعادة تسميتها إلى report.html في PR #11
+    window.location.href = `report.html?id=${data.assessment_id}`;
   } catch (e) {
     stopScanAnimation();
     const navBtns  = document.getElementById('navButtons');
@@ -530,5 +548,3 @@ document.addEventListener('DOMContentLoaded', () => {
     saveState(); updateProgress();
   });
 });
-
-
