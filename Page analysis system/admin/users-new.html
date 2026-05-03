@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العملاء — لوحة التحكم</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #060608;
+      --sidebar-bg: rgba(15, 23, 42, 0.7);
+      --glass-border: rgba(255,255,255,0.08);
+      --text-light: #f1f5f9;
+      --text-gray: #94a3b8;
+      --text-muted: #64748b;
+      --primary: #f58e1a;
+      --green: #10b981;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --blue: #3b82f6;
+      --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    body { background: var(--bg-main); color: var(--text-light); display: flex; min-height: 100vh; overflow-x: hidden; }
+
+    .bg-orb { position: fixed; border-radius: 50%; filter: blur(120px); z-index: -1; opacity: 0.18; }
+    .orb-1 { top: -100px; left: -100px; width: 600px; height: 600px; background: var(--purple); }
+    .orb-2 { bottom: -100px; right: -100px; width: 500px; height: 500px; background: var(--primary); opacity: 0.1; }
+
+    .sidebar { width: 280px; background: var(--sidebar-bg); backdrop-filter: blur(20px); border-left: 1px solid var(--glass-border); display: flex; flex-direction: column; position: fixed; right: 0; top: 0; height: 100vh; z-index: 100; }
+    .main-content { flex: 1; margin-right: 280px; padding: 0; display: flex; flex-direction: column; }
+
+    .brand { padding: 32px 24px; font-size: 22px; font-weight: 900; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--glass-border); }
+    .brand span { color: var(--primary); }
+
+    .nav-group-title { padding: 24px 24px 8px; font-size: 11px; font-weight: 800; color: var(--text-gray); text-transform: uppercase; letter-spacing: 1px; }
+    .nav-menu { flex: 1; overflow-y: auto; padding-bottom: 24px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--text-gray); text-decoration: none; font-weight: 700; font-size: 14px; border-right: 4px solid transparent; transition: 0.2s; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .nav-item.active { color: #fff; background: linear-gradient(90deg, rgba(245, 142, 26, 0.1), transparent); border-right-color: var(--primary); }
+    .badge-new { display:inline-block; background: rgba(245, 142, 26, 0.18); color: var(--primary); border:1px solid rgba(245, 142, 26, 0.4); padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 11px; margin-right: 8px; }
+
+    .topbar { display: flex; justify-content: space-between; align-items: center; padding: 24px 48px; background: rgba(6, 6, 8, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 90; }
+    .topbar-title { font-size: 22px; font-weight: 900; }
+    .topbar-actions { display: flex; gap: 16px; align-items: center; }
+    .search-input { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; padding: 10px 16px; border-radius: 8px; font-weight: 600; outline: none; width: 280px; }
+
+    .content-body { padding: 32px 48px; display: flex; flex-direction: column; gap: 20px; }
+
+    .card { background: rgba(255,255,255,0.04); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-soft); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .card-title { font-size: 17px; font-weight: 800; }
+    .meta { color: var(--text-gray); font-size: 13px; font-weight: 700; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: right; padding: 12px 8px; color: var(--text-gray); font-weight: 800; font-size: 12px; border-bottom: 1px solid var(--glass-border); }
+    td { padding: 12px 8px; border-bottom: 1px solid var(--glass-border); font-size: 14px; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr.row-clickable { cursor: pointer; transition: background 0.15s; }
+    tr.row-clickable:hover { background: rgba(255,255,255,0.04); }
+    /* tier values from DB are ENUM('red','yellow','green'); we map them to
+       Arabic labels in JS but keep CSS class names aligned with the raw value. */
+    .tier-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 800; font-size: 11px; }
+    .tier-green  { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .tier-yellow { background: rgba(245, 142, 26, 0.15); color: var(--primary); }
+    .tier-red    { background: rgba(239, 68, 68, 0.15);  color: var(--red); }
+    .empty { text-align:center; padding: 32px; color: var(--text-muted); }
+    .pager { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 20px 0 0; }
+    .pager button { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .alert-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--red); padding: 12px 16px; border-radius: 12px; font-weight: 700; }
+
+    @media (max-width: 900px) {
+      .sidebar { width: 100%; height: auto; position: relative; }
+      .main-content { margin-right: 0; }
+      .topbar { padding: 16px 20px; flex-wrap: wrap; gap: 12px; }
+      .search-input { width: 100%; }
+      .content-body { padding: 20px; }
+      table { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <aside class="sidebar">
+    <div class="brand">📊 مختبر <span>النمو</span></div>
+    <nav class="nav-menu">
+      <div class="nav-group-title">القيادة</div>
+      <a href="dashboard-new.html" class="nav-item">🏠 لوحة التحكم <span class="badge-new">جديد</span></a>
+      <a href="users-new.html" class="nav-item active">👥 العملاء <span class="badge-new">جديد</span></a>
+      <a href="reports.html" class="nav-item">📋 التقارير</a>
+
+      <div class="nav-group-title">الإصدار القديم</div>
+      <a href="dashboard.html" class="nav-item">🗂️ Dashboard (القديم)</a>
+      <a href="users.html" class="nav-item">🗂️ Users (القديم)</a>
+
+      <div class="nav-group-title">الإعدادات</div>
+      <a href="#" id="logoutBtn" class="nav-item" style="color: var(--red);">🚪 تسجيل الخروج</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">العملاء</div>
+      <div class="topbar-actions">
+        <input id="searchInput" class="search-input" placeholder="ابحث بالاسم/البريد/الهاتف/المشروع…">
+      </div>
+    </header>
+
+    <div class="content-body">
+
+      <div id="errorBox" class="alert-error" style="display:none"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">قائمة العملاء</div>
+          <div id="metaInfo" class="meta">جارٍ التحميل…</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>البريد</th>
+              <th>الهاتف</th>
+              <th>المشروع</th>
+              <th>آخر درجة</th>
+              <th>الفئة</th>
+              <th>التاريخ</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody">
+            <tr><td colspan="8" class="empty">جارٍ التحميل…</td></tr>
+          </tbody>
+        </table>
+
+        <div class="pager">
+          <button id="prevPage" disabled>← السابق</button>
+          <span id="pageLabel" class="meta">صفحة 1</span>
+          <button id="nextPage" disabled>التالي →</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    const API   = '../api/admin';
+    const PAGE  = 50;
+    let offset  = 0;
+    let total   = 0;
+    let lastQ   = '';
+    let searchTimer = null;
+
+    const $$ = (sel) => document.querySelector(sel);
+
+    function showError(msg) {
+      const box = $$('#errorBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+    function clearError() {
+      $$('#errorBox').style.display = 'none';
+    }
+
+    function safeText(s) {
+      return (s || '').toString().replace(/[<>&"']/g, c =>
+        ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function checkAuth() {
+      try {
+        const res  = await fetch(`${API}/auth.php?action=check`, { credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (!data || !data.authed) {
+          window.location.href = 'login.html';
+          return false;
+        }
+        return true;
+      } catch (_) {
+        window.location.href = 'login.html';
+        return false;
+      }
+    }
+
+    async function loadUsers() {
+      clearError();
+      const params = new URLSearchParams({
+        limit:  String(PAGE),
+        offset: String(offset),
+      });
+      if (lastQ) params.set('q', lastQ);
+
+      try {
+        const res = await fetch(`${API}/users.php?${params.toString()}`, {
+          credentials: 'include'
+        });
+        if (res.status === 401) {
+          window.location.href = 'login.html';
+          return;
+        }
+        if (!res.ok) {
+          showError('فشل تحميل قائمة العملاء — رمز الخطأ ' + res.status);
+          return;
+        }
+        const data = await res.json();
+        if (!data.ok) {
+          showError(data.error || 'استجابة غير متوقعة من الخادم.');
+          return;
+        }
+
+        total = data.total || 0;
+        renderRows(data.items || []);
+        $$('#metaInfo').textContent = `الإجمالي: ${total.toLocaleString('en-US')} عميل`;
+
+        const pageNum = Math.floor(offset / PAGE) + 1;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE));
+        $$('#pageLabel').textContent = `صفحة ${pageNum} / ${totalPages}`;
+        $$('#prevPage').disabled = offset <= 0;
+        $$('#nextPage').disabled = offset + PAGE >= total;
+      } catch (err) {
+        console.error('[users] fetch error:', err);
+        showError('تعذّر الاتصال بالخادم. تأكد من تسجيل دخولك ثم حاول مجدداً.');
+      }
+    }
+
+    function renderRows(items) {
+      const tbody = $$('#rowsBody');
+      tbody.innerHTML = '';
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">لا توجد نتائج</td></tr>';
+        return;
+      }
+      // Map raw tier code (red/yellow/green) -> Arabic display label.
+      const tierLabels = { green: 'انطلاق', yellow: 'نمو', red: 'خطر' };
+      for (const it of items) {
+        const tr = document.createElement('tr');
+        if (it.latest_assessment_id) tr.classList.add('row-clickable');
+        const tierKey   = it.latest_tier || '';
+        const tierClass = tierKey ? `tier-${tierKey}` : '';
+        const tierText  = tierLabels[tierKey] || tierKey;
+        tr.innerHTML = `
+          <td>${safeText(it.name) || '—'}</td>
+          <td>${safeText(it.email)}</td>
+          <td>${safeText(it.phone)}</td>
+          <td>${safeText(it.project_type) || '—'}</td>
+          <td>${it.latest_score !== null ? it.latest_score : '—'}</td>
+          <td>${tierKey ? `<span class="tier-badge ${tierClass}">${safeText(tierText)}</span>` : '—'}</td>
+          <td>${safeText(it.created_at)}</td>
+          <td>${it.latest_assessment_id ? `<a href="../report.html?id=${it.latest_assessment_id}" target="_blank" style="color:var(--primary);font-weight:800">التقرير ←</a>` : ''}</td>
+        `;
+        if (it.latest_assessment_id) {
+          tr.addEventListener('click', (e) => {
+            // Don't double-trigger when clicking on the explicit link.
+            if (e.target.tagName === 'A') return;
+            window.open('../report.html?id=' + it.latest_assessment_id, '_blank');
+          });
+        }
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function doLogout(e) {
+      if (e) e.preventDefault();
+      try {
+        await fetch(`${API}/auth.php?action=logout`, {
+          method: 'POST', credentials: 'include'
+        });
+      } catch (_) { /* ignore */ }
+      window.location.href = 'login.html';
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      $$('#logoutBtn').addEventListener('click', doLogout);
+      $$('#prevPage').addEventListener('click', () => {
+        offset = Math.max(0, offset - PAGE);
+        loadUsers();
+      });
+      $$('#nextPage').addEventListener('click', () => {
+        offset += PAGE;
+        loadUsers();
+      });
+
+      // Debounced search.
+      $$('#searchInput').addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const q = e.target.value.trim();
+          if (q !== lastQ) {
+            lastQ = q;
+            offset = 0;
+            loadUsers();
+          }
+        }, 300);
+      });
+
+      const ok = await checkAuth();
+      if (ok) loadUsers();
+    });
+  </script>
+</body>
+</html>
