@@ -4,11 +4,11 @@
 // ⚠️ لا يُستدعى إلا بعد تسجيل دخول الأدمن (session-based).
 // ============================================================
 
-// ── 1) Auth: نتأكد من جلسة الأدمن قبل أي شيء ────────────────
-require_once __DIR__ . '/admin/middleware.php';
-requireAdmin();   // ترجع 401 وتنهي التنفيذ لو لا توجد جلسة
-
-// ── 2) Headers: CORS مُحكَمة (whitelist origins فقط) ─────────
+// ── 1) Headers: CORS مُحكَمة (whitelist origins فقط) ─────────
+// ملاحظة مهمة: نضع CORS + OPTIONS handler قبل auth gate
+// لأن preflight (OPTIONS) لا يحمل cookies بحكم المواصفات،
+// فلو requireAdmin() ركضت قبله ستردّ 401 وتُحظر الـ preflight
+// كاملاً مما يُعطّل أي طلب cross-origin مشروع.
 header('Content-Type: application/json; charset=utf-8');
 header('Vary: Origin');
 
@@ -32,10 +32,15 @@ if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Headers: Content-Type');
 }
 
+// CORS preflight ينتهي هنا قبل أي auth check.
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
+
+// ── 2) Auth: بقية الـ HTTP methods (GET/POST) محمية بـ session ──
+require_once __DIR__ . '/admin/middleware.php';
+requireAdmin();   // ترجع 401 وتنهي التنفيذ لو لا توجد جلسة
 
 require_once __DIR__ . '/db.php';
 
