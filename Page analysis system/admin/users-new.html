@@ -59,10 +59,12 @@
     tr:last-child td { border-bottom: none; }
     tr.row-clickable { cursor: pointer; transition: background 0.15s; }
     tr.row-clickable:hover { background: rgba(255,255,255,0.04); }
+    /* tier values from DB are ENUM('red','yellow','green'); we map them to
+       Arabic labels in JS but keep CSS class names aligned with the raw value. */
     .tier-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 800; font-size: 11px; }
-    .tier-انطلاق { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .tier-نمو { background: rgba(245, 142, 26, 0.15); color: var(--primary); }
-    .tier-خطر { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+    .tier-green  { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .tier-yellow { background: rgba(245, 142, 26, 0.15); color: var(--primary); }
+    .tier-red    { background: rgba(239, 68, 68, 0.15);  color: var(--red); }
     .empty { text-align:center; padding: 32px; color: var(--text-muted); }
     .pager { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 20px 0 0; }
     .pager button { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; }
@@ -234,17 +236,21 @@
         tbody.innerHTML = '<tr><td colspan="8" class="empty">لا توجد نتائج</td></tr>';
         return;
       }
+      // Map raw tier code (red/yellow/green) -> Arabic display label.
+      const tierLabels = { green: 'انطلاق', yellow: 'نمو', red: 'خطر' };
       for (const it of items) {
         const tr = document.createElement('tr');
         if (it.latest_assessment_id) tr.classList.add('row-clickable');
-        const tierClass = it.latest_tier ? `tier-${it.latest_tier}` : '';
+        const tierKey   = it.latest_tier || '';
+        const tierClass = tierKey ? `tier-${tierKey}` : '';
+        const tierText  = tierLabels[tierKey] || tierKey;
         tr.innerHTML = `
           <td>${safeText(it.name) || '—'}</td>
           <td>${safeText(it.email)}</td>
           <td>${safeText(it.phone)}</td>
           <td>${safeText(it.project_type) || '—'}</td>
           <td>${it.latest_score !== null ? it.latest_score : '—'}</td>
-          <td>${it.latest_tier ? `<span class="tier-badge ${tierClass}">${safeText(it.latest_tier)}</span>` : '—'}</td>
+          <td>${tierKey ? `<span class="tier-badge ${tierClass}">${safeText(tierText)}</span>` : '—'}</td>
           <td>${safeText(it.created_at)}</td>
           <td>${it.latest_assessment_id ? `<a href="../report.html?id=${it.latest_assessment_id}" target="_blank" style="color:var(--primary);font-weight:800">التقرير ←</a>` : ''}</td>
         `;

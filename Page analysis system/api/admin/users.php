@@ -34,6 +34,8 @@ $stmtTotal->execute($params);
 $total = (int) $stmtTotal->fetchColumn();
 
 // الصفوف: نضمّ آخر تقييم لكل lead (إن وجد) عبر subquery
+// نُطابق على MAX(id) — وليس MAX(created_at) — لأن timestamps قد تتطابق
+// لـ assessments متعددة على نفس الـ lead، فيُكرّر الصف. الـ id فريد دوماً.
 $sql = "
     SELECT
         l.id, l.full_name AS name, l.email, l.phone,
@@ -43,8 +45,8 @@ $sql = "
     FROM leads l
     LEFT JOIN (
         SELECT a1.* FROM assessments a1
-        JOIN (SELECT lead_id, MAX(created_at) AS mx FROM assessments GROUP BY lead_id) m
-            ON a1.lead_id = m.lead_id AND a1.created_at = m.mx
+        JOIN (SELECT lead_id, MAX(id) AS mx_id FROM assessments GROUP BY lead_id) m
+            ON a1.id = m.mx_id
     ) a ON a.lead_id = l.id
     {$where}
     ORDER BY l.created_at DESC

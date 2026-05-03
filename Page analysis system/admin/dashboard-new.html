@@ -66,10 +66,12 @@
     th { text-align: right; padding: 12px 8px; color: var(--text-gray); font-weight: 800; font-size: 12px; border-bottom: 1px solid var(--glass-border); }
     td { padding: 14px 8px; border-bottom: 1px solid var(--glass-border); font-size: 14px; }
     tr:last-child td { border-bottom: none; }
+    /* tier values from DB are ENUM('red','yellow','green'); we map them to
+       Arabic labels in JS but keep CSS class names aligned with the raw value. */
     .tier-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 800; font-size: 11px; }
-    .tier-انطلاق { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .tier-نمو { background: rgba(245, 142, 26, 0.15); color: var(--primary); }
-    .tier-خطر { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+    .tier-green  { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .tier-yellow { background: rgba(245, 142, 26, 0.15); color: var(--primary); }
+    .tier-red    { background: rgba(239, 68, 68, 0.15);  color: var(--red); }
     .empty { text-align:center; padding: 32px; color: var(--text-muted); }
 
     .alert-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--red); padding: 12px 16px; border-radius: 12px; font-weight: 700; }
@@ -264,16 +266,20 @@
         if (!data.hot_leads || data.hot_leads.length === 0) {
           tbody.innerHTML = '<tr><td colspan="5" class="empty">لا توجد بيانات بعد</td></tr>';
         } else {
+          // Map raw tier code (red/yellow/green) -> Arabic display label.
+          const tierLabels = { green: 'انطلاق', yellow: 'نمو', red: 'خطر' };
           for (const lead of data.hot_leads) {
             const tr = document.createElement('tr');
             const safe = (s) => (s || '').toString().replace(/[<>&"']/g, c =>
               ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
-            const tierClass = lead.tier ? `tier-${lead.tier}` : '';
+            const tierKey   = lead.tier || '';
+            const tierClass = tierKey ? `tier-${tierKey}` : '';
+            const tierText  = tierLabels[tierKey] || tierKey || '—';
             tr.innerHTML = `
               <td>${safe(lead.name)}</td>
               <td>${safe(lead.email)}</td>
               <td>${lead.score !== null ? lead.score : '—'}</td>
-              <td><span class="tier-badge ${tierClass}">${safe(lead.tier || '—')}</span></td>
+              <td><span class="tier-badge ${tierClass}">${safe(tierText)}</span></td>
               <td>${safe(lead.time)}</td>
             `;
             tbody.appendChild(tr);
