@@ -39,8 +39,11 @@ return [
     ],
 
     // ── 3) أولوية AI providers (Fallback chain) ──────────────
+    // الترتيب: gemini أولاً (مجاني وسريع)، ثم groq (مجاني)، ثم openai (مدفوع
+    // كاحتياط نهائي لو الاثنان معطّلان أو مستهلك كان كامل)، وأخيراً pekpik.
+    // إن استُهلك Gemini بـ 429 فالنظام يقفز إلى Groq ثم OpenAI تلقائياً.
     'analysis' => [
-        'ai_priority' => $csv('AI_PRIORITY') ?: ['gemini', 'groq', 'pekpik'],
+        'ai_priority' => $csv('AI_PRIORITY') ?: ['gemini', 'groq', 'openai', 'pekpik'],
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────

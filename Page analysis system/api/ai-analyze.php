@@ -82,7 +82,10 @@ function loadAssessmentData(int $id): ?array {
 
 // ============================================================
 function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false): array {
-    $priority = $cfg['analysis']['ai_priority'] ?? ['gemini', 'groq', 'pekpik'];
+    // مطابق لـ config.example.php:46 — gemini → groq → openai → pekpik. وجود
+    // openai كاحتياط حقيقي لازم؛ بدونه إذا استُهلك Gemini و فشل Groq يقفز
+    // النظام إلى fallback ثابت رغم أن مفتاح OpenAI صالح.
+    $priority = $cfg['analysis']['ai_priority'] ?? ['gemini', 'groq', 'openai', 'pekpik'];
 
     // ── Cache: لا تستدعي AI مرتين لنفس البيانات ─────────────
     $cacheKey = 'ai_' . md5(
