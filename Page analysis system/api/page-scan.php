@@ -105,7 +105,7 @@ function runPageScan(string $rawUrl, array $cfg): array {
         $ttData = scanTikTokPublic($url, $cfg);
         $result['tiktok'] = $ttData;
         $result['social']  = $ttData;
-        
+
         // اكتشاف الموقع من تيك توك ومسحه فوراً
         $detectedUrl = $ttData['website'] ?? '';
         if ($detectedUrl) {
@@ -120,7 +120,7 @@ function runPageScan(string $rawUrl, array $cfg): array {
         $twData = scanTwitterPublic($url, $cfg);
         $result['twitter'] = $twData;
         $result['social']  = $twData;
-        
+
         // اكتشاف الموقع من تويتر ومسحه فوراً
         $detectedUrl = $twData['website'] ?? '';
         if ($detectedUrl) {
@@ -230,7 +230,7 @@ function runPageScan(string $rawUrl, array $cfg): array {
     if ($cfg['analysis']['enable_apify'] ?? false) {
         try {
             require_once __DIR__ . '/apify-scraper.php';
-            if (function_exists('getValidApifyToken') && function_exists('scrapeCompetitorsViaGoogle') && function_exists('enrichCompetitorsData')) {
+            if (function_exists('getValidApifyToken') && function_exists('scrapeCompetitorsViaGoogle')) {
                 $compToken   = getValidApifyToken($cfg);
                 $companyName = $result['social']['page_name']
                             ?? $result['facebook']['page_name']
@@ -239,12 +239,31 @@ function runPageScan(string $rawUrl, array $cfg): array {
                 if ($compToken && $companyName) {
                     $competitorsResult = scrapeCompetitorsViaGoogle($companyName, '', $compToken);
                     if (!empty($competitorsResult['success']) && !empty($competitorsResult['competitors'])) {
-                        $result['competitors']      = enrichCompetitorsData($competitorsResult['competitors'], $cfg);
-                        $result['competitor_radar'] = $result['competitors'];
+                        // enrichCompetitorsData يستدعي runPageScan لكل منافس →
+                        // ×6 actors لكل منافس. عطّل افتراضياً لتفادي استنفاد
+                        // حصة Apify الشهرية، وفعّل عبر ENABLE_COMPETITOR_ENRICH=true.
+                        $enrich = ($cfg['analysis']['enable_competitor_enrich'] ?? false)
+                                  && function_exists('enrichCompetitorsData');
+                        $competitors = $enrich
+                            ? enrichCompetitorsData($competitorsResult['competitors'], $cfg)
+                            : $competitorsResult['competitors'];
+                        $result['competitors']      = $competitors;
+                        $result['competitor_radar'] = $competitors;
+                    } else {
+                        if (function_exists('logError')) {
+                            logError('Page-scan competitor scrape failed', [
+                                'company' => $companyName,
+                                'error'   => $competitorsResult['error'] ?? 'Unknown',
+                            ]);
+                        }
                     }
                 }
             }
-        } catch (\Throwable $e) { /* لا تُوقف التحليل */ }
+        } catch (\Throwable $e) {
+            if (function_exists('logError')) {
+                logError('Page-scan competitor scrape exception', ['error' => $e->getMessage()]);
+            }
+        }
     }
 
     // ── Step 5: حساب درجة الفحص الجزئية ───────────────────────
@@ -442,7 +461,7 @@ function scanFacebookPublic(string $url, array $cfg = []): array {
                     $apifyResult = scrapeFacebook($url, $token, $cfg);
                     if ($apifyResult['success'] ?? false) {
                         $apifyResult['accessible'] = true;
-                        
+
                         // محاولة جلب النواقص عبر Public Scraping السريع
                         if (!($apifyResult['has_whatsapp'] ?? false) || empty($apifyResult['whatsapp']) || empty($apifyResult['posts_count'])) {
                             $mobileUrl = str_replace(['www.facebook.com', 'facebook.com'], 'm.facebook.com', $url);
@@ -472,7 +491,7 @@ function scanFacebookPublic(string $url, array $cfg = []): array {
                         $apifyResult['has_shop']     = $apifyResult['has_shop'] ?? false;
                         $apifyResult['website']      = $apifyResult['website'] ?? '';
                         $apifyResult['website_url']  = $apifyResult['website_url'] ?? $apifyResult['website'];
-                        
+
                         // دمج نتائج Apify مع البيانات الأساسية (نستخدم array_filter لتجنب مسح القيم ببيانات فارغة)
                         $data = array_merge($data, array_filter($apifyResult, fn($v) => $v !== null && $v !== ''));
                     }
@@ -728,7 +747,7 @@ function scanWebsiteHTML(string $url, array $cfg = []): array {
     // ── 2) محاولة Apify (Puppeteer) كخطة بديلة إذا تم حجب cURL أو كان المحتوى فقيراً
     $isBlocked = ($httpCode === 403 || $httpCode === 401 || $httpCode === 0);
     $isPoor    = ($html && strlen($html) < 1500 && stripos($html, 'javascript') !== false); // احتمال صفحة انتظار JS
-    
+
     if (($isBlocked || $isPoor || !$html || $httpCode >= 400) && ($cfg['analysis']['enable_apify'] ?? false)) {
         require_once __DIR__ . '/apify-scraper.php';
         if (function_exists('getValidApifyToken') && function_exists('scrapeWebsiteApify')) {
