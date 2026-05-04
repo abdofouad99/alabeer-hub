@@ -174,8 +174,28 @@ if (!empty($row['ai_report']['action_week']) && is_array($row['ai_report']['acti
 // ── package_tier: مجاني (3 توصيات) أم مدفوع (القائمة الكاملة) ──
 // المصدر: assessments.is_unlocked (TINYINT(1)) — يُضبط على 1 من قِبل الإدارة
 // عند فتح التقرير للعميل بعد دفع باقة. يُستهلك في الواجهة (report-connect.js)
-// لتطبيق slice(0, 3) على قسم التوصيات في الباقة المجانية.
+// للتمييز بين عرض الباقة المجانية والمدفوعة.
 $row['package_tier'] = !empty($row['is_unlocked']) ? 'paid' : 'free';
+
+// ── Server-side paywall: قطع التوصيات قبل إرسالها للعميل ──
+// FREE_TIER_RECS_LIMIT يحدد عدد التوصيات المرسلة في الباقة المجانية.
+// recommendations_total_count يحفظ عدد التوصيات الأصلي ليعرض شارة "3 من N"
+// دون كشف العناصر المحجوبة في الـ HTTP response (فحص DevTools/Network).
+// هذا يطبّق البوابة في الـ Backend بدلاً من الـ JS فقط (إصلاح أمني).
+if (!defined('FREE_TIER_RECS_LIMIT')) {
+    define('FREE_TIER_RECS_LIMIT', 3);
+}
+$totalRecs = is_array($row['recommendations'] ?? null) ? count($row['recommendations']) : 0;
+$row['recommendations_total_count'] = $totalRecs;
+
+if ($row['package_tier'] === 'free' && $totalRecs > FREE_TIER_RECS_LIMIT) {
+    $row['recommendations'] = array_slice($row['recommendations'], 0, FREE_TIER_RECS_LIMIT);
+    if (isset($row['ai_report']['recommendations']) && is_array($row['ai_report']['recommendations'])) {
+        $row['ai_report']['recommendations'] = array_slice(
+            $row['ai_report']['recommendations'], 0, FREE_TIER_RECS_LIMIT
+        );
+    }
+}
 
 // ── DEBUG: أضف مؤشر المصدر لتسهيل التشخيص ──────────────────
 $row['_debug'] = [
@@ -183,6 +203,7 @@ $row['_debug'] = [
     'strengths_count'         => count($row['ai_report']['strengths']       ?? []),
     'weaknesses_count'        => count($row['ai_report']['weaknesses']      ?? []),
     'recommendations_count'   => count($row['recommendations']              ?? []),
+    'recommendations_total'   => $totalRecs,
     'has_high_priority_rec'   => count(array_filter($row['recommendations'] ?? [], fn($r) => ($r['priority'] ?? '') === 'high')),
     'has_content_analysis'    => !empty($row['ai_report']['content_analysis']),
 ];

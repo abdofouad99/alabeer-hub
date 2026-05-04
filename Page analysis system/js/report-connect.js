@@ -537,7 +537,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
               </div>
             </div>`;
-          }).join('') + `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${recs.length} إجراء)</a></div>`;
+          }).join('');
+          // ── العدد المعروض في رابط "عرض كل التوصيات" ──
+          // يستخدم recommendations_total_count (العدد الأصلي قبل الـ slice في الباقة المجانية)
+          // وليس recs.length (الذي قد يكون 3 فقط بعد البوابة في الـ Backend).
+          const totalRecs = data.recommendations_total_count != null ? data.recommendations_total_count : recs.length;
+          resultRecsList.innerHTML += `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${totalRecs} إجراء)</a></div>`;
         }
       }
 
@@ -854,14 +859,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (recLowList)  recLowList.innerHTML  = '<div style="padding:20px;color:var(--text-gray);">جاري التحميل...</div>';
 
         if (data.recommendations && data.recommendations.length > 0) {
-          // ── Free tier: عرض 3 توصيات بالضبط (slice(0, 3)). Paid: القائمة كاملة. ──
-          // المصدر: data.package_tier (يأتي من api/result.php مبنياً على
-          // assessments.is_unlocked). الترتيب من الـ AI prompt يضمن أن أول
-          // 3 عناصر هي الأعلى أولوية (recommendations[0..1] = high،
-          // recommendations[2] = medium) — وهذا ما يحدده عرض الباقة المجانية.
+          // ── البوابة في الـ Backend: api/result.php يقطع المصفوفة إلى 3 ──
+          // عناصر للباقة المجانية قبل الإرسال، ويُمرّر العدد الأصلي عبر
+          // recommendations_total_count لعرض شارة "3 من N" بصدق.
+          // هنا نعرض ما أرسله الخادم كما هو (لا قطع في الـ JS — ذلك كان
+          // ثغرة أمنية: العميل المجاني كان يقدر يقرأ الـ 2 المحجوبة من
+          // DevTools/Network). ترتيب الـ AI prompt يضمن أن أول 3 عناصر هي
+          // الأعلى أولوية (recommendations[0..1] = high، recommendations[2] = medium).
           const isPaidTier  = data.package_tier === 'paid';
-          const visibleRecs = isPaidTier ? data.recommendations : data.recommendations.slice(0, 3);
-          const totalCount  = data.recommendations.length;
+          const visibleRecs = data.recommendations;
+          const totalCount  = data.recommendations_total_count != null
+            ? data.recommendations_total_count
+            : data.recommendations.length;
 
           if (recTotalCount) {
             recTotalCount.textContent = isPaidTier
