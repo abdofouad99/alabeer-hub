@@ -475,16 +475,25 @@
 
     // Direct probe of result.php — used as a fallback when status.php polling
     // can't confirm the 'analyzed' status (e.g. very slow DB connection retry,
-    // dropped responses, or any other transport issue). If result.php returns
-    // a non-empty ai_report, the analysis is done and we redirect.
+    // dropped responses, or any other transport issue).
+    //
+    // Only redirect when status is exactly 'analyzed'. result.php returns the
+    // full row for both 'analyzed' AND 'failed', and a failed assessment may
+    // still have a partial score or empty ai_report — checking those would
+    // mistakenly redirect to a broken report instead of letting the polling
+    // loop's failure handler surface the error.
     async function probeResultDirectly() {
       if (!assessmentId) return;
       try {
         const r = await fetch('api/result.php?id=' + assessmentId, { cache: 'no-store' });
         if (!r.ok) return;
         const d = await r.json();
-        if (d && d.id && (d.status === 'analyzed' || d.ai_report || d.score != null)) {
+        if (d && d.id && d.status === 'analyzed') {
           redirectToResult();
+        } else if (d && d.id && d.status === 'failed') {
+          // Mirror the polling-loop behavior so the user sees the error UI
+          // even if status.php was unreachable when the failure was recorded.
+          showError('فشل التحليل على الخادم. ' + (d.scan_error || ''));
         }
       } catch (e) {
         // ignore — next poll will catch up eventually
