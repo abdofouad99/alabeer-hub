@@ -24,6 +24,19 @@ $csv = function (string $key) use ($get): array {
     return array_values(array_filter(array_map('trim', explode(',', $raw)), fn($v) => $v !== ''));
 };
 
+// helper: aggregate Apify tokens. يجمع APIFY_TOKENS (CSV) مع APIFY_TOKEN
+// و APIFY_TOKEN_1..APIFY_TOKEN_9 للتوافق مع تركيبات .env المختلفة.
+$apifyTokensList = function () use ($get, $csv): array {
+    $list = $csv('APIFY_TOKENS');
+    $single = $get('APIFY_TOKEN', '');
+    if ($single !== '') $list[] = $single;
+    for ($i = 1; $i <= 9; $i++) {
+        $v = $get('APIFY_TOKEN_' . $i, '');
+        if ($v !== '') $list[] = $v;
+    }
+    return array_values(array_unique(array_filter(array_map('trim', $list), fn($v) => $v !== '')));
+};
+
 // ── 2) تكوين قاعدة البيانات ──────────────────────────────────
 $dbHost = $get('DB_HOST', '127.0.0.1');
 $dbPort = $get('DB_PORT', '3306');
@@ -43,7 +56,21 @@ return [
     // كاحتياط نهائي لو الاثنان معطّلان أو مستهلك كان كامل)، وأخيراً pekpik.
     // إن استُهلك Gemini بـ 429 فالنظام يقفز إلى Groq ثم OpenAI تلقائياً.
     'analysis' => [
-        'ai_priority' => $csv('AI_PRIORITY') ?: ['gemini', 'groq', 'openai', 'pekpik'],
+        'ai_priority'        => $csv('AI_PRIORITY') ?: ['gemini', 'groq', 'openai', 'pekpik'],
+        // ── علامات تشغيل Apify scrapers ────────────────────────
+        // الإعلانات والمنافسين مُفعَّلان افتراضياً (true). ضع ENABLE_APIFY=false
+        // أو ENABLE_ADS_LIBRARY=false في .env لتعطيلها (تقليل التكلفة/الحصة).
+        // analyze.php و page-scan.php يفحصان هاتين القيمتين قبل أي استدعاء
+        // لـ Apify scrapers.
+        // ⚠️ ملاحظة هامة: لو نشرت بدون ملف .env فستعمل الـ scrapers افتراضياً
+        // وقد تستهلك حصة Apify بدون قصد. اضبط false صراحةً للحسابات الإنتاجية
+        // المُحدّدة الميزانية.
+        'enable_apify'       => filter_var($get('ENABLE_APIFY',       'true'),  FILTER_VALIDATE_BOOLEAN),
+        'enable_ads_library' => filter_var($get('ENABLE_ADS_LIBRARY', 'true'),  FILTER_VALIDATE_BOOLEAN),
+        'enable_pagespeed'   => filter_var($get('ENABLE_PAGESPEED',   'false'), FILTER_VALIDATE_BOOLEAN),
+        // enable_competitor_enrich مُعطَّل افتراضياً لأنه يضاعف استهلاك Apify ×6
+        // لكل منافس (يُستدعى runPageScan الكامل لكل صفحة منافس).
+        'enable_competitor_enrich' => filter_var($get('ENABLE_COMPETITOR_ENRICH', 'false'), FILTER_VALIDATE_BOOLEAN),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
@@ -71,7 +98,8 @@ return [
         'nvidia_keys'    => $csv('NVIDIA_KEYS'),
 
         // Apify — Tokens + Actor IDs
-        'apify_tokens'        => $csv('APIFY_TOKENS'),
+        // يدعم APIFY_TOKENS (CSV) و APIFY_TOKEN / APIFY_TOKEN_1..9 (مفرد).
+        'apify_tokens'        => $apifyTokensList(),
         'apify_actor_ig'      => $get('APIFY_ACTOR_IG', 'apify/instagram-scraper'),
         'apify_actor_fb'      => $get('APIFY_ACTOR_FB', 'apify/facebook-pages-scraper'),
         'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/free-tiktok-scraper'),

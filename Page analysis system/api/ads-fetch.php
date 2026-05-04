@@ -10,6 +10,7 @@ header('Access-Control-Allow-Methods: GET, POST');
 
 $cfg    = require __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/apify-scraper.php';   // for getValidApifyToken()
 
 $envPath = __DIR__ . '/../.env';
 $env     = file_exists($envPath) ? parse_ini_file($envPath) : [];
@@ -26,9 +27,17 @@ if (!$scanId) {
 }
 
 // ── جلب بيانات العميل ────────────────────────────────────────
+// البيانات موزّعة بين assessments (scan_result) و leads (الحقول الشخصية).
 try {
     $pdo  = getDB();
-    $stmt = $pdo->prepare("SELECT * FROM scans WHERE id = ?");
+    $stmt = $pdo->prepare(
+        "SELECT a.id, a.scan_result,
+                l.full_name, l.company_name,
+                l.facebook_url, l.website_url
+           FROM assessments a
+      LEFT JOIN leads l ON l.id = a.lead_id
+          WHERE a.id = ?"
+    );
     $stmt->execute([$scanId]);
     $scan = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$scan) { echo json_encode(['success'=>false,'error'=>'لا يوجد سجل']); exit; }
@@ -62,8 +71,9 @@ if (!empty($existing['deep_analysis']) && !isset($_GET['force'])) {
 }
 
 // ── 1. جلب الإعلانات من Apify ─────────────────────────────────
-$apifyToken = getApifyToken($cfg);
-$actor      = $cfg['apis']['apify_actor_ads_fb'] ?? 'JJghSZmShuco4j9gJ';
+// يستخدم نفس آلية اختيار التوكن في باقي المشروع (rotation + validation).
+$apifyToken = function_exists('getValidApifyToken') ? getValidApifyToken($cfg) : '';
+$actor      = $cfg['apis']['apify_actor_ads_fb'] ?? 'curious_coder/facebook-ads-library-scraper';
 $adsData    = [];
 $entityData = [];
 
@@ -101,7 +111,8 @@ $adsLibrary = [
 
 try {
     $scanResult['ads_library'] = $adsLibrary;
-    $pdo->prepare("UPDATE scans SET scan_result=?, updated_at=NOW() WHERE id=?")
+    // الجدول الفعلي هو assessments (لا scans)، ولا يحتوي عمود updated_at.
+    $pdo->prepare("UPDATE assessments SET scan_result=? WHERE id=?")
         ->execute([json_encode($scanResult, JSON_UNESCAPED_UNICODE), $scanId]);
 } catch (Exception $e) {
     error_log('[ads-fetch] DB: '.$e->getMessage());

@@ -836,9 +836,21 @@ function runAnalysis(int $assessmentId): array {
                 if ($compResult['success'] ?? false) {
                     $compRadar = $compResult['competitors'];
                     $saveScanProgress('competitor_radar', $compRadar); // ✅ حفظ فوري
+                } else {
+                    logError('Competitor radar scrape failed', [
+                        'company' => $compName,
+                        'error'   => $compResult['error'] ?? 'Unknown error',
+                    ]);
                 }
+            } else {
+                logError('Competitor radar skipped — no valid Apify token', ['company' => $compName]);
             }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            logError('Competitor radar scrape exception', [
+                'company' => $compName,
+                'error'   => $e->getMessage(),
+            ]);
+        }
     }
 
     // ─── 8) دمج الكل في scanResult موحّد ─────────────────────

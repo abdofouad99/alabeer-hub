@@ -289,7 +289,8 @@ function _apifyStartRun(string $actorId, string $inputJson, string $token): ?str
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_TIMEOUT        => 30,   // start endpoint قد يستغرق وقتاً تحت ضغط Apify
+        CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
         CURLOPT_POSTFIELDS     => $inputJson,
         CURLOPT_SSL_VERIFYPEER => false,
