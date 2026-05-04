@@ -151,7 +151,9 @@ try {
     }
 
     // ─── assessments ──────────────────────────────────────────
-    $db->exec("ALTER TABLE assessments MODIFY COLUMN status VARCHAR(30) DEFAULT 'pending'");
+    // مطابق لـ CREATE TABLE وَ database/schema_mysql.sql:48 — NOT NULL DEFAULT 'submitted'.
+    // قبل هذا الإصلاح كان الـ ALTER يُسقط NOT NULL ويُغيّر القيمة الافتراضية إلى 'pending'.
+    $db->exec("ALTER TABLE assessments MODIFY COLUMN status VARCHAR(30) NOT NULL DEFAULT 'submitted'");
     $existAsmCols = $db->query("SHOW COLUMNS FROM assessments")->fetchAll(PDO::FETCH_COLUMN);
     $wantAsmCols  = [
         'report_token'   => 'VARCHAR(64)',
@@ -174,13 +176,16 @@ try {
             try { $db->exec("ALTER TABLE assessments ADD COLUMN `$col` $def NULL"); } catch (\Throwable $e) {}
         }
     }
-    // ENUM يحتاج معالجة خاصة
+    // tier: نُطابق database/schema_mysql.sql:50 — VARCHAR(20). كان سابقاً ENUM،
+    // فيتعارض مع CREATE TABLE في النشر النظيف ويُسبّب اختلاف نوع العمود بين
+    // قواعد البيانات القديمة والجديدة. مع الـ CHECK في الكود (نقبل red/yellow/green)
+    // فالـ VARCHAR كافٍ.
     if (!in_array('tier', $existAsmCols)) {
-        try { $db->exec("ALTER TABLE assessments ADD COLUMN `tier` ENUM('red','yellow','green') NULL"); } catch (\Throwable $e) {}
+        try { $db->exec("ALTER TABLE assessments ADD COLUMN `tier` VARCHAR(20) NULL"); } catch (\Throwable $e) {}
     }
 
     // ─── كتابة Lock File ──────────────────────────────────────
-    file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Migration v3.0 completed');
+    file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Migration v4.0 completed');
 
     return true;
 
