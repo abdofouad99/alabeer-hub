@@ -241,8 +241,10 @@
       for (const it of items) {
         const tr = document.createElement('tr');
         if (it.latest_assessment_id) tr.classList.add('row-clickable');
+        // Defense-in-depth: only allow alphanumerics in the class
+        // attribute even though the DB ENUM constrains tier server-side.
         const tierKey   = it.latest_tier || '';
-        const tierClass = tierKey ? `tier-${tierKey}` : '';
+        const tierClass = /^[a-z]+$/.test(tierKey) ? `tier-${tierKey}` : '';
         const tierText  = tierLabels[tierKey] || tierKey;
         tr.innerHTML = `
           <td>${safeText(it.name) || '—'}</td>

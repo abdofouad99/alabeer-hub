@@ -272,8 +272,10 @@
             const tr = document.createElement('tr');
             const safe = (s) => (s || '').toString().replace(/[<>&"']/g, c =>
               ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+            // Defense-in-depth: only allow alphanumerics in the class
+            // attribute even though the DB ENUM constrains tier server-side.
             const tierKey   = lead.tier || '';
-            const tierClass = tierKey ? `tier-${tierKey}` : '';
+            const tierClass = /^[a-z]+$/.test(tierKey) ? `tier-${tierKey}` : '';
             const tierText  = tierLabels[tierKey] || tierKey || '—';
             tr.innerHTML = `
               <td>${safe(lead.name)}</td>
