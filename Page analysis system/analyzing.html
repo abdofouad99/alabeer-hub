@@ -179,6 +179,16 @@
       <div style="font-size:12px;color:var(--text-gray);margin-top:4px;">⏳ جاري الآن: التحليل العميق بالذكاء الاصطناعي...</div>
     </div>
 
+    <!-- Manual "show report now" — يظهر بعد 30s + assessmentId معروف.
+         في حال تأخر status.php (مثل بطء DB connection retry) أو فقد آخر
+         response بسبب timeout/شبكة، يمكن للمستخدم فتح التقرير يدوياً -->
+    <div id="manualOpenWrap" style="display:none;margin-top:20px;padding:16px;background:rgba(245,142,26,0.06);border:1px solid rgba(245,142,26,0.2);border-radius:14px;">
+      <div style="font-size:13px;color:var(--text-gray);margin-bottom:10px;line-height:1.6;">
+        التحليل ربما اكتمل بالفعل في الخلفية. إذا توقّفت الصفحة عند نسبة معيّنة لفترة طويلة، يمكنك فتح التقرير الآن.
+      </div>
+      <button id="manualOpenBtn" class="retry-btn" style="background:var(--primary);">📄 افتح التقرير الآن</button>
+    </div>
+
     <!-- Error Box -->
     <div class="error-box" id="errorBox">
       <strong>حدث خطأ أثناء التحليل!</strong><br>
@@ -215,6 +225,13 @@
     let elapsedTimer    = null;
     let assessmentId    = null;
     let partialShown    = false;
+    let manualBtnShown  = false;
+    let lastStuckPct    = -1;
+    let stuckSince      = 0;
+
+    // Manual-open thresholds (ms since startTime)
+    const MANUAL_BTN_AFTER_MS  = 30 * 1000;  // show button after 30s
+    const STUCK_FALLBACK_MS    = 90 * 1000;  // auto-probe result.php after 90s same %
 
     // ── Elapsed Timer ──────────────────────────────────────────
     elapsedTimer = setInterval(() => {
@@ -222,7 +239,28 @@
       const m   = Math.floor(sec / 60);
       const s   = sec % 60;
       elapsedEl.textContent = `${m}:${String(s).padStart(2,'0')} مضت`;
+
+      // Show "Open report now" button once 30s have elapsed and we have an id.
+      if (!manualBtnShown && assessmentId && (Date.now() - startTime) >= MANUAL_BTN_AFTER_MS) {
+        manualBtnShown = true;
+        const wrap = document.getElementById('manualOpenWrap');
+        if (wrap) wrap.style.display = 'block';
+      }
     }, 1000);
+
+    // Manual button click handler — go straight to report.html?id=<id>.
+    // result.html itself handles the case where the report isn't ready yet.
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('manualOpenBtn');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          if (!assessmentId) return;
+          clearInterval(pollTimer);
+          clearInterval(elapsedTimer);
+          window.location.href = 'report.html?id=' + assessmentId;
+        });
+      }
+    });
 
     // ── UI Helpers ─────────────────────────────────────────────
     function setProgress(p) {
@@ -416,6 +454,49 @@
       // Show partial score if available
       if (data.score != null && !partialShown) {
         showPartialResult(data.score);
+      }
+
+      // Stuck-at-same-percent fallback: if the UI hasn't advanced for 90s
+      // and we have an assessmentId, the backend may have finished but
+      // status.php is too slow to deliver the 'analyzed' signal in time.
+      // Probe result.php directly — if it returns a complete report, redirect.
+      if (assessmentId && elapsed * 1000 >= STUCK_FALLBACK_MS) {
+        if (lastStuckPct === ui.pct) {
+          if (Date.now() - stuckSince >= STUCK_FALLBACK_MS) {
+            probeResultDirectly();
+            stuckSince = Date.now(); // throttle re-probes to 1/STUCK_FALLBACK_MS
+          }
+        } else {
+          lastStuckPct = ui.pct;
+          stuckSince = Date.now();
+        }
+      }
+    }
+
+    // Direct probe of result.php — used as a fallback when status.php polling
+    // can't confirm the 'analyzed' status (e.g. very slow DB connection retry,
+    // dropped responses, or any other transport issue).
+    //
+    // Only redirect when status is exactly 'analyzed'. result.php returns the
+    // full row for both 'analyzed' AND 'failed', and a failed assessment may
+    // still have a partial score or empty ai_report — checking those would
+    // mistakenly redirect to a broken report instead of letting the polling
+    // loop's failure handler surface the error.
+    async function probeResultDirectly() {
+      if (!assessmentId) return;
+      try {
+        const r = await fetch('api/result.php?id=' + assessmentId, { cache: 'no-store' });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d && d.id && d.status === 'analyzed') {
+          redirectToResult();
+        } else if (d && d.id && d.status === 'failed') {
+          // Mirror the polling-loop behavior so the user sees the error UI
+          // even if status.php was unreachable when the failure was recorded.
+          showError('فشل التحليل على الخادم. ' + (d.scan_error || ''));
+        }
+      } catch (e) {
+        // ignore — next poll will catch up eventually
       }
     }
 
