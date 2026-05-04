@@ -58,12 +58,18 @@ return [
     'analysis' => [
         'ai_priority'        => $csv('AI_PRIORITY') ?: ['gemini', 'groq', 'openai', 'pekpik'],
         // ── علامات تشغيل Apify scrapers ────────────────────────
-        // الإعلانات والمنافسين معطّلان افتراضياً ما لم تُضبط ENABLE_APIFY=true
-        // و ENABLE_ADS_LIBRARY=true في .env. (analyze.php و page-scan.php
-        // يفحصان هاتين القيمتين قبل أي استدعاء لـ Apify scrapers.)
+        // الإعلانات والمنافسين مُفعَّلان افتراضياً (true). ضع ENABLE_APIFY=false
+        // أو ENABLE_ADS_LIBRARY=false في .env لتعطيلها (تقليل التكلفة/الحصة).
+        // analyze.php و page-scan.php يفحصان هاتين القيمتين قبل أي استدعاء
+        // لـ Apify scrapers.
+        // ⚠️ ملاحظة هامة: لو نشرت بدون ملف .env فستعمل الـ scrapers افتراضياً
+        // وقد تستهلك حصة Apify بدون قصد. اضبط false صراحةً للحسابات الإنتاجية
+        // المُحدّدة الميزانية.
         'enable_apify'       => filter_var($get('ENABLE_APIFY',       'true'),  FILTER_VALIDATE_BOOLEAN),
         'enable_ads_library' => filter_var($get('ENABLE_ADS_LIBRARY', 'true'),  FILTER_VALIDATE_BOOLEAN),
         'enable_pagespeed'   => filter_var($get('ENABLE_PAGESPEED',   'false'), FILTER_VALIDATE_BOOLEAN),
+        // enable_competitor_enrich مُعطَّل افتراضياً لأنه يضاعف استهلاك Apify ×6
+        // لكل منافس (يُستدعى runPageScan الكامل لكل صفحة منافس).
         'enable_competitor_enrich' => filter_var($get('ENABLE_COMPETITOR_ENRICH', 'false'), FILTER_VALIDATE_BOOLEAN),
     ],
 
