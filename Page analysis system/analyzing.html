@@ -268,78 +268,85 @@
     }
 
     // ── Redirect guard ──
-    if (!targetUrl && !urlParams.get('id')) {
-      window.location.href = 'scan.html';
+    // analyzing.html تُفتح بأحد مسارين فقط:
+    //   1) ?id=…              → استئناف Polling لتقييم موجود
+    //   2) ?url=…&sessionStorage[lead_data]   → إرسال جديد جاء من scan.html
+    // الدخول المباشر بدون أحدهما كان يُنشئ assessment وهمياً بـ full_name='زائر'
+    // و phone='000'. نمنع ذلك بإعادة التوجيه لـ scan.html.
+    if (!urlParams.get('id') && (!leadDataRaw || !targetUrl)) {
+      const fallback = targetUrl
+        ? 'scan.html?url=' + encodeURIComponent(targetUrl)
+        : 'scan.html';
+      window.location.href = fallback;
     }
 
     // ── Phase 1: Submit & Register ─────────────────────────────
+    // يُستدعى عند الدخول من scan.html (sessionStorage فيه lead_data).
+    // مع طبقة CSRF: نجلب التوكن أولاً ثم نضيفه كـ X-CSRF-Token header.
     async function phase1_submit() {
       activateStep(1);
       setProgress(8);
       msg.innerHTML = 'جاري تسجيل طلبك وبدء الفحص...';
 
-      // Build lead object from sessionStorage
-      let lead = {
-        url:             targetUrl,
-        full_name:       'زائر',
-        phone:           '000',
-        email:           '',
-        website_url:     '',
-        instagram_url:   '',
-        facebook_url:    '',
-        tiktok_url:      '',
-        twitter_url:     '',
-        objective:       '',
-        project_type:    '',
-        target_audience: '',
-        ad_budget:       '',
-        country:         ''
-      };
-
-      if (leadDataRaw) {
-        try { Object.assign(lead, JSON.parse(leadDataRaw)); } catch(e) {}
+      // ابنِ كائن lead من sessionStorage (المصدر الوحيد للحقيقة).
+      // لا توجد قيم افتراضية وهمية: لو ما فيه lead_data، الـ Redirect guard أعلاه
+      // كان قد أعاد التوجيه لـ scan.html قبل الوصول هنا.
+      let lead;
+      try {
+        lead = JSON.parse(leadDataRaw);
+      } catch (e) {
+        showError('بيانات الجلسة تالفة. <a href="scan.html" style="color:#f58e1a">ارجع لصفحة الفحص</a>');
+        return;
       }
-
-      // Normalize URL fields
-      if (!lead.website_url && !lead.facebook_url && !lead.instagram_url && !lead.tiktok_url && !lead.twitter_url) {
-        if (targetUrl.includes('instagram.com'))                               lead.instagram_url = targetUrl;
-        else if (targetUrl.includes('facebook.com') || targetUrl.includes('fb.com')) lead.facebook_url = targetUrl;
-        else if (targetUrl.includes('tiktok.com'))                             lead.tiktok_url   = targetUrl;
-        else if (targetUrl.includes('twitter.com') || targetUrl.includes('x.com')) lead.twitter_url = targetUrl;
-        else                                                                   lead.website_url  = targetUrl;
+      if (!lead || !lead.full_name || !lead.phone) {
+        showError('بيانات ناقصة. <a href="scan.html" style="color:#f58e1a">ارجع لصفحة الفحص</a>');
+        return;
       }
+      // تأكد من وجود url (للـ scan)
+      if (!lead.url) lead.url = targetUrl;
 
       try {
+        // 1) اجلب CSRF token
+        const csrfResp = await fetch('api/csrf.php', { credentials: 'same-origin' });
+        if (!csrfResp.ok) throw new Error('CSRF endpoint غير متاح');
+        const csrfData = await csrfResp.json();
+        const csrfToken = csrfData.csrf_token || '';
+        if (!csrfToken) throw new Error('لم يصل CSRF token');
+
         activateStep(2);
         setProgress(15);
         msg.innerHTML = `يتم الآن فحص: <small style="color:#94a3b8">${decodeURIComponent(targetUrl)}</small>`;
 
+        // 2) أرسل submit.php مع التوكن
         const resp = await fetch('api/submit.php', {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type':  'application/json',
+            'X-CSRF-Token':  csrfToken,
+          },
+          credentials: 'same-origin',
           body:    JSON.stringify({ lead, answers: {} })
         });
 
         const data = await resp.json();
-
         if (data.error) { showError(data.error); return; }
 
         assessmentId = data.assessment_id || data.id;
         if (!assessmentId) { showError('لم يتم إنشاء معرّف التقييم. حاول مجدداً.'); return; }
 
-        // Save id to sessionStorage for recovery
+        // احفظ الـ id لاسترجاع لاحق لو حدث reload
         sessionStorage.setItem('last_assessment_id', assessmentId);
 
-        // If analysis already done (fast path)
+        // عرض النتيجة الأولية لو وصلت
         if (data.score != null && data.tier) {
           showPartialResult(data.score);
         }
 
-        // تشغيل التحليل في الخلفية (نطلب من السيرفر أن يبدأ التحليل الطويل)
-        // لا نستخدم await لكي لا نعلق المتصفح
-        fetch('api/run.php?id=' + assessmentId).catch(e => console.log('Run triggered', e));
+        // 3) شغّل التحليل العميق في الخلفية (لا await — لئلا يعلّق المتصفح)
+        fetch('api/run.php?id=' + assessmentId, { credentials: 'same-origin' })
+          .catch(e => console.log('Run triggered (background)', e));
 
-        // Phase 2: Start polling
+        // 4) ابدأ polling
         phase2_poll();
 
       } catch(err) {
@@ -427,10 +434,14 @@
     }
 
     // ── Start ──────────────────────────────────────────────────
+    // ثلاث حالات (تم فلترتها بالـ Redirect guard أعلاه):
+    //   1) ?id=…                → استئناف polling لتقييم موجود
+    //   2) ?url=… + sessionStorage.lead_data → إرسال جديد عبر phase1_submit
+    //   3) أي شيء آخر          → الـ Redirect guard أعاد التوجيه لـ scan.html
     if (urlParams.get('id')) {
       assessmentId = urlParams.get('id');
       phase2_poll();
-    } else {
+    } else if (leadDataRaw && targetUrl) {
       phase1_submit();
     }
   </script>
