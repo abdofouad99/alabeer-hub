@@ -212,14 +212,29 @@ function scrapeCompetitorsViaGoogle(string $companyName, string $targetAudience,
     if (empty(trim($companyName))) return ['success' => false, 'error' => 'لا يوجد اسم نشاط للبحث عنه'];
 
     $location = trim($targetAudience) !== '' ? trim($targetAudience) : 'السعودية';
-    $query = "أهم منافسين $companyName في $location";
-    // أو صيغة أخرى
-    // $query = "شركات مثل $companyName في $location";
+
+    // Sites we never want as "competitors" — Arabic dictionaries, encyclopedias,
+    // Q&A boards, Wikipedia. Without these exclusions a short company name like
+    // "أهم" returns dictionary definitions instead of real businesses.
+    $excludedDomains = [
+        'almaany.com', 'arabicterminology.com', 'mawdoo3.com', 'wikipedia.org',
+        'ar.wikipedia.org', 'en.wikipedia.org', 'mojeek.com', 'baheth.info',
+        'qaalbany.com', 'lisanarab.com', 'arabdict.com', 'reverso.net',
+        'glosbe.com', 'almu3jam.com', 'almaajim.com',
+    ];
+    $exclusionFilter = '';
+    foreach ($excludedDomains as $d) {
+        $exclusionFilter .= " -site:{$d}";
+    }
+
+    // Quote the company name to force exact phrase matching, plus add
+    // commerce-context keywords that bias Google away from definitions.
+    $query = '"' . trim($companyName) . '" (شركة OR متجر OR موقع OR حساب) في ' . $location . $exclusionFilter;
 
     $input = [
         "queries" => [$query],
         "maxPagesPerQuery" => 1,
-        "maxResults" => "10", // Apify requires this to be a string
+        "maxResults" => "20", // Fetch a few extra so post-filter can drop noise
         "countryCode" => "SA" // Default fallback
     ];
 
@@ -229,24 +244,49 @@ function scrapeCompetitorsViaGoogle(string $companyName, string $targetAudience,
     $result = _apifyWaitAndFetch($runId, $token, 45); // أسرع من باقي السواحب
     if (!$result) return ['success' => false, 'error' => 'انتهت مهلة Google Apify'];
 
-    // استخراج النتائج
+    // استخراج النتائج — مع filter ثاني محلي على حالات لم تُستبعد عبر -site
     $competitors = [];
+    $seenHosts   = [];
     foreach ($result as $item) {
-        $title = $item['title'] ?? $item['metadataTitle'] ?? '';
-        $url = $item['url'] ?? '';
-        $desc = $item['metadataDescription'] ?? $item['description'] ?? '';
-        if (!empty($title) && !empty($url)) {
-            $competitors[] = [
-                'name' => $title,
-                'url' => $url,
-                'description' => $desc
-            ];
+        $title = trim($item['title'] ?? $item['metadataTitle'] ?? '');
+        $url   = trim($item['url']   ?? '');
+        $desc  = trim($item['metadataDescription'] ?? $item['description'] ?? '');
+        if (empty($title) || empty($url)) continue;
+
+        // Drop any URL whose host is in our exclusion list (defensive — Google
+        // sometimes ignores -site: when the exclusion list is long).
+        $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+        $skip = false;
+        foreach ($excludedDomains as $d) {
+            if ($host === $d || str_ends_with($host, '.' . $d)) { $skip = true; break; }
         }
+        if ($skip) continue;
+
+        // Drop obvious dictionary/definition results by title heuristics.
+        $titleLower = mb_strtolower($title, 'UTF-8');
+        $defKeywords = ['تعريف', 'معنى', 'في معجم', 'لسان العرب', 'الفرق بين', 'مرادفات'];
+        $isDefinition = false;
+        foreach ($defKeywords as $k) {
+            if (mb_strpos($titleLower, $k) !== false) { $isDefinition = true; break; }
+        }
+        if ($isDefinition) continue;
+
+        // Dedupe by host so we don't return 5 results from the same domain.
+        if ($host !== '' && isset($seenHosts[$host])) continue;
+        if ($host !== '') $seenHosts[$host] = true;
+
+        $competitors[] = [
+            'name'        => $title,
+            'url'         => $url,
+            'description' => $desc,
+        ];
+
+        if (count($competitors) >= 5) break;
     }
 
     return [
-        'success' => true,
-        'competitors' => array_slice($competitors, 0, 5) // نأخذ أول 5
+        'success'     => true,
+        'competitors' => $competitors,
     ];
 }
 
