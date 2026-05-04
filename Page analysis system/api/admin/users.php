@@ -21,12 +21,15 @@ $offset = max(0, (int)($_GET['offset'] ?? 0));
 $q      = trim((string)($_GET['q'] ?? ''));
 
 // إجمالي السطور (مع تطبيق الـ search لو وُجد)
+// نستخدم ? positional placeholders بدل named :q المُكرَّر،
+// لأن PDO::ATTR_EMULATE_PREPARES=false (انظر api/db.php:41)
+// لا يسمح بإعادة استخدام نفس الـ named parameter في prepared statement.
 $where  = '';
 $params = [];
 if ($q !== '') {
-    $where = " WHERE l.full_name LIKE :q OR l.email LIKE :q OR l.phone LIKE :q
-                  OR l.company_name LIKE :q OR l.project_type LIKE :q";
-    $params[':q'] = '%' . $q . '%';
+    $where = " WHERE l.full_name LIKE ? OR l.email LIKE ? OR l.phone LIKE ?
+                  OR l.company_name LIKE ? OR l.project_type LIKE ?";
+    $params = array_fill(0, 5, '%' . $q . '%');
 }
 
 $stmtTotal = $db->prepare("SELECT COUNT(*) FROM leads l" . $where);
