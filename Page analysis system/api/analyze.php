@@ -982,24 +982,12 @@ function runAnalysis(int $assessmentId): array {
         }
     }
 
-    // ─── 11) auto-migration ───────────────────────────────────
-    try {
-        $db->exec("ALTER TABLE assessments MODIFY COLUMN status VARCHAR(30) DEFAULT 'pending'");
-        $existing = $db->query("SHOW COLUMNS FROM assessments")->fetchAll(\PDO::FETCH_COLUMN);
-        $needed   = [
-            'breakdown' => 'JSON', 'summary' => 'TEXT', 'recommendations' => 'JSON',
-            'strengths' => 'JSON', 'weaknesses' => 'JSON', 'next_steps' => 'JSON',
-            'scan_result' => 'JSON', 'scan_status' => 'VARCHAR(20)', 'scan_error' => 'TEXT',
-            'report_token' => 'VARCHAR(64)', 'tier' => "ENUM('red','yellow','green')",
-            'ai_report' => 'JSON',
-        ];
-        foreach ($needed as $col => $def) {
-            if (!in_array($col, $existing))
-                try { $db->exec("ALTER TABLE assessments ADD COLUMN `{$col}` {$def} NULL"); } catch (\Throwable $e) {}
-        }
-    } catch (\Throwable $e) {}
+    // ملاحظة: المهاجرات تُدار مركزياً في api/migrate.php (يستدعى عبر init.php).
+    // كان هنا auto-migration مكرر يُنفّذ على كل تحليل ويُعيد تعريف status إلى
+    // DEFAULT 'pending' (NULL مسموح) — متعارض مع schema_mysql.sql ومع migrate.php.
+    // أُزيل لأن migrate.php هو المصدر الوحيد للمهاجرات.
 
-    // ─── 12) حفظ النتيجة ─────────────────────────────────────
+    // ─── 11) حفظ النتيجة ─────────────────────────────────────
     try {
         $db->prepare("UPDATE assessments SET
             status='analyzed', score=?, tier=?, breakdown=?, summary=?,
