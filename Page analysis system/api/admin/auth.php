@@ -4,6 +4,8 @@
 // ============================================================
 require_once __DIR__ . '/../db.php';
 
+require_once __DIR__ . '/../init.php';
+
 $cfg = require __DIR__ . '/../config.php';
 session_name($cfg['admin']['session_name']);
 ini_set('session.gc_maxlifetime', $cfg['admin']['session_lifetime']);
@@ -31,6 +33,10 @@ $email    = trim($body['email']    ?? '');
 $password = trim($body['password'] ?? '');
 
 if (!$email || !$password) jsonError('البريد وكلمة المرور مطلوبان');
+
+if (!checkApiRateLimit('admin_login_' . $email, 5, 300)) {
+    jsonError('تم تجاوز عدد المحاولات. حاول بعد 5 دقائق', 429);
+}
 
 $db   = getDB();
 $stmt = $db->prepare("SELECT id, password_hash FROM admin_users WHERE email = ? LIMIT 1");

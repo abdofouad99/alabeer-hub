@@ -38,9 +38,88 @@ function sanitizeRelaxed(str) {
   return div.innerHTML;
 }
 
+function missingDataHtml(title = 'البيانات غير متوفرة من الفحص', body = 'لم يرجع هذا المحور بيانات كافية لهذا التقرير. أعد تشغيل التحليل أو اربط مصدر البيانات المطلوب لعرض نتيجة مؤكدة.') {
+  return `
+    <div style="grid-column:1/-1;padding:22px;border:1px solid rgba(148,163,184,0.22);border-radius:14px;background:rgba(148,163,184,0.08);direction:rtl;">
+      <strong style="display:block;color:#f59e0b;margin-bottom:8px;">${sanitize(title)}</strong>
+      <p style="margin:0;color:#94a3b8;line-height:1.8;font-weight:700;">${sanitize(body)}</p>
+    </div>
+  `;
+}
+
+// نسخة createElement — آمنة مع CSP (بدون innerHTML)
+function appendMissingData(parent, title, body) {
+  title = title || 'البيانات غير متوفرة من الفحص';
+  body = body || 'لم يرجع هذا المحور بيانات كافية لهذا التقرير. أعد تشغيل التحليل أو اربط مصدر البيانات المطلوب لعرض نتيجة مؤكدة.';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'grid-column:1/-1;padding:22px;border:1px solid rgba(148,163,184,0.22);border-radius:14px;background:rgba(148,163,184,0.08);direction:rtl;';
+  const strong = document.createElement('strong');
+  strong.style.cssText = 'display:block;color:#f59e0b;margin-bottom:8px;';
+  strong.textContent = title;
+  const p = document.createElement('p');
+  p.style.cssText = 'margin:0;color:#94a3b8;line-height:1.8;font-weight:700;';
+  p.textContent = body;
+  wrap.appendChild(strong);
+  wrap.appendChild(p);
+  while (parent.firstChild) parent.removeChild(parent.firstChild);
+  parent.appendChild(wrap);
+}
+
+function setTextIf(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function buildPublicAdsOverview(sr) {
+  const adsLib = (sr && (sr.ads_library || sr.ads)) || {};
+  const ads = Array.isArray(adsLib.ads) ? adsLib.ads : [];
+  const rawItems = Array.isArray(adsLib.raw_items) ? adsLib.raw_items : [];
+  const totalAds = Number(adsLib.total_ads ?? adsLib.total_count ?? adsLib.raw_count ?? ads.length ?? rawItems.length ?? 0) || 0;
+  const activeAds = Number(adsLib.active_ads ?? adsLib.active_count ?? 0) || 0;
+  const stoppedAds = Math.max(totalAds - activeAds, 0);
+  const hasPixel = !!(sr && (sr.hasPixel || sr.has_fb_pixel || sr.pixel_found || sr.meta_pixel));
+  const realMetrics = adsLib.real_metrics && typeof adsLib.real_metrics === 'object' ? adsLib.real_metrics : null;
+  const hasRealMetrics = !!(realMetrics && Object.keys(realMetrics).length > 0);
+  const spendVal = realMetrics && (realMetrics.spend ?? realMetrics.amount_spent);
+  const roasVal = realMetrics && (realMetrics.roas ?? realMetrics.purchase_roas);
+  const ctrVal = realMetrics && realMetrics.ctr;
+
+  const exactMetrics = hasRealMetrics
+    ? [
+        { title: 'الإنفاق الحقيقي', val: spendVal != null ? String(spendVal) : 'غير متوفر', status: 'من Meta Ads Manager', status_class: 'status-green', val_class: spendVal != null ? 'val-green' : 'val-yellow', desc: 'هذه القيمة تأتي من ربط Meta Ads Manager وليست من مكتبة الإعلانات العامة.' },
+        { title: 'ROAS الحقيقي', val: roasVal != null ? String(roasVal) : 'غير متوفر', status: 'من الحساب الإعلاني', status_class: 'status-green', val_class: roasVal != null ? 'val-green' : 'val-yellow', desc: 'لا يتم تقدير العائد هنا. يظهر فقط إذا أرجعه الحساب الإعلاني المربوط.' },
+        { title: 'CTR الحقيقي', val: ctrVal != null ? String(ctrVal) : 'غير متوفر', status: 'من الحساب الإعلاني', status_class: 'status-green', val_class: ctrVal != null ? 'val-green' : 'val-yellow', desc: 'مؤشر النقر يظهر من بيانات Meta المربوطة عند توفره.' }
+      ]
+    : [
+        { title: 'الميزانية والعائد', val: 'غير متوفر', status: 'يتطلب ربط Meta Ads Manager', status_class: 'status-yellow', val_class: 'val-yellow', desc: 'مكتبة الإعلانات العامة تعرض وجود الإعلان ومحتواه، لكنها لا تعطي الإنفاق أو ROAS أو تكلفة النتيجة.' }
+      ];
+
+  return {
+    score: totalAds > 0 ? (hasPixel ? 55 : 35) : 10,
+    status: totalAds > 0 ? 'بيانات إعلانات عامة متاحة' : 'لا توجد إعلانات مؤكدة من البيانات العامة',
+    desc: totalAds > 0 ? `تم العثور على ${totalAds} إعلان في البيانات العامة. الأرقام المالية لا تظهر إلا عند ربط Meta Ads Manager.` : 'لم ترجع مكتبة الإعلانات العامة أي إعلان مؤكد لهذا التقرير.',
+    metrics: [
+      { title: 'إجمالي الإعلانات المرصودة', val: String(totalAds), status: totalAds > 0 ? 'من مكتبة Meta العامة' : 'لا يوجد رصد', status_class: totalAds > 0 ? 'status-green' : 'status-red', val_class: totalAds > 0 ? 'val-green' : 'val-red', desc: 'هذا العدد مبني على نتيجة السحب الفعلية من مكتبة الإعلانات أو بيانات Apify المحفوظة.' },
+      { title: 'الإعلانات النشطة', val: activeAds ? String(activeAds) : (totalAds ? 'غير محدد' : '0'), status: activeAds ? 'نشطة وقت السحب' : 'غير مؤكد', status_class: activeAds ? 'status-green' : 'status-yellow', val_class: activeAds ? 'val-green' : 'val-yellow', desc: stoppedAds > 0 ? `يوجد ${stoppedAds} إعلان غير نشط أو غير مصنف ضمن البيانات المتاحة.` : 'حالة النشاط تعرض فقط عندما ترجعها أداة السحب.' },
+      ...exactMetrics
+    ],
+    creative_pointers: [
+      { type: totalAds > 0 ? 'green' : 'yellow', icon: totalAds > 0 ? '✓' : '!', title: totalAds > 0 ? 'محتوى إعلاني مرصود' : 'لا توجد نسخة إعلان مؤكدة', desc: totalAds > 0 ? 'يمكن تحليل الرسائل والكرياتيف من نصوص الإعلانات والصور المتاحة.' : 'لا يمكن تحليل الرسائل الإعلانية بدون إعلانات مرصودة.' },
+      { type: hasPixel ? 'green' : 'yellow', icon: hasPixel ? '✓' : '!', title: hasPixel ? 'Meta Pixel مؤكد من الفحص' : 'حالة Meta Pixel غير مؤكدة', desc: hasPixel ? 'وجود البيكسل يساعد على قراءة مسار التحويل عند توفر بيانات الحساب.' : 'غياب تأكيد البيكسل لا يعني بالضرورة أنه غير موجود، لكنه غير مثبت في بيانات الفحص الحالية.' },
+      { type: hasRealMetrics ? 'green' : 'yellow', icon: hasRealMetrics ? '✓' : '!', title: hasRealMetrics ? 'أرقام Ads Manager متاحة' : 'الأرقام المالية غير متاحة', desc: hasRealMetrics ? 'الصفحة ستعرض أرقام الحساب الإعلاني المربوط فقط.' : 'اربط Meta Ads Manager لعرض الإنفاق، تكلفة النتيجة، ROAS، والتحويلات.' }
+    ],
+    strategy: {
+      desc: 'هذا عرض مبني على البيانات المؤكدة فقط:',
+      steps: hasRealMetrics
+        ? ['راجع الإنفاق والعائد من الحساب المربوط قبل أي قرار ميزانية.', 'حلل آخر 30 إعلان من الرسائل والكرياتيف لتحديد الأنماط الرابحة.', 'اربط نتائج الإعلانات بصفحة الهبوط للتحقق من جاهزية التحويل.']
+        : ['استخدم مكتبة الإعلانات لتحليل الرسائل والكرياتيف فقط.', 'اربط Meta Ads Manager للحصول على الإنفاق، ROAS، CPA، والتحويلات.', 'لا تعتمد على أي تقدير مالي قبل توفر بيانات الحساب الإعلاني.']
+    }
+  };
+}
+
 // ── Animation Helpers (Moved to top) ──
 function animateCounters() {
-  document.querySelectorAll('.score-num[data-val], .d-score-num[data-val]').forEach(el => {
+  document.querySelectorAll('.score-num[data-val], .d-score-num[data-val], .mini-val[data-val]').forEach(el => {
     const target = parseInt(el.getAttribute('data-val'));
     if (isNaN(target)) return;
     let current = 0;
@@ -55,7 +134,7 @@ function animateCounters() {
 }
 
 function animateRings() {
-  document.querySelectorAll('.score-circle[data-percent]').forEach(ring => {
+  document.querySelectorAll('.score-circle[data-percent], .mini-ring[data-percent]').forEach(ring => {
     const pct   = parseInt(ring.getAttribute('data-percent'));
     const color = ring.getAttribute('data-color') || 'var(--primary)';
     let cur = 0;
@@ -70,135 +149,152 @@ function animateRings() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // ── Wire print button (CSP-safe replacement for onclick="window.print()") ──
+  const printBtn = document.getElementById('btnPrint');
+  if (printBtn) printBtn.addEventListener('click', () => window.print());
+
   const urlParams = new URLSearchParams(window.location.search);
   const path = window.location.pathname;
   let id = urlParams.get('id');
 
-  // ── MOCK DATA FOR PREVIEW MODE ──
-  let isMockMode = false;
-  let mockData = null;
+  // ── بدون id حقيقي → رسالة خطأ واضحة ──
   if (!id) {
-    isMockMode = true;
-    id = "mock";
-    mockData = {
-      full_name: "متجر ناتشورال بيوتي (معاينة شاملة)",
-      company_name: "ناتشورال بيوتي",
-      url: "https://naturalbeauty.com",
-      score: 65,
-      website_url: "https://naturalbeauty.com",
-      instagram_url: "https://instagram.com/natural_beauty",
-      facebook_url: "https://facebook.com/naturalbeauty",
-      scan_result: {
-        hasSSL: true,
-        hasPixel: false,
-        hasGA: true,
-        ads_library: {
-          total_ads: 3,
-          ads: [
-            { id: "101", page_name: "متجر ناتشورال بيوتي", is_active: true, start_date: "2023-10-15", image_url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500&q=80", title: "احصلي على بشرة نضرة وخالية من العيوب مع سيروم فيتامين سي الجديد. اطلبي الآن!" },
-            { id: "102", page_name: "متجر ناتشورال بيوتي", is_active: true, start_date: "2023-10-12", image_url: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=500&q=80", title: "خصم 20% لفترة محدودة على جميع منتجات العناية بالبشرة. لا تفوتي الفرصة." },
-            { id: "103", page_name: "متجر ناتشورال بيوتي", is_active: false, start_date: "2023-09-01", image_url: "https://images.unsplash.com/photo-1615397323381-45cd3c20037a?w=500&q=80", title: "مجموعة العناية المتكاملة، الخطوة الأولى لجمالك الطبيعي." }
-          ]
-        },
-        hasWhatsApp: false,
-        instagram: { followers: 12400, engagement_rate: 1.2, avg_likes: 148 }
-      },
-      breakdown: [
-        { axis: "الهوية والبراندينج", score: 85, reason: "الهوية البصرية للمتجر وحسابات التواصل متناسقة بشكل ممتاز. لوحة الألوان (الأخضر والذهبي) تعكس طبيعة المنتجات العضوية بشكل قوي وتبني انطباعاً أولياً بالفخامة والجودة. المشكلة الوحيدة تكمن في عدم وجود 'Brand Voice' موحد في كتابة المنشورات (Tone of Voice)." },
-        { axis: "المحتوى والاستقطاب", score: 55, reason: "هناك خلل استراتيجي في نوعية المحتوى المنشور. الحساب يعتمد بنسبة 90% على منشورات البيع المباشر (Hard Selling) وصور المنتجات الجامدة. في خوارزميات 2026، هذا المحتوى لا يحصل على وصول عضوي (Reach). يجب فوراً البدء بإنتاج محتوى فيديو قصير (Reels) يركز على (UGC) وتجارب العملاء المباشرة لخلق طلب (Demand Generation)." },
-        { axis: "الثقة (Social Proof)", score: 40, reason: "هذه هي أكبر نقطة تسرب مبيعات (Leakage) في البزنس حالياً. العميل الجديد الذي لا يعرف علامتك التجارية لن يشتري لمجرد أن المنتج شكله جميل. لا يوجد قسم واضح لآراء العملاء الموثقة (Testimonials)، ولا يوجد فيديوهات لأشخاص حقيقيين يستخدمون المنتج. الثقة معدومة، وهذا يرفع تكلفة استحواذ العميل (CPA) في الإعلانات بشكل مخيف." },
-        { axis: "الإعلانات والاستهداف", score: 70, reason: "يوجد نشاط إعلاني حالي (4 إعلانات نشطة)، وهذا جيد. لكن تم رصد أن جميع الإعلانات تعتمد على (الصور الثابتة)، وهو خطأ فادح في منصات تعتمد على الفيديو (TikTok/Reels). الصور الثابتة في الإعلانات اليوم تكلف 3 أضعاف إعلانات الفيديو من حيث تكلفة النقرة (CPC). إضافة إلى ذلك، لا يوجد بيكسل تتبع مفعل لجمع البيانات، مما يعني أن ميزانية الإعلانات تحترق دون جمع Data للمستقبل." },
-        { axis: "رحلة العميل والمبيعات", score: 65, reason: "العميل يصل للمتجر بسلاسة، ولكن سرعة الموقع بطيئة نوعاً ما مما يفقده التركيز. والأخطر من ذلك هو صفحة الدفع (Checkout) المعقدة، وعدم وجود زر تواصل سريع (واتساب) للإجابة على اعتراضات العميل الأخيرة قبل الدفع. تبسيط الـ Checkout إلى خطوة واحدة سيرفع مبيعاتك بنسبة لا تقل عن 20% فوراً." }
-      ],
-      competitor_radar: [
-        { name: "بيوتي سيكريتس", url: "beautysecrets.com", strengths: ["ميزانية إعلانية ضخمة", "شراكات مستمرة مع المشاهير"], weaknesses: ["أسعار مبالغ فيها للمنتجات", "تأخر مستمر في خدمة العملاء"], attack_plan: "أطلق حملة مقارنة (Us vs Them) تبرز جودتك العضوية مع سرعة التوصيل." },
-        { name: "ذا بودي شوب (محلي)", url: "thebodyshop.sa", strengths: ["موثوقية عالية للعلامة التجارية", "فروع في كل مكان"], weaknesses: ["موقع إلكتروني بطيء جداً", "لا يوجد تواصل سريع عبر الواتساب"], attack_plan: "استحوذ على المبيعات أونلاين بتقديم تجربة شراء في خطوة واحدة (1-Click Checkout)." },
-        { name: "أورجانيك هيرب", url: "organicherb.co", strengths: ["تغليف ممتاز", "برنامج ولاء للعملاء"], weaknesses: ["لا يشغلون إعلانات فيديو", "محتوى حساباتهم ممل"], attack_plan: "اكتسحهم فوراً بتشغيل إعلانات فيديو UGC قصيرة على تيك توك وإنستجرام ريلز." },
-        { name: "جلوي سكين", url: "glowyskin.net", strengths: ["صور منتجات احترافية", "أسعار منخفضة جداً"], weaknesses: ["جودة رديئة", "تقييمات سلبية بكثرة في التعليقات"], attack_plan: "لا تنافسهم في السعر. ركز في رسالتك التسويقية على (المكونات العضوية الخالية من الكيماويات)." },
-        { name: "ناتشرال فيبز", url: "naturalvibes.sa", strengths: ["إعلانات ممولة مستمرة", "سرعة موقع جيدة"], weaknesses: ["صفحات هبوط (Landing pages) سيئة", "غياب آراء العملاء (Social Proof)"], attack_plan: "ضع آراء عملائك في أول الصفحة، وابنِ صفحة هبوط مخصصة لكل منتج لتتغلب عليهم بالتحويل." }
-      ],
-      execution_arsenal: [
-        { icon: "🎥", title: "محتوى الفيديو (UGC)", desc: "إنتاج 8-12 فيديو شهرياً بتصوير عفوي لاكتساح خوارزميات التيك توك والريلز التي أهملها منافسوك." },
-        { icon: "⚡", title: "صفحة هبوط مخصصة (Landing Page)", desc: "بناء صفحة هبوط ذات تحويل عالي (High-Converting) تركز على حل مشكلة العميل بدلاً من المتجر التقليدي." },
-        { icon: "💬", title: "الرد الفوري والاحتفاظ", desc: "تفعيل أتمتة الواتساب لرد على استفسارات العملاء في أقل من دقيقة وسحب المبيعات من المنافسين البطيئين." },
-        { icon: "🎯", title: "إعادة الاستهداف الذكي (Retargeting)", desc: "تخصيص 20% من الميزانية الإعلانية لملاحقة العملاء الذين زاروا مواقع المنافسين أو تخلوا عن سلة الشراء." }
-      ],
-      recommendations: [
-        { priority: "high", icon: "🛡️", title: "سد ثغرة انعدام الثقة (Social Proof)", desc: "يجب إنشاء قسم مخصص في Highlights يسمى 'تجارب حقيقية'، يتضمن لقطات شاشة لمحادثات عملاء راضين، وفيديوهات (UGC) لعملاء يستلمون المنتجات." },
-        { priority: "high", icon: "🎯", title: "تغيير الخطاف الإعلاني (Hook) في الحملات النشطة", desc: "أوقف الإعلانات التي تستعرض المكونات واستبدلها بـفيديوهات تبدأ بمشكلة العميل: 'هل مللتي من جفاف بشرتك؟'." },
-        { priority: "medium", icon: "✍️", title: "إعادة هندسة البايو (Bio Engineering)", desc: "البايو الحالي يشبه الكتالوج. قم بتحويله إلى رسالة بيعية قوية تتكون من ضمان استرجاع ورابط شراء واضح." },
-        { priority: "medium", icon: "🖼️", title: "إضفاء الطابع الإنساني على المحتوى", desc: "ابدأ بتصوير المنتجات أثناء استخدامها فعلياً، فهذا يرفع من القيمة المتصورة للمنتج (Perceived Value)." },
-        { priority: "low", icon: "🤝", title: "بناء برنامج الولاء والنقاط", desc: "استغل أن 45% من عملائك يعودون للشراء بإنشاء نظام نقاط أو كود خصم للعملاء الحاليين عند جلبهم لصديق." }
-      ],
-      ads_analysis: {
-        score: 45,
-        status: "⚠️ هدر مالي (نزيف ميزانية)",
-        desc: "أنت تدفع للإعلانات لجلب الزيارات، ولكن <strong>العائد غير مرضي تماماً</strong> وميزانيتك تحترق.",
-        metrics: [
-          { title: "العائد على الإنفاق (ROAS)", val: "0.8x", status: "▼ خسارة محققة", status_class: "status-red", val_class: "val-red", desc: "أنت تخسر أموالك! تدفع دولاراً للإعلان وتستعيد 80 سنتاً فقط. يجب إيقاف الحملات فوراً والمراجعة." },
-          { title: "تكلفة النقرة (CPC)", val: "$1.15", status: "▶ مكلف جداً", status_class: "status-yellow", val_class: "val-yellow", desc: "تكلفة جلب الزائر مرتفعة جداً لأن المحتوى الإعلاني غير جذاب ولا يثير الفضول الكافي." },
-          { title: "نسبة النقر للظهور (CTR)", val: "0.9%", status: "▼ تجاهل تام", status_class: "status-red", val_class: "val-red", desc: "العملاء يرون الإعلان أثناء التصفح ولكنهم لا يتوقفون. الصورة النمطية للإعلان تقتل التحويل." }
-        ],
-        creative_pointers: [
-          { type: "red", icon: "❌", title: "غياب 'الخطاف' (Hook)", desc: "أول 3 ثواني مملة تماماً. المستخدم يمرر (Scroll) دون توقف. ابدأ الإعلان بسؤال صادم أو مشكلة يعاني منها عميلك." },
-          { type: "red", icon: "❌", title: "العرض مبهم ولا يقاوم", desc: "أنت تعرض المنتج كسلعة وليس كحل سحري. لا يوجد عرض حصري (Irresistible Offer) يدفعهم للشراء الآن بدلاً من غداً." },
-          { type: "yellow", icon: "⚠️", title: "نص الإعلان (Copy) طويل وممل", desc: "التركيز على سرد المكونات (Features) بدلاً من الفوائد (Benefits). العميل لا يريد سيروم، بل يريد بشرة نضرة." }
-        ],
-        strategy: {
-          desc: "أوقف حرق الميزانية في الحملات الحالية فوراً. سنقوم بتغيير استراتيجية الشراء الإعلاني بالكامل:",
-          steps: [
-            "<strong>إعلانات المحتوى المنشأ بواسطة المستخدم (UGC):</strong> استبدل التصاميم الاحترافية الجامدة بفيديوهات حقيقية بعيدة عن المثالية.",
-            "<strong>إعادة الاستهداف المكثف (Retargeting):</strong> استهدف فوراً الـ 60% الذين زاروا الموقع وخرجوا، بعرض خصم مؤقت لمدة 24 ساعة.",
-            "<strong>هندسة صفحة الهبوط (Landing Page):</strong> وجه الزوار لصفحة هبوط سريعة الشراء (1-Click) بدلاً من الصفحة الرئيسية المشتتة للمتجر."
-          ]
-        }
-      },
-      market_summary: "السوق يعاني من فجوة خطيرة: أغلب المنافسين يركزون على جلب العميل ويهملون خدمة ما بعد البيع وبناء مجتمع حول العلامة التجارية. بناء برنامج ولاء بسيط (Loyalty Program) مع ضمان ذهبي للاسترجاع سيجعلك <span class=\"highlight\">تحتكر حصة ضخمة من السوق وتخفض تكلفة إعلاناتك بـ 40%</span> خلال 90 يوماً."
-    };
+    // لا يوجد معرّف تقرير — عرض رسالة واضحة بدلاً من بيانات وهمية
+    const _mc = document.querySelector('.main-content') || document.querySelector('main') || document.body;
+    if (_mc) _mc.innerHTML = `
+      <div style="text-align:center;padding:80px 40px;direction:rtl;font-family:Cairo,sans-serif;">
+        <div style="font-size:64px;margin-bottom:20px;">🔒</div>
+        <h2 style="color:#f58e1a;font-size:26px;font-weight:900;margin-bottom:12px;">لا يوجد تقرير لعرضه</h2>
+        <p style="color:#94a3b8;font-size:16px;font-weight:600;margin-bottom:32px;line-height:1.7;">
+          هذه الصفحة تعرض نتائج تحليل حقيقي فقط.<br>يجب الوصول إليها عبر رابط التقرير المُرسَل إليك.
+        </p>
+        <a href="index.html" style="display:inline-block;background:#f58e1a;color:#fff;padding:14px 36px;border-radius:14px;font-weight:900;font-size:16px;text-decoration:none;">🚀 ابدأ تحليلك الآن</a>
+      </div>`;
+    return;
   }
 
   // ── 1. تحديث روابط التنقل والباكجات لتحتفظ بـ id ──────────
+  if (path.includes('content.html')) {
+    document.querySelectorAll('.q-answer').forEach(el => { el.textContent = 'جاري تحميل بيانات التقرير...'; });
+    document.querySelectorAll('.q-status').forEach(el => {
+      el.className = el.className.replace(/\b(good|warn|bad|neu)\b/g, '').trim() + ' neu';
+      el.textContent = '--';
+    });
+  }
+
   document.querySelectorAll('.nav-menu a, .btn-upgrade, .btn-primary, .btn-pkg, .back-btn').forEach(link => {
     const href = link.getAttribute('href');
     if (href && !href.startsWith('#') && !href.startsWith('http')) {
-      // If it already has the exact id parameter, skip
       if (href.includes('id=' + id)) return;
-
       const separator = href.includes('?') ? '&' : '?';
       link.setAttribute('href', href + separator + 'id=' + id);
     }
   });
 
-  // ── 2. جلب البيانات ──────────────────────────────────────
-  if (isMockMode) {
-    // تشغيل وضع المعاينة ببيانات وهمية
-    renderData(mockData);
-  } else {
-    if (!id || id === 'mock') return;
-    let token = urlParams.get('token') || sessionStorage.getItem('last_assessment_token');
+  // ── 2. جلب البيانات الحقيقية فقط ─────────────────────────
+  const token = urlParams.get('token') || sessionStorage.getItem('last_assessment_token');
 
-    fetch(`api/result.php?id=${id}&token=${token || ''}`)
-      .then(res => { if (!res.ok) throw new Error('Server error: ' + res.status); return res.json(); })
-      .then(data => {
-        if (data.error) { console.error('API error:', data.error); return; }
-        if (data.status === 'pending') {
-          const _mc = document.querySelector('.main-content') || document.querySelector('main') || document.body;
-          if (_mc) _mc.innerHTML = '<div style="text-align:center;padding:60px;direction:rtl;font-family:Cairo,sans-serif;"><h2 style="color:#f58e1a;">⏳ جاري تجهيز تقريرك...</h2><p style="color:#666;margin-top:12px;">يرجى الانتظار قليلاً ثم تحديث الصفحة</p><button onclick="location.reload()" style="margin-top:20px;padding:12px 28px;background:#f58e1a;color:#fff;border:none;border-radius:12px;cursor:pointer;">🔄 تحديث</button></div>';
-          return;
+  fetch(`api/result.php?id=${id}&token=${token || ''}`)
+    .then(res => { if (!res.ok) throw new Error('Server error: ' + res.status); return res.json(); })
+    .then(data => {
+      if (data.error) {
+        const _mc = document.querySelector('.main-content') || document.querySelector('main') || document.body;
+        if (_mc) {
+          // CSP-safe: use createElement instead of innerHTML with onclick
+          while (_mc.firstChild) _mc.removeChild(_mc.firstChild);
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'text-align:center;padding:60px;direction:rtl;font-family:Cairo,sans-serif;';
+          const iconDiv = document.createElement('div');
+          iconDiv.style.cssText = 'font-size:48px;margin-bottom:16px;';
+          iconDiv.textContent = '⚠️';
+          const h2 = document.createElement('h2');
+          h2.style.cssText = 'color:#ef4444;font-size:22px;font-weight:900;';
+          h2.textContent = data.error;
+          const p = document.createElement('p');
+          p.style.cssText = 'color:#94a3b8;margin-top:10px;';
+          p.textContent = 'تحقق من رابط التقرير وأعد المحاولة';
+          const a = document.createElement('a');
+          a.href = 'index.html';
+          a.style.cssText = 'display:inline-block;margin-top:24px;background:#f58e1a;color:#fff;padding:12px 28px;border-radius:12px;font-weight:900;text-decoration:none;';
+          a.textContent = 'ابدأ من جديد';
+          wrap.appendChild(iconDiv);
+          wrap.appendChild(h2);
+          wrap.appendChild(p);
+          wrap.appendChild(a);
+          _mc.appendChild(wrap);
         }
-        renderData(data);
-      })
-      .catch(e => {
-        console.error(e);
-      });
-  }
+        return;
+      }
+      if (data.status === 'pending') {
+        const _mc = document.querySelector('.main-content') || document.querySelector('main') || document.body;
+        if (_mc) {
+          // CSP-safe: use createElement instead of innerHTML with onclick
+          while (_mc.firstChild) _mc.removeChild(_mc.firstChild);
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'text-align:center;padding:60px;direction:rtl;font-family:Cairo,sans-serif;';
+          const h2 = document.createElement('h2');
+          h2.style.cssText = 'color:#f58e1a;';
+          h2.textContent = '⏳ جاري تجهيز تقريرك...';
+          const p = document.createElement('p');
+          p.style.cssText = 'color:#666;margin-top:12px;';
+          p.textContent = 'يرجى الانتظار قليلاً ثم تحديث الصفحة';
+          const btn = document.createElement('button');
+          btn.style.cssText = 'margin-top:20px;padding:12px 28px;background:#f58e1a;color:#fff;border:none;border-radius:12px;cursor:pointer;';
+          btn.textContent = '🔄 تحديث';
+          btn.addEventListener('click', function() { location.reload(); });
+          wrap.appendChild(h2);
+          wrap.appendChild(p);
+          wrap.appendChild(btn);
+          _mc.appendChild(wrap);
+        }
+        return;
+      }
+      renderData(data);
+    })
+    .catch(e => {
+      console.error('[RC] Fetch error:', e);
+      const _mc = document.querySelector('.main-content') || document.querySelector('main') || document.body;
+      if (_mc) {
+        // CSP-safe: use createElement instead of innerHTML with onclick
+        while (_mc.firstChild) _mc.removeChild(_mc.firstChild);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'text-align:center;padding:60px;direction:rtl;font-family:Cairo,sans-serif;';
+        const iconDiv = document.createElement('div');
+        iconDiv.style.cssText = 'font-size:48px;margin-bottom:16px;';
+        iconDiv.textContent = '🔌';
+        const h2 = document.createElement('h2');
+        h2.style.cssText = 'color:#ef4444;font-size:20px;font-weight:900;';
+        h2.textContent = 'تعذّر الاتصال بالخادم';
+        const p = document.createElement('p');
+        p.style.cssText = 'color:#94a3b8;margin-top:10px;';
+        p.textContent = 'تحقق من اتصالك بالإنترنت ثم أعد تحديث الصفحة';
+        const btn = document.createElement('button');
+        btn.style.cssText = 'margin-top:20px;padding:12px 28px;background:#f58e1a;color:#fff;border:none;border-radius:12px;cursor:pointer;';
+        btn.textContent = '🔄 تحديث';
+        btn.addEventListener('click', function() { location.reload(); });
+        wrap.appendChild(iconDiv);
+        wrap.appendChild(h2);
+        wrap.appendChild(p);
+        wrap.appendChild(btn);
+        _mc.appendChild(wrap);
+      }
+    });
 
   function renderData(data) {
+      // Share data with report-page.js to render platform cards
+      window.__reportData = data;
+      document.dispatchEvent(new CustomEvent('reportDataReady', { detail: data }));
+
       const sr     = data.scan_result || {};
       const srObj  = sr; // alias — available to all page blocks inside renderData
-      const fb     = sr.facebook     || {};
-      const ig     = sr.instagram    || {};
+      // ✅ إصلاح: عند إدخال رابط فيسبوك/إنستجرام مباشرة، البيانات قد تُخزَّن في sr مباشرة
+      // وليس ضمن sr.facebook أو sr.instagram — نتحقق من sr.platform لتحديد المصدر الصحيح
+      const fb     = sr.facebook || (sr.platform === 'facebook' ? sr : (sr.social || {}));
+      const ig     = sr.instagram || (sr.platform === 'instagram' ? sr : (sr.social || {}));
       const ws     = sr.website_scan || {};
+
+
+
 
       // ── P2-1: الاسم الصحيح (مصدر واحد — DB فقط) ──────────
       const clientName = data.full_name || data.company_name || 'العميل';
@@ -222,9 +318,25 @@ document.addEventListener("DOMContentLoaded", () => {
       const typeEl  = document.getElementById('profileAccountType');
       const nicheEl = document.getElementById('profileNiche');
 
-      const ai = data.ai_report || {};
+      // ── دمج المصادر: ai_report (التحليل الكامل) + الجذر (الحقول القديمة) ──
+      // التقارير القديمة قد تحفظ strengths/weaknesses/recommendations في جذر الـ row
+      // بدلاً من ai_report. هنا ندمج الاثنين لضمان عمل جميع التقارير.
+      const ai = Object.assign({}, data.ai_report || {}, {
+        strengths:       (data.ai_report && data.ai_report.strengths       && data.ai_report.strengths.length       > 0) ? data.ai_report.strengths       : (data.strengths       || []),
+        weaknesses:      (data.ai_report && data.ai_report.weaknesses      && data.ai_report.weaknesses.length      > 0) ? data.ai_report.weaknesses      : (data.weaknesses      || []),
+        recommendations: (data.ai_report && data.ai_report.recommendations && data.ai_report.recommendations.length > 0) ? data.ai_report.recommendations : (data.recommendations || []),
+      });
+      // ── DEBUG (يمكن حذفه لاحقاً) ──
+      console.debug('[RC] ai merged:', {
+        str_count: ai.strengths.length,
+        weak_count: ai.weaknesses.length,
+        rec_count: ai.recommendations.length,
+        source_ai_report: !!(data.ai_report && data.ai_report.strengths && data.ai_report.strengths.length > 0),
+        source_root: !!(data.strengths && data.strengths.length > 0),
+        _debug: data._debug
+      });
       if (typeEl) {
-        let typeStr = ai.page_type || data.project_type || 'تجاري';
+        let typeStr = ai.page_type || data.project_type || 'غير محدد من البيانات';
         // ترجمة سريعة للأنواع الشائعة
         const translations = {
           'E-commerce Store': 'متجر إلكتروني 🛒',
@@ -236,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
         typeEl.textContent = translations[typeStr] || typeStr;
       }
       if (nicheEl) {
-        nicheEl.textContent = ai.niche || 'تسويق رقمي ✨';
+        nicheEl.textContent = ai.niche || 'غير محدد من البيانات';
       }
 
       // ── تحديث الدرجة في جميع الصفحات ─────────────────────
@@ -263,8 +375,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // PAGE: result.html (MAIN DASHBOARD)
       // ==========================================
       if (path.includes('result.html') || path.endsWith('/') || path.endsWith('report.html')) {
-        const score = data.score || 50;
-        const ai    = data.ai_report || {};
+        const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
+        // استخدام `ai` الموحد من الـ outer scope (يشمل strengths/weaknesses من الجذر)
         const cj    = ai.customer_journey || null;
 
         // ── 1. Score Status & Competitor Pin ──
@@ -285,6 +397,33 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (compPin) {
           setTimeout(() => { compPin.style.left = (100 - score) + '%'; }, 600);
+        }
+
+        // ── 1.5 Update Axes Grid from breakdown ──
+        if (data.breakdown && data.breakdown.length > 0) {
+          const axisCards = document.querySelectorAll('.axes-grid .axis-card');
+          axisCards.forEach(card => {
+            const axisNameEl = card.querySelector('.axis-name');
+            if (!axisNameEl) return;
+            const name = axisNameEl.textContent.trim();
+            const item = data.breakdown.find(b => b.axis && (b.axis.includes(name) || name.includes(b.axis)));
+            if (item) {
+              const s = item.score || 0;
+              const ring = card.querySelector('.mini-ring');
+              const valSpan = card.querySelector('.mini-val');
+              const statusSpan = card.querySelector('.axis-status');
+              
+              if (ring) {
+                ring.setAttribute('data-percent', s);
+                ring.setAttribute('data-color', s >= 75 ? 'var(--green)' : s >= 50 ? 'var(--yellow)' : 'var(--red)');
+              }
+              if (valSpan) valSpan.setAttribute('data-val', s);
+              if (statusSpan) {
+                statusSpan.textContent = s >= 75 ? 'جيد جداً' : s >= 50 ? 'متوسط' : 'ضعيف';
+                statusSpan.className = 'axis-status ' + (s >= 75 ? 'status-green' : s >= 50 ? 'status-yellow' : 'status-red');
+              }
+            }
+          });
         }
 
         // ── 2. Problem Card من AI أو من الـ breakdown ──
@@ -343,49 +482,75 @@ document.addEventListener("DOMContentLoaded", () => {
             fDesc.innerHTML = `يتوقف معظم العملاء في <strong>مرحلة ${stageNames[cj.bottleneck_stage] || cj.bottleneck_stage}</strong> — ${cj.bottleneck_fix || 'تحتاج لمعالجة هذه المرحلة بشكل عاجل.'}<div class="fix-box" id="resultFixBox"><div class="fix-box-title">كيف نحل هذه العقدة؟</div><ul id="resultFixList">${(cj.fix_steps || []).map(s => `<li><span style="color:var(--green);">✔</span> ${s}</li>`).join('') || '<li><span style="color:var(--green);">✔</span> راجع تقرير رحلة العميل للتفاصيل الكاملة</li>'}</ul></div>`;
           }
         } else {
-          // Fallback — قيم مبنية على الـ score الحقيقي
-          const fVals = [
-            Math.min(99, score + 20),
-            Math.min(95, score + 10),
-            Math.max(10, score - 15),
-            Math.max(5,  score - 30),
-            Math.max(10, score - 10)
+          // Fallback funnel based on overall score
+          const s = score || 50;
+          const funnelStages = [
+            { id: 'resultFVal1', stageId: 'resultFStage1', val: Math.min(100, s + 25) },
+            { id: 'resultFVal2', stageId: 'resultFStage2', val: Math.min(100, s + 10) },
+            { id: 'resultFVal3', stageId: 'resultFStage3', val: s },
+            { id: 'resultFVal4', stageId: 'resultFStage4', val: Math.max(5, s - 20) },
+            { id: 'resultFVal5', stageId: 'resultFStage5', val: Math.max(2, s - 35) }
           ];
-          ['resultFVal1','resultFVal2','resultFVal3','resultFVal4','resultFVal5'].forEach((elId, i) => {
-            const el = document.getElementById(elId);
-            if (el) el.textContent = fVals[i] + '%';
+          
+          let minScore = 100; let bottleneckId = 'resultFVal4';
+          funnelStages.forEach(f => {
+            const el = document.getElementById(f.id);
+            const stageEl = document.getElementById(f.stageId);
+            if (el) el.textContent = f.val + '%';
+            if (stageEl) stageEl.style.width = Math.max(15, f.val) + '%';
+            if (f.val < minScore) { minScore = f.val; bottleneckId = f.id; }
           });
-          ['resultFStage1','resultFStage2','resultFStage3','resultFStage4','resultFStage5'].forEach((elId, i) => {
-            const el = document.getElementById(elId);
-            const widths = [100, 85, 60, 42, 30];
-            if (el) el.style.width = widths[i] + '%';
-          });
-          // اكتشاف نقطة الاختناق تلقائياً
-          const minIdx = fVals.indexOf(Math.min(...fVals));
-          if (minIdx === 2 || minIdx === 3) {
-            const badge = document.getElementById('resultBottleneckBadge');
-            if (badge) badge.style.display = 'inline';
+          
+          const badge = document.getElementById('resultBottleneckBadge');
+          if (badge) {
+            badge.style.display = 'inline';
+            // Adjust badge position roughly based on bottleneck
+            const badgePositions = {
+              'resultFVal1': '10%', 'resultFVal2': '30%', 'resultFVal3': '50%',
+              'resultFVal4': '70%', 'resultFVal5': '90%'
+            };
+            badge.style.top = badgePositions[bottleneckId] || '70%';
+          }
+          
+          const fDesc = document.getElementById('resultFunnelDesc');
+          if (fDesc) {
+            fDesc.innerHTML = 'بناءً على التقييم العام والأداء الرقمي للحساب، قمنا بتقدير مسار التحويل، حيث يظهر تسرب واضح في مرحلة الشراء/الولاء.<div class="fix-box" id="resultFixBox"><div class="fix-box-title">كيف نحل هذه العقدة؟</div><ul id="resultFixList"><li><span style="color:var(--green);">✔</span> إطلاق حملات إعادة استهداف للزوار المتخلين عن الشراء.</li><li><span style="color:var(--green);">✔</span> تحسين صفحة الهبوط لتسهيل إجراءات الدفع.</li><li><span style="color:var(--green);">✔</span> مراجعة العروض الترويجية والأسعار التنافسية.</li></ul></div>';
           }
         }
 
         // ── 4. Mini Strengths & Weaknesses (عناوين فقط من نفس البيانات) ──
+        // بناء بـ createElement — آمن مع CSP بدون innerHTML
         const resultStrList = document.getElementById('resultStrengthsList');
         const resultWksList = document.getElementById('resultWeaknessesList');
 
         if (resultStrList && ai.strengths && ai.strengths.length > 0) {
-          resultStrList.innerHTML = ai.strengths.slice(0, 5).map(s => {
-            const raw = extractText(s, 'نقطة قوة');
-            const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
-            return `<li><span style="color:var(--green);">✔</span> ${sanitize(title)}</li>`;
-          }).join('');
+          while (resultStrList.firstChild) resultStrList.removeChild(resultStrList.firstChild);
+          ai.strengths.forEach(s => {
+            const isObj = (s && typeof s === 'object');
+            const title = isObj ? (s.title || s.name || s.point || extractText(s, 'نقطة قوة')) : extractText(s, 'نقطة قوة');
+            const li = document.createElement('li');
+            const checkSpan = document.createElement('span');
+            checkSpan.style.color = 'var(--green)';
+            checkSpan.textContent = '✔';
+            li.appendChild(checkSpan);
+            li.appendChild(document.createTextNode(' ' + title));
+            resultStrList.appendChild(li);
+          });
         }
 
         if (resultWksList && ai.weaknesses && ai.weaknesses.length > 0) {
-          resultWksList.innerHTML = ai.weaknesses.slice(0, 5).map(w => {
-            const raw = extractText(w, 'نقطة ضعف');
-            const title = typeof raw === 'string' ? raw.split(':')[0] : raw;
-            return `<li><span style="color:var(--red);">✖</span> ${sanitize(title)}</li>`;
-          }).join('');
+          while (resultWksList.firstChild) resultWksList.removeChild(resultWksList.firstChild);
+          ai.weaknesses.forEach(w => {
+            const isObj = (w && typeof w === 'object');
+            const title = isObj ? (w.title || w.name || w.point || extractText(w, 'نقطة ضعف')) : extractText(w, 'نقطة ضعف');
+            const li = document.createElement('li');
+            const xSpan = document.createElement('span');
+            xSpan.style.color = 'var(--red)';
+            xSpan.textContent = '✖';
+            li.appendChild(xSpan);
+            li.appendChild(document.createTextNode(' ' + title));
+            resultWksList.appendChild(li);
+          });
         }
 
         // ── 5. Quick Checks الأربعة ──────────────────────────────────
@@ -471,11 +636,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if (vl) { vl.textContent = text; vl.style.color = color; }
         };
 
-        const sr  = data.scan_result || srObj || {};
+        const sr2 = data.scan_result || srObj || {};
         const ca2 = ai.content_analysis || {};
 
         // — CTA —
-        const hasCTA = sr.hasCTA || sr.has_cta || (ca2.bar_cta && ca2.bar_cta >= 50);
+        const hasCTA = sr2.hasCTA || sr2.has_cta || (ca2.bar_cta && ca2.bar_cta >= 50);
         if (hasCTA) set('wkCheckCTA','wkCheckCTAVal','✅','واضح ومحدد','var(--green)');
         else         set('wkCheckCTA','wkCheckCTAVal','❌','غير واضح — يخسرك عملاء في مرحلة الشراء','var(--red)');
 
@@ -485,22 +650,22 @@ document.addEventListener("DOMContentLoaded", () => {
         else              set('wkCheckContent','wkCheckContentVal','⚠️','محتوى البيع أكثر من اللازم — يبيع قبل أن يبني ثقة','var(--yellow)');
 
         // — الإعلانات —
-        const hasAds = sr.hasAds || sr.has_ads || sr.activeAds || (ai.ads_analysis && ai.ads_analysis.has_active_ads);
+        const hasAds = sr2.hasAds || sr2.has_ads || sr2.activeAds || (ai.ads_analysis && ai.ads_analysis.has_active_ads);
         const adsNeedFix = hasAds && score < 55;
         if (!hasAds)       set('wkCheckAds','wkCheckAdsVal','⚠️','لا توجد إعلانات نشطة مكتشفة','var(--yellow)');
         else if (adsNeedFix) set('wkCheckAds','wkCheckAdsVal','⚠️','الإعلان موجود لكن يحتاج تعديل في الاستهداف','var(--yellow)');
         else               set('wkCheckAds','wkCheckAdsVal','✅','الإعلانات تعمل بشكل جيد','var(--green)');
 
         // — التتبع التقني (Pixel / Analytics) —
-        const hasPixel = sr.hasPixel || sr.has_pixel || sr.hasFbPixel;
-        const hasGA    = sr.hasGA || sr.has_ga || sr.hasAnalytics;
+        const hasPixel = sr2.hasPixel || sr2.has_pixel || sr2.hasFbPixel;
+        const hasGA    = sr2.hasGA || sr2.has_ga || sr2.hasAnalytics;
         if (hasPixel && hasGA) set('wkCheckPixel','wkCheckPixelVal','✅','Pixel + Analytics مفعّلان','var(--green)');
         else if (hasPixel || hasGA) set('wkCheckPixel','wkCheckPixelVal','⚠️',`${hasPixel?'Pixel':'Analytics'} مفعّل — الآخر مفقود`,'var(--yellow)');
         else set('wkCheckPixel','wkCheckPixelVal','❌','Pixel و Analytics غير مربوطَين — بيانات الحملات تضيع','var(--red)');
 
         // — التفاعل —
-        const engRate = sr.engagementRate || sr.engagement_rate || sr.avg_engagement || 0;
-        const igFol   = sr.instagramFollowers || sr.ig_followers || 0;
+        const engRate = sr2.engagementRate || sr2.engagement_rate || sr2.avg_engagement || 0;
+        const igFol   = sr2.instagramFollowers || sr2.ig_followers || 0;
         if (engRate >= 3)       set('wkCheckEng','wkCheckEngVal','✅',`معدل تفاعل ${engRate}% — ممتاز`,'var(--green)');
         else if (engRate >= 1)  set('wkCheckEng','wkCheckEngVal','⚠️',`معدل تفاعل ${engRate}% — أقل من المتوسط (3%)`,'var(--yellow)');
         else if (igFol > 0)     set('wkCheckEng','wkCheckEngVal','❌','تفاعل منخفض — يضر بالظهور العضوي','var(--red)');
@@ -514,20 +679,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (recViewAllEl) recViewAllEl.href = 'recommendations.html?id=' + curId;
 
         if (resultRecsList && recs.length > 0) {
-          const highRecs = recs.filter(r => r.priority === 'high');
+          const highRecs = recs.filter(r => r.priority === 'critical' || r.priority === 'high');
           const preview  = (highRecs.length >= 3 ? highRecs : recs).slice(0, 3);
-          const priColor = p => p === 'high' ? 'var(--red)' : p === 'low' ? 'var(--green)' : 'var(--yellow)';
-          const priRgb   = p => p === 'high' ? '239,68,68' : p === 'low' ? '16,185,129' : '234,179,8';
-          const priLabel = p => p === 'high' ? 'عاجل' : p === 'low' ? 'مستقبلي' : 'متوسط';
+          const priColor = p => (p === 'critical' || p === 'high') ? 'var(--red)' : p === 'low' ? 'var(--green)' : 'var(--yellow)';
+          const priRgb   = p => (p === 'critical' || p === 'high') ? '239,68,68' : p === 'low' ? '16,185,129' : '234,179,8';
+          const priLabel = p => p === 'critical' ? 'حرجة' : p === 'high' ? 'عاجل' : p === 'low' ? 'مستقبلي' : 'متوسط';
           resultRecsList.innerHTML = preview.map(rec => {
             const p   = rec.priority || 'medium';
             const ac  = priColor(p); const ar = priRgb(p);
-            const icon = rec.icon || (p === 'high' ? '🛡️' : p === 'low' ? '🤝' : '✍️');
+            const icon = rec.icon || (p === 'critical' ? '🛑' : p === 'high' ? '🛡️' : p === 'low' ? '🤝' : '✍️');
             const step1   = (rec.bullets && rec.bullets[0]) ? `<div style="margin-top:8px;font-size:12px;color:var(--text-gray);font-weight:700;">▶ ${sanitize(rec.bullets[0])}</div>` : '';
             const whyNow  = rec.why_now  ? `<div style="font-size:11px;font-weight:800;color:${ac};margin-top:6px;">⚡ ${sanitize(rec.why_now)}</div>` : '';
             const roiBox  = rec.roi      ? `<div style="margin-top:10px;padding:6px 12px;background:rgba(${ar},0.08);border:1px solid rgba(${ar},0.2);border-radius:8px;font-size:12px;font-weight:800;color:${ac};">💰 ${sanitize(rec.roi)}</div>` : '';
             return `<div style="background:rgba(${ar},0.04);border:1px solid rgba(${ar},0.2);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
-              <div style="position:absolute;top:0;right:0;background:${ac};color:${p==='medium'?'#000':'#fff'};font-size:10px;font-weight:900;padding:3px 12px;border-radius:0 16px 0 10px;">${priLabel(p)}</div>
+              <div style="position:absolute;top:0;right:0;background:${ac};color:${p==='medium'?'#000':'#fff'};font-size:10px;font-weight:900;padding:3px 12px;border-radius:0 16px 0 10px;">${priLabel(p)}${p==='critical'?' ⚠️':''}</div>
               <div style="display:flex;align-items:flex-start;gap:14px;margin-top:8px;">
                 <div style="font-size:22px;flex-shrink:0;">${icon}</div>
                 <div style="flex:1;">
@@ -546,99 +711,210 @@ document.addEventListener("DOMContentLoaded", () => {
       // ==========================================
       if (path.includes('strengths.html')) {
         // ── تعريف score محلي خاص بهذه الصفحة ──
-        const score = data.score || 50;
+        const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
         const strList = document.getElementById('strengthsList');
         const strengths = (ai && ai.strengths && ai.strengths.length > 0) ? ai.strengths : null;
 
-        if (strList && strengths) {
-          let html = '';
+        // إزالة رسالة التحميل
+        const loadingMsg = document.getElementById('strLoadingMsg');
+        if (loadingMsg) loadingMsg.remove();
+
+        if (strList && strengths && strengths.length > 0) {
+          // بناء بـ createElement — آمن مع CSP
+          while (strList.firstChild) strList.removeChild(strList.firstChild);
           strengths.forEach((str, i) => {
             const iconMap = ['🎨','🖼️','💬','📅','⏱️','💡','🔥','🚀'];
 
-            // ── دالة مساعدة لبناء التفاصيل (bullets + metric + action) ──
-            const buildDetails = (accentColor, accentColorRgb) => {
-              const metricHtml = str.metric
-                ? `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(${accentColorRgb},0.12); border:1px solid rgba(${accentColorRgb},0.25); padding:5px 12px; border-radius:8px; font-size:12px; font-weight:800; color:${accentColor}; margin:10px 0 8px 0;">📊 ${sanitize(str.metric)}</div>`
-                : '';
-              const bulletsHtml = (str.bullets && str.bullets.length)
-                ? `<ul style="margin:6px 0 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:5px;">
-                    ${str.bullets.map(b => `<li style="font-size:13px; color:var(--text-gray); font-weight:600; display:flex; align-items:flex-start; gap:7px;"><span style="color:${accentColor}; flex-shrink:0; margin-top:2px;">◈</span>${sanitize(b)}</li>`).join('')}
-                   </ul>`
-                : '';
-              const actionHtml = str.action
-                ? `<div style="margin-top:12px; padding:8px 14px; background:rgba(${accentColorRgb},0.08); border-right:3px solid ${accentColor}; border-radius:6px; font-size:13px; font-weight:800; color:${accentColor};">⚡ الإجراء: ${sanitize(str.action)}</div>`
-                : '';
-              return metricHtml + bulletsHtml + actionHtml;
+            // ── دالة مساعدة لبناء التفاصيل (bullets + metric + action) بـ createElement ──
+            const appendDetails = (parent, accentColor, accentColorRgb) => {
+              if (str.metric) {
+                const metricDiv = document.createElement('div');
+                metricDiv.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:rgba('+accentColorRgb+',0.12);border:1px solid rgba('+accentColorRgb+',0.25);padding:5px 12px;border-radius:8px;font-size:12px;font-weight:800;color:'+accentColor+';margin:10px 0 8px 0;';
+                metricDiv.textContent = '📊 ' + str.metric;
+                parent.appendChild(metricDiv);
+              }
+              if (str.bullets && str.bullets.length) {
+                const bulletsUl = document.createElement('ul');
+                bulletsUl.style.cssText = 'margin:6px 0 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;';
+                str.bullets.forEach(b => {
+                  const bLi = document.createElement('li');
+                  bLi.style.cssText = 'font-size:13px;color:var(--text-gray);font-weight:600;display:flex;align-items:flex-start;gap:7px;';
+                  const bMark = document.createElement('span');
+                  bMark.style.cssText = 'color:'+accentColor+';flex-shrink:0;margin-top:2px;';
+                  bMark.textContent = '◈';
+                  bLi.appendChild(bMark);
+                  bLi.appendChild(document.createTextNode(b));
+                  bulletsUl.appendChild(bLi);
+                });
+                parent.appendChild(bulletsUl);
+              }
+              if (str.action) {
+                const actionDiv = document.createElement('div');
+                actionDiv.style.cssText = 'margin-top:12px;padding:8px 14px;background:rgba('+accentColorRgb+',0.08);border-right:3px solid '+accentColor+';border-radius:6px;font-size:13px;font-weight:800;color:'+accentColor+';';
+                actionDiv.textContent = '⚡ الإجراء: ' + str.action;
+                parent.appendChild(actionDiv);
+              }
             };
 
-            // ── النقطة 1: ما يميز الحساب (الأولى دائماً بالموضع) ──
+            // ── النقطة 1: ما يميز الحساب ──
             if (i === 0) {
-              html += `
-              <div class="detail-item d-excellent" style="border:1px solid rgba(245,142,26,0.3); background:linear-gradient(135deg,rgba(245,142,26,0.08),rgba(245,142,26,0.02)); position:relative; overflow:hidden; flex-direction:column; align-items:flex-start;">
-                <div style="position:absolute;top:0;right:0;background:var(--primary);color:#fff;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;">✨ ما يميز الحساب</div>
-                <div style="display:flex; align-items:flex-start; gap:20px; width:100%; margin-top:16px;">
-                  <div class="d-icon" style="background:rgba(245,142,26,0.15);border:1px solid rgba(245,142,26,0.3);color:var(--primary);font-size:26px;flex-shrink:0;">🏆</div>
-                  <div style="flex:1;">
-                    <h4 style="color:var(--primary); font-size:17px; margin-bottom:6px;">${sanitize(str.title || 'ما يميز الحساب')}</h4>
-                    <p style="color:var(--text-gray); font-size:14px; line-height:1.6;">${sanitize(str.desc || str.description || '')}</p>
-                    ${buildDetails('var(--primary)', '245,142,26')}
-                  </div>
-                  <div class="d-score" style="flex-direction:column; align-items:center; min-width:70px;">
-                    <span class="d-score-text" style="color:var(--primary); font-size:12px;">تميز</span>
-                    <span class="d-score-num" data-val="${str.score || 90}" style="border-color:rgba(245,142,26,0.3);color:var(--primary);font-size:28px;">${str.score || 90}</span>
-                  </div>
-                </div>
-              </div>`;
+              const item = document.createElement('div');
+              item.className = 'detail-item d-excellent';
+              item.style.cssText = 'border:1px solid rgba(245,142,26,0.3);background:linear-gradient(135deg,rgba(245,142,26,0.08),rgba(245,142,26,0.02));position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;';
+
+              const badge = document.createElement('div');
+              badge.style.cssText = 'position:absolute;top:0;right:0;background:var(--primary);color:#fff;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;';
+              badge.textContent = '✨ ما يميز الحساب';
+
+              const innerWrap = document.createElement('div');
+              innerWrap.style.cssText = 'display:flex;align-items:flex-start;gap:20px;width:100%;margin-top:16px;';
+
+              const iconDiv = document.createElement('div');
+              iconDiv.className = 'd-icon';
+              iconDiv.style.cssText = 'background:rgba(245,142,26,0.15);border:1px solid rgba(245,142,26,0.3);color:var(--primary);font-size:26px;flex-shrink:0;';
+              iconDiv.textContent = '🏆';
+
+              const contentDiv = document.createElement('div');
+              contentDiv.style.flex = '1';
+              const h4 = document.createElement('h4');
+              h4.style.cssText = 'color:var(--primary);font-size:17px;margin-bottom:6px;';
+              h4.textContent = str.title || 'ما يميز الحساب';
+              const p = document.createElement('p');
+              p.style.cssText = 'color:var(--text-gray);font-size:14px;line-height:1.6;';
+              p.textContent = str.desc || str.description || '';
+              contentDiv.appendChild(h4);
+              contentDiv.appendChild(p);
+              appendDetails(contentDiv, 'var(--primary)', '245,142,26');
+
+              const scoreDiv = document.createElement('div');
+              scoreDiv.className = 'd-score';
+              scoreDiv.style.cssText = 'flex-direction:column;align-items:center;min-width:70px;';
+              const scoreText = document.createElement('span');
+              scoreText.className = 'd-score-text';
+              scoreText.style.cssText = 'color:var(--primary);font-size:12px;';
+              scoreText.textContent = 'تميز';
+              const scoreNum = document.createElement('span');
+              scoreNum.className = 'd-score-num';
+              scoreNum.setAttribute('data-val', str.score || 90);
+              scoreNum.style.cssText = 'border-color:rgba(245,142,26,0.3);color:var(--primary);font-size:28px;';
+              scoreNum.textContent = str.score || 90;
+              scoreDiv.appendChild(scoreText);
+              scoreDiv.appendChild(scoreNum);
+
+              innerWrap.appendChild(iconDiv);
+              innerWrap.appendChild(contentDiv);
+              innerWrap.appendChild(scoreDiv);
+              item.appendChild(badge);
+              item.appendChild(innerWrap);
+              strList.appendChild(item);
               return;
             }
 
-            // ── النقطة 2: ما يمكن البناء عليه (الثانية دائماً بالموضع) ──
+            // ── النقطة 2: ما يمكن البناء عليه ──
             if (i === 1) {
-              html += `
-              <div class="detail-item d-vgood" style="border:1px solid rgba(16,185,129,0.3); background:linear-gradient(135deg,rgba(16,185,129,0.08),rgba(16,185,129,0.02)); position:relative; overflow:hidden; flex-direction:column; align-items:flex-start;">
-                <div style="position:absolute;top:0;right:0;background:var(--green);color:#fff;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;">🛠️ ما يمكن البناء عليه</div>
-                <div style="display:flex; align-items:flex-start; gap:20px; width:100%; margin-top:16px;">
-                  <div class="d-icon" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:var(--green);font-size:26px;flex-shrink:0;">📈</div>
-                  <div style="flex:1;">
-                    <h4 style="color:var(--green); font-size:17px; margin-bottom:6px;">${sanitize(str.title || 'ما يمكن البناء عليه')}</h4>
-                    <p style="color:var(--text-gray); font-size:14px; line-height:1.6;">${sanitize(str.desc || str.description || '')}</p>
-                    ${buildDetails('var(--green)', '16,185,129')}
-                  </div>
-                  <div class="d-score" style="flex-direction:column; align-items:center; min-width:70px;">
-                    <span class="d-score-text" style="color:var(--green); font-size:12px;">أساس</span>
-                    <span class="d-score-num" data-val="${str.score || 85}" style="border-color:rgba(16,185,129,0.3);color:var(--green);font-size:28px;">${str.score || 85}</span>
-                  </div>
-                </div>
-              </div>`;
+              const item = document.createElement('div');
+              item.className = 'detail-item d-vgood';
+              item.style.cssText = 'border:1px solid rgba(16,185,129,0.3);background:linear-gradient(135deg,rgba(16,185,129,0.08),rgba(16,185,129,0.02));position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;';
+
+              const badge = document.createElement('div');
+              badge.style.cssText = 'position:absolute;top:0;right:0;background:var(--green);color:#fff;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;';
+              badge.textContent = '🛠️ ما يمكن البناء عليه';
+
+              const innerWrap = document.createElement('div');
+              innerWrap.style.cssText = 'display:flex;align-items:flex-start;gap:20px;width:100%;margin-top:16px;';
+
+              const iconDiv = document.createElement('div');
+              iconDiv.className = 'd-icon';
+              iconDiv.style.cssText = 'background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:var(--green);font-size:26px;flex-shrink:0;';
+              iconDiv.textContent = '📈';
+
+              const contentDiv = document.createElement('div');
+              contentDiv.style.flex = '1';
+              const h4 = document.createElement('h4');
+              h4.style.cssText = 'color:var(--green);font-size:17px;margin-bottom:6px;';
+              h4.textContent = str.title || 'ما يمكن البناء عليه';
+              const p = document.createElement('p');
+              p.style.cssText = 'color:var(--text-gray);font-size:14px;line-height:1.6;';
+              p.textContent = str.desc || str.description || '';
+              contentDiv.appendChild(h4);
+              contentDiv.appendChild(p);
+              appendDetails(contentDiv, 'var(--green)', '16,185,129');
+
+              const scoreDiv = document.createElement('div');
+              scoreDiv.className = 'd-score';
+              scoreDiv.style.cssText = 'flex-direction:column;align-items:center;min-width:70px;';
+              const scoreText = document.createElement('span');
+              scoreText.className = 'd-score-text';
+              scoreText.style.cssText = 'color:var(--green);font-size:12px;';
+              scoreText.textContent = 'أساس';
+              const scoreNum = document.createElement('span');
+              scoreNum.className = 'd-score-num';
+              scoreNum.setAttribute('data-val', str.score || 85);
+              scoreNum.style.cssText = 'border-color:rgba(16,185,129,0.3);color:var(--green);font-size:28px;';
+              scoreNum.textContent = str.score || 85;
+              scoreDiv.appendChild(scoreText);
+              scoreDiv.appendChild(scoreNum);
+
+              innerWrap.appendChild(iconDiv);
+              innerWrap.appendChild(contentDiv);
+              innerWrap.appendChild(scoreDiv);
+              item.appendChild(badge);
+              item.appendChild(innerWrap);
+              strList.appendChild(item);
               return;
             }
 
-            // ── النقاط 3-5: تصميم عادي مع تفاصيل ──
+            // ── النقاط 3+: تصميم عادي مع تفاصيل ──
             const itemScore = str.score || Math.max(70, 95 - (i * 5));
-            const scoreText = itemScore >= 90 ? 'ممتاز' : itemScore >= 80 ? 'جيد جداً' : itemScore >= 70 ? 'جيد' : 'متوسط';
+            const scoreLabel = itemScore >= 90 ? 'ممتاز' : itemScore >= 80 ? 'جيد جداً' : itemScore >= 70 ? 'جيد' : 'متوسط';
             const dClass   = itemScore >= 90 ? 'd-excellent' : itemScore >= 80 ? 'd-vgood' : 'd-good';
             const acColor  = itemScore >= 80 ? 'var(--green)' : 'var(--yellow)';
             const acRgb    = itemScore >= 80 ? '16,185,129' : '234,179,8';
             const icon     = str.icon || iconMap[i % iconMap.length];
-            html += `
-              <div class="detail-item ${dClass}" style="flex-direction:column; align-items:flex-start;">
-                <div style="display:flex; align-items:flex-start; gap:20px; width:100%;">
-                  <div class="d-icon" style="flex-shrink:0;">${icon}</div>
-                  <div style="flex:1;">
-                    <h4>${sanitize(str.title || 'نقطة قوة')}</h4>
-                    <p>${sanitize(str.desc || str.description || '')}</p>
-                    ${buildDetails(acColor, acRgb)}
-                  </div>
-                  <div class="d-score" style="flex-direction:column; align-items:center; min-width:70px; flex-shrink:0;">
-                    <span class="d-score-text">${scoreText}</span>
-                    <span class="d-score-num" data-val="${itemScore}" style="font-size:28px;">${itemScore}</span>
-                  </div>
-                </div>
-              </div>
-            `;
+
+            const item = document.createElement('div');
+            item.className = 'detail-item ' + dClass;
+            item.style.cssText = 'flex-direction:column;align-items:flex-start;';
+
+            const innerWrap = document.createElement('div');
+            innerWrap.style.cssText = 'display:flex;align-items:flex-start;gap:20px;width:100%;';
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'd-icon';
+            iconDiv.style.flexShrink = '0';
+            iconDiv.textContent = icon;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.flex = '1';
+            const h4 = document.createElement('h4');
+            h4.textContent = str.title || 'نقطة قوة';
+            const p = document.createElement('p');
+            p.textContent = str.desc || str.description || '';
+            contentDiv.appendChild(h4);
+            contentDiv.appendChild(p);
+            appendDetails(contentDiv, acColor, acRgb);
+
+            const scoreDiv = document.createElement('div');
+            scoreDiv.className = 'd-score';
+            scoreDiv.style.cssText = 'flex-direction:column;align-items:center;min-width:70px;flex-shrink:0;';
+            const scoreTextEl = document.createElement('span');
+            scoreTextEl.className = 'd-score-text';
+            scoreTextEl.textContent = scoreLabel;
+            const scoreNumEl = document.createElement('span');
+            scoreNumEl.className = 'd-score-num';
+            scoreNumEl.setAttribute('data-val', itemScore);
+            scoreNumEl.style.fontSize = '28px';
+            scoreNumEl.textContent = itemScore;
+            scoreDiv.appendChild(scoreTextEl);
+            scoreDiv.appendChild(scoreNumEl);
+
+            innerWrap.appendChild(iconDiv);
+            innerWrap.appendChild(contentDiv);
+            innerWrap.appendChild(scoreDiv);
+            item.appendChild(innerWrap);
+            strList.appendChild(item);
           });
 
-          strList.innerHTML = html;
           // تشغيل العداد على الأرقام المولودة ديناميكياً
           setTimeout(() => { animateCounters(); animateRings(); }, 100);
         }
@@ -654,12 +930,24 @@ document.addEventListener("DOMContentLoaded", () => {
           strClientName.style.fontSize = '';
         }
         if (strClientHandle) {
-          strClientHandle.textContent = srObj.instagram_url
-            ? srObj.instagram_url.replace(/https?:\/\/(www\.)?instagram\.com\//, '@')
-            : '@' + (clientName || '—').replace(/\s+/g, '_').toLowerCase();
+          // يقرأ من data مباشرة أولاً، ثم من scan_result كبديل
+          const igUrl = data.instagram_url || srObj.instagram_url || '';
+          const fbUrl = data.facebook_url  || srObj.facebook_url  || '';
+          if (igUrl) {
+            strClientHandle.textContent = igUrl.replace(/https?:\/\/(www\.)?instagram\.com\//, '@').replace(/\/$/, '');
+          } else if (fbUrl) {
+            strClientHandle.textContent = fbUrl.replace(/https?:\/\/(www\.)?facebook\.com\//, '@').replace(/\/$/, '');
+          } else {
+            strClientHandle.textContent = '@' + (clientName || '—').replace(/\s+/g, '_').toLowerCase();
+          }
         }
-        if (pAccType && ai.page_type) pAccType.textContent = ai.page_type;
-        if (pNiche   && ai.niche)     pNiche.textContent   = ai.niche;
+        // fallback لنوع الحساب والمجال
+        if (pAccType) {
+          pAccType.textContent = ai.page_type || data.project_type || 'غير محدد من البيانات';
+        }
+        if (pNiche) {
+          pNiche.textContent = ai.niche || 'غير محدد من البيانات';
+        }
 
         // Update Mini Score Card
         const strScore  = document.getElementById('strScore');
@@ -677,14 +965,14 @@ document.addEventListener("DOMContentLoaded", () => {
           strCircle.setAttribute('data-color', color);
         }
         if (strTitle && score) {
-          if (score >= 70) { strTitle.innerHTML = '✅ ممتاز'; strTitle.style.color = 'var(--green)'; }
-          else if (score >= 50) { strTitle.innerHTML = '😊 جيد'; strTitle.style.color = 'var(--yellow)'; }
-          else { strTitle.innerHTML = '⚠️ ضعيف'; strTitle.style.color = 'var(--red)'; }
+          if (score >= 70) { strTitle.textContent = '✅ ممتاز'; strTitle.style.color = 'var(--green)'; }
+          else if (score >= 50) { strTitle.textContent = '😊 جيد'; strTitle.style.color = 'var(--yellow)'; }
+          else { strTitle.textContent = '⚠️ ضعيف'; strTitle.style.color = 'var(--red)'; }
         }
         if (strDesc && score) {
-           if (score >= 70) strDesc.innerHTML = 'لديك أساس ممتاز ومتقدم للعمل عليه.';
-           else if (score >= 40) strDesc.innerHTML = 'لديك أساس جيد للعمل عليه، لكن هناك <strong>فرص مهمة</strong> للتحسين.';
-           else strDesc.innerHTML = 'هناك ثغرات تستنزف فرصك، لكن نقاط القوة أدناه هي نواة للنمو.';
+           if (score >= 70) strDesc.textContent = 'لديك أساس ممتاز ومتقدم للعمل عليه.';
+           else if (score >= 40) strDesc.textContent = 'لديك أساس جيد للعمل عليه، لكن هناك فرص مهمة للتحسين.';
+           else strDesc.textContent = 'هناك ثغرات تستنزف فرصك، لكن نقاط القوة أدناه هي نواة للنمو.';
         }
       }
 
@@ -692,7 +980,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // PAGE: weaknesses.html
       // ==========================================
       if (path.includes('weaknesses.html')) {
-        const score = data.score || 50;
+        const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
         const wkList = document.getElementById('weaknessesList');
         const weaknesses = (ai && ai.weaknesses && ai.weaknesses.length > 0) ? ai.weaknesses : null;
 
@@ -720,39 +1008,54 @@ document.addEventListener("DOMContentLoaded", () => {
           weakCircle.setAttribute('data-color', riskColor);
         }
         if (weakTitle) {
-          if (riskVal >= 60)      { weakTitle.innerHTML = '🔴 خطر عالٍ'; weakTitle.style.color = 'var(--red)'; }
-          else if (riskVal >= 35) { weakTitle.innerHTML = '⚠️ يحتاج تدخلاً'; weakTitle.style.color = 'var(--yellow)'; }
-          else                    { weakTitle.innerHTML = '✅ تحت السيطرة'; weakTitle.style.color = 'var(--green)'; }
+          if (riskVal >= 60)      { weakTitle.textContent = '🔴 خطر عالٍ'; weakTitle.style.color = 'var(--red)'; }
+          else if (riskVal >= 35) { weakTitle.textContent = '⚠️ يحتاج تدخلاً'; weakTitle.style.color = 'var(--yellow)'; }
+          else                    { weakTitle.textContent = '✅ تحت السيطرة'; weakTitle.style.color = 'var(--green)'; }
         }
         if (weakDesc) {
-          if (riskVal >= 60)      weakDesc.innerHTML = 'هناك <strong>ثغرات حرجة</strong> تستنزف فرصك يومياً — تدخل عاجل مطلوب.';
-          else if (riskVal >= 35) weakDesc.innerHTML = 'بعض <strong>نقاط الاختناق</strong> تؤثر على معدل التحويل والمبيعات.';
-          else                    weakDesc.innerHTML = 'الوضع <strong>تحت السيطرة</strong>، لكن هناك فرص تحسين قابلة للتنفيذ.';
+          if (riskVal >= 60)      weakDesc.textContent = 'هناك ثغرات حرجة تستنزف فرصك يومياً — تدخل عاجل مطلوب.';
+          else if (riskVal >= 35) weakDesc.textContent = 'بعض نقاط الاختناق تؤثر على معدل التحويل والمبيعات.';
+          else                    weakDesc.textContent = 'الوضع تحت السيطرة، لكن هناك فرص تحسين قابلة للتنفيذ.';
         }
 
-        // ── 3. قائمة نقاط الضعف ──
+        // ── 3. قائمة نقاط الضعف (بـ createElement — آمن مع CSP) ──
         const iconMap = ['🚧','⛔','📢','🎯','⚡','🔍','📉','💸'];
 
-        // دالة مساعدة لبناء تفاصيل الضعف
-        const buildWkDetails = (w, acColor, acRgb) => {
-          const metricHtml = w.metric
-            ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(${acRgb},0.12);border:1px solid rgba(${acRgb},0.25);padding:5px 12px;border-radius:8px;font-size:12px;font-weight:800;color:${acColor};margin:10px 0 8px 0;">📊 ${sanitize(w.metric)}</div>`
-            : '';
-          const bulletsHtml = (w.bullets && w.bullets.length)
-            ? `<ul style="margin:6px 0 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;">
-                ${w.bullets.map(b => `<li style="font-size:13px;color:var(--text-gray);font-weight:600;display:flex;align-items:flex-start;gap:7px;"><span style="color:${acColor};flex-shrink:0;margin-top:2px;">◈</span>${sanitize(b)}</li>`).join('')}
-               </ul>`
-            : '';
-          const actionHtml = w.action
-            ? `<div style="margin-top:12px;padding:8px 14px;background:rgba(${acRgb},0.08);border-right:3px solid ${acColor};border-radius:6px;font-size:13px;font-weight:800;color:${acColor};">⚡ الحل الفوري: ${sanitize(w.action)}</div>`
-            : '';
-          return metricHtml + bulletsHtml + actionHtml;
+        // دالة مساعدة لبناء تفاصيل الضعف بـ createElement
+        const appendWkDetails = (parent, w, acColor, acRgb) => {
+          if (w.metric) {
+            const metricDiv = document.createElement('div');
+            metricDiv.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:rgba('+acRgb+',0.12);border:1px solid rgba('+acRgb+',0.25);padding:5px 12px;border-radius:8px;font-size:12px;font-weight:800;color:'+acColor+';margin:10px 0 8px 0;';
+            metricDiv.textContent = '📊 ' + w.metric;
+            parent.appendChild(metricDiv);
+          }
+          if (w.bullets && w.bullets.length) {
+            const bulletsUl = document.createElement('ul');
+            bulletsUl.style.cssText = 'margin:6px 0 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;';
+            w.bullets.forEach(b => {
+              const bLi = document.createElement('li');
+              bLi.style.cssText = 'font-size:13px;color:var(--text-gray);font-weight:600;display:flex;align-items:flex-start;gap:7px;';
+              const bMark = document.createElement('span');
+              bMark.style.cssText = 'color:'+acColor+';flex-shrink:0;margin-top:2px;';
+              bMark.textContent = '◈';
+              bLi.appendChild(bMark);
+              bLi.appendChild(document.createTextNode(b));
+              bulletsUl.appendChild(bLi);
+            });
+            parent.appendChild(bulletsUl);
+          }
+          if (w.action) {
+            const actionDiv = document.createElement('div');
+            actionDiv.style.cssText = 'margin-top:12px;padding:8px 14px;background:rgba('+acRgb+',0.08);border-right:3px solid '+acColor+';border-radius:6px;font-size:13px;font-weight:800;color:'+acColor+';';
+            actionDiv.textContent = '⚡ الحل الفوري: ' + w.action;
+            parent.appendChild(actionDiv);
+          }
         };
 
         if (wkList && weaknesses) {
-          let html = '';
+          while (wkList.firstChild) wkList.removeChild(wkList.firstChild);
           weaknesses.forEach((w, i) => {
-            const wObj = typeof w === 'string' ? { title: w.split(':')[0], desc: w } : w;
+            const wObj = typeof w === 'string' ? { title: w.includes(':') ? w.split(':').slice(0,2).join(':').replace(/[\*\-\#]/g,'').trim() : w, desc: w } : w;
             const title  = wObj.title || 'نقطة ضعف';
             const desc   = wObj.desc || wObj.description || '';
             const wScore = wObj.score || Math.max(20, 65 - (i * 8));
@@ -760,184 +1063,174 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // ── البطاقة 1: أهم العوائق الحالية ──
             if (i === 0) {
-              html += `
-              <div class="detail-item d-weak" style="border:1px solid rgba(239,68,68,0.35);background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(239,68,68,0.02));position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;">
-                <div style="position:absolute;top:0;right:0;background:var(--red);color:#fff;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;">🚧 أهم العوائق الحالية</div>
-                <div style="display:flex;align-items:flex-start;gap:20px;width:100%;margin-top:16px;">
-                  <div class="d-icon" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:var(--red);font-size:26px;flex-shrink:0;">⛔</div>
-                  <div style="flex:1;">
-                    <h4 style="color:var(--red);font-size:17px;margin-bottom:6px;">${sanitize(title)}</h4>
-                    ${desc ? `<p style="color:var(--text-gray);font-size:14px;line-height:1.6;">${sanitize(desc)}</p>` : ''}
-                    ${buildWkDetails(wObj, 'var(--red)', '239,68,68')}
-                  </div>
-                  <div class="d-score" style="flex-direction:column;align-items:center;min-width:70px;">
-                    <span class="d-score-text" style="color:var(--red);font-size:12px;">خطر</span>
-                    <span class="d-score-num" data-val="${wScore}" style="border-color:rgba(239,68,68,0.3);color:var(--red);font-size:28px;">${wScore}</span>
-                  </div>
-                </div>
-              </div>`;
+              const item = document.createElement('div');
+              item.className = 'detail-item d-weak';
+              item.style.cssText = 'border:1px solid rgba(239,68,68,0.35);background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(239,68,68,0.02));position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;';
+
+              const badge = document.createElement('div');
+              badge.style.cssText = 'position:absolute;top:0;right:0;background:var(--red);color:#fff;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;';
+              badge.textContent = '🚧 أهم العوائق الحالية';
+
+              const innerWrap = document.createElement('div');
+              innerWrap.style.cssText = 'display:flex;align-items:flex-start;gap:20px;width:100%;margin-top:16px;';
+
+              const iconDiv = document.createElement('div');
+              iconDiv.className = 'd-icon';
+              iconDiv.style.cssText = 'background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:var(--red);font-size:26px;flex-shrink:0;';
+              iconDiv.textContent = '⛔';
+
+              const contentDiv = document.createElement('div');
+              contentDiv.style.flex = '1';
+              const h4 = document.createElement('h4');
+              h4.style.cssText = 'color:var(--red);font-size:17px;margin-bottom:6px;';
+              h4.textContent = title;
+              contentDiv.appendChild(h4);
+              if (desc) {
+                const p = document.createElement('p');
+                p.style.cssText = 'color:var(--text-gray);font-size:14px;line-height:1.6;';
+                p.textContent = desc;
+                contentDiv.appendChild(p);
+              }
+              appendWkDetails(contentDiv, wObj, 'var(--red)', '239,68,68');
+
+              const scoreDiv = document.createElement('div');
+              scoreDiv.className = 'd-score';
+              scoreDiv.style.cssText = 'flex-direction:column;align-items:center;min-width:70px;';
+              const scoreText = document.createElement('span');
+              scoreText.className = 'd-score-text';
+              scoreText.style.cssText = 'color:var(--red);font-size:12px;';
+              scoreText.textContent = 'خطر';
+              const scoreNum = document.createElement('span');
+              scoreNum.className = 'd-score-num';
+              scoreNum.setAttribute('data-val', wScore);
+              scoreNum.style.cssText = 'border-color:rgba(239,68,68,0.3);color:var(--red);font-size:28px;';
+              scoreNum.textContent = wScore;
+              scoreDiv.appendChild(scoreText);
+              scoreDiv.appendChild(scoreNum);
+
+              innerWrap.appendChild(iconDiv);
+              innerWrap.appendChild(contentDiv);
+              innerWrap.appendChild(scoreDiv);
+              item.appendChild(badge);
+              item.appendChild(innerWrap);
+              wkList.appendChild(item);
               return;
             }
 
             // ── البطاقة 2: ما الذي يوقف النمو ──
             if (i === 1) {
-              html += `
-              <div class="detail-item d-avg" style="border:1px solid rgba(234,179,8,0.35);background:linear-gradient(135deg,rgba(234,179,8,0.08),rgba(234,179,8,0.02));position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;">
-                <div style="position:absolute;top:0;right:0;background:var(--yellow);color:#000;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;">⛔ ما يوقف النمو</div>
-                <div style="display:flex;align-items:flex-start;gap:20px;width:100%;margin-top:16px;">
-                  <div class="d-icon" style="background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.3);color:var(--yellow);font-size:26px;flex-shrink:0;">📉</div>
-                  <div style="flex:1;">
-                    <h4 style="color:var(--yellow);font-size:17px;margin-bottom:6px;">${sanitize(title)}</h4>
-                    ${desc ? `<p style="color:var(--text-gray);font-size:14px;line-height:1.6;">${sanitize(desc)}</p>` : ''}
-                    ${buildWkDetails(wObj, 'var(--yellow)', '234,179,8')}
-                  </div>
-                  <div class="d-score" style="flex-direction:column;align-items:center;min-width:70px;">
-                    <span class="d-score-text" style="color:var(--yellow);font-size:12px;">عائق</span>
-                    <span class="d-score-num" data-val="${wScore}" style="border-color:rgba(234,179,8,0.3);color:var(--yellow);font-size:28px;">${wScore}</span>
-                  </div>
-                </div>
-              </div>`;
+              const item = document.createElement('div');
+              item.className = 'detail-item d-avg';
+              item.style.cssText = 'border:1px solid rgba(234,179,8,0.35);background:linear-gradient(135deg,rgba(234,179,8,0.08),rgba(234,179,8,0.02));position:relative;overflow:hidden;flex-direction:column;align-items:flex-start;';
+
+              const badge = document.createElement('div');
+              badge.style.cssText = 'position:absolute;top:0;right:0;background:var(--yellow);color:#000;font-size:11px;font-weight:900;padding:4px 14px;border-radius:0 var(--radius) 0 12px;';
+              badge.textContent = '⛔ ما يوقف النمو';
+
+              const innerWrap = document.createElement('div');
+              innerWrap.style.cssText = 'display:flex;align-items:flex-start;gap:20px;width:100%;margin-top:16px;';
+
+              const iconDiv = document.createElement('div');
+              iconDiv.className = 'd-icon';
+              iconDiv.style.cssText = 'background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.3);color:var(--yellow);font-size:26px;flex-shrink:0;';
+              iconDiv.textContent = '📉';
+
+              const contentDiv = document.createElement('div');
+              contentDiv.style.flex = '1';
+              const h4 = document.createElement('h4');
+              h4.style.cssText = 'color:var(--yellow);font-size:17px;margin-bottom:6px;';
+              h4.textContent = title;
+              contentDiv.appendChild(h4);
+              if (desc) {
+                const p = document.createElement('p');
+                p.style.cssText = 'color:var(--text-gray);font-size:14px;line-height:1.6;';
+                p.textContent = desc;
+                contentDiv.appendChild(p);
+              }
+              appendWkDetails(contentDiv, wObj, 'var(--yellow)', '234,179,8');
+
+              const scoreDiv = document.createElement('div');
+              scoreDiv.className = 'd-score';
+              scoreDiv.style.cssText = 'flex-direction:column;align-items:center;min-width:70px;';
+              const scoreText = document.createElement('span');
+              scoreText.className = 'd-score-text';
+              scoreText.style.cssText = 'color:var(--yellow);font-size:12px;';
+              scoreText.textContent = 'عائق';
+              const scoreNum = document.createElement('span');
+              scoreNum.className = 'd-score-num';
+              scoreNum.setAttribute('data-val', wScore);
+              scoreNum.style.cssText = 'border-color:rgba(234,179,8,0.3);color:var(--yellow);font-size:28px;';
+              scoreNum.textContent = wScore;
+              scoreDiv.appendChild(scoreText);
+              scoreDiv.appendChild(scoreNum);
+
+              innerWrap.appendChild(iconDiv);
+              innerWrap.appendChild(contentDiv);
+              innerWrap.appendChild(scoreDiv);
+              item.appendChild(badge);
+              item.appendChild(innerWrap);
+              wkList.appendChild(item);
               return;
             }
 
-            // ── البطاقات 3-5: عادية ──
+            // ── البطاقات 3+: عادية ──
             const acColor = wScore < 45 ? 'var(--red)' : 'var(--yellow)';
             const acRgb   = wScore < 45 ? '239,68,68' : '234,179,8';
             const dClass  = wScore < 45 ? 'd-weak' : 'd-avg';
             const sLabel  = wScore < 45 ? 'ضعيف جداً' : wScore < 60 ? 'ضعيف' : 'متوسط';
             const icon    = wObj.icon || iconMap[i % iconMap.length];
-            html += `
-              <div class="detail-item ${dClass}" style="flex-direction:column;align-items:flex-start;">
-                <div style="display:flex;align-items:flex-start;gap:20px;width:100%;">
-                  <div class="d-icon" style="flex-shrink:0;">${icon}</div>
-                  <div style="flex:1;">
-                    <h4 style="color:${acColor};">${sanitize(title)}</h4>
-                    ${desc ? `<p>${sanitize(desc)}</p>` : ''}
-                    ${buildWkDetails(wObj, acColor, acRgb)}
-                  </div>
-                  <div class="d-score" style="flex-direction:column;align-items:center;min-width:70px;flex-shrink:0;">
-                    <span class="d-score-text" style="color:${acColor};">${sLabel}</span>
-                    <span class="d-score-num" data-val="${wScore}" style="font-size:28px;color:${acColor};">${wScore}</span>
-                  </div>
-                </div>
-              </div>`;
+
+            const item = document.createElement('div');
+            item.className = 'detail-item ' + dClass;
+            item.style.cssText = 'flex-direction:column;align-items:flex-start;';
+
+            const innerWrap = document.createElement('div');
+            innerWrap.style.cssText = 'display:flex;align-items:flex-start;gap:20px;width:100%;';
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'd-icon';
+            iconDiv.style.flexShrink = '0';
+            iconDiv.textContent = icon;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.flex = '1';
+            const h4 = document.createElement('h4');
+            h4.style.color = acColor;
+            h4.textContent = title;
+            contentDiv.appendChild(h4);
+            if (desc) {
+              const p = document.createElement('p');
+              p.textContent = desc;
+              contentDiv.appendChild(p);
+            }
+            appendWkDetails(contentDiv, wObj, acColor, acRgb);
+
+            const scoreDiv = document.createElement('div');
+            scoreDiv.className = 'd-score';
+            scoreDiv.style.cssText = 'flex-direction:column;align-items:center;min-width:70px;flex-shrink:0;';
+            const scoreText = document.createElement('span');
+            scoreText.className = 'd-score-text';
+            scoreText.style.color = acColor;
+            scoreText.textContent = sLabel;
+            const scoreNum = document.createElement('span');
+            scoreNum.className = 'd-score-num';
+            scoreNum.setAttribute('data-val', wScore);
+            scoreNum.style.cssText = 'font-size:28px;color:'+acColor+';';
+            scoreNum.textContent = wScore;
+            scoreDiv.appendChild(scoreText);
+            scoreDiv.appendChild(scoreNum);
+
+            innerWrap.appendChild(iconDiv);
+            innerWrap.appendChild(contentDiv);
+            innerWrap.appendChild(scoreDiv);
+            item.appendChild(innerWrap);
+            wkList.appendChild(item);
           });
-          wkList.innerHTML = html;
           setTimeout(() => { animateCounters(); animateRings(); }, 100);
         }
       }
 
-      // ==========================================
-      // PAGE: recommendations.html (Merged Block)
-      // ==========================================
 
-      if (path.includes('recommendations.html')) {
-        const recClientName = document.getElementById('recClientName');
-        const recHandle = document.getElementById('recHandle');
-        const recTotalCount = document.getElementById('recTotalCount');
-
-        if (recClientName) recClientName.textContent = clientName;
-        if (recHandle) {
-          recHandle.textContent = srObj.instagram_url ? srObj.instagram_url.replace(/https?:\/\/(www\.)?instagram\.com\//, '@') : '@' + clientName.replace(/\s+/g, '_').toLowerCase();
-        }
-
-        // ── جلب حاويات العرض قبل أي تعديل على DOM ──
-        const recHighList = document.getElementById('recHighList');
-        const recMedList  = document.getElementById('recMedList');
-        const recLowList  = document.getElementById('recLowList');
-        const mainContainer = document.querySelector('.card');
-        const ctaBanner     = document.querySelector('.rec-cta-banner');
-
-        // مسح المحتوى فقط (لا حذف الحاوية لأن IDs بداخلها)
-        if (recHighList) recHighList.innerHTML = '<div style="padding:20px;color:var(--text-gray);">جاري التحميل...</div>';
-        if (recMedList)  recMedList.innerHTML  = '<div style="padding:20px;color:var(--text-gray);">جاري التحميل...</div>';
-        if (recLowList)  recLowList.innerHTML  = '<div style="padding:20px;color:var(--text-gray);">جاري التحميل...</div>';
-
-        if (data.recommendations && data.recommendations.length > 0) {
-          // ── Free tier: عرض 3 توصيات بالضبط (slice(0, 3)). Paid: القائمة كاملة. ──
-          // المصدر: data.package_tier (يأتي من api/result.php مبنياً على
-          // assessments.is_unlocked). الترتيب من الـ AI prompt يضمن أن أول
-          // 3 عناصر هي الأعلى أولوية (recommendations[0..1] = high،
-          // recommendations[2] = medium) — وهذا ما يحدده عرض الباقة المجانية.
-          const isPaidTier  = data.package_tier === 'paid';
-          const visibleRecs = isPaidTier ? data.recommendations : data.recommendations.slice(0, 3);
-          const totalCount  = data.recommendations.length;
-
-          if (recTotalCount) {
-            recTotalCount.textContent = isPaidTier
-              ? totalCount + ' إجراء'
-              : visibleRecs.length + ' من ' + totalCount + ' إجراء (الباقة المجانية)';
-          }
-
-          let highHtml = '', medHtml = '', lowHtml = '';
-
-          visibleRecs.forEach((rec, idx) => {
-            const priority   = rec.priority || 'medium';
-            const iconMap    = { high: '🛡️', medium: '✍️', low: '🤝' };
-            const icon       = rec.icon || iconMap[priority] || '💡';
-            const iconClass  = priority === 'high' ? 'high' : priority === 'low' ? 'low' : 'med';
-            const acColor    = priority === 'high' ? 'var(--red)' : priority === 'low' ? 'var(--green)' : 'var(--yellow)';
-            const acRgb      = priority === 'high' ? '239,68,68' : priority === 'low' ? '16,185,129' : '234,179,8';
-            const borderClr  = priority === 'high' ? 'rgba(239,68,68,0.2)' : priority === 'low' ? 'rgba(16,185,129,0.2)' : 'rgba(234,179,8,0.2)';
-            const bgClr      = priority === 'high' ? 'rgba(239,68,68,0.03)' : priority === 'low' ? 'rgba(16,185,129,0.03)' : 'rgba(234,179,8,0.03)';
-            const label      = priority === 'high' ? 'عاجل' : priority === 'low' ? 'مستقبلي' : 'متوسط';
-
-            // why_now badge
-            const whyNowHtml = rec.why_now
-              ? `<div style="display:flex;align-items:center;gap:8px;margin:10px 0;padding:7px 14px;background:rgba(${acRgb},0.1);border:1px solid rgba(${acRgb},0.2);border-radius:8px;font-size:12px;font-weight:800;color:${acColor};">⚡ لماذا الآن: ${sanitize(rec.why_now)}</div>`
-              : '';
-
-            // bullets (خطوات التنفيذ)
-            const bulletsHtml = (rec.bullets && rec.bullets.length)
-              ? `<div style="margin:12px 0 0 0;">
-                  <p style="font-size:12px;font-weight:900;color:${acColor};margin-bottom:8px;letter-spacing:0.5px;">📋 خطوات التنفيذ:</p>
-                  <ol style="margin:0;padding-right:20px;display:flex;flex-direction:column;gap:7px;">
-                    ${rec.bullets.map((b,bi) => `<li style="font-size:13px;color:var(--text-gray);font-weight:700;line-height:1.6;"><span style="color:${acColor};font-weight:900;">${bi+1}.</span> ${sanitize(b)}</li>`).join('')}
-                  </ol>
-                </div>`
-              : '';
-
-            // roi + time boxes
-            const roiHtml = rec.roi
-              ? `<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
-                  <div style="flex:1;min-width:140px;padding:10px 14px;background:rgba(${acRgb},0.08);border:1px solid rgba(${acRgb},0.2);border-radius:10px;">
-                    <div style="font-size:11px;color:var(--text-gray);font-weight:700;margin-bottom:4px;">💰 العائد المتوقع</div>
-                    <div style="font-size:13px;font-weight:900;color:${acColor};">${sanitize(rec.roi)}</div>
-                  </div>
-                  ${rec.time_to_implement ? `<div style="padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
-                    <div style="font-size:11px;color:var(--text-gray);font-weight:700;margin-bottom:4px;">⏱️ وقت التنفيذ</div>
-                    <div style="font-size:13px;font-weight:900;color:var(--text-dark);">${sanitize(rec.time_to_implement)}</div>
-                  </div>` : ''}
-                </div>`
-              : '';
-
-            const cardHtml = `
-              <div class="rec-card" style="border-color:${borderClr};background:${bgClr};flex-direction:column;align-items:flex-start;gap:0;position:relative;overflow:hidden;">
-                <div style="position:absolute;top:0;left:0;background:${acColor};color:${priority==='medium'?'#000':'#fff'};font-size:10px;font-weight:900;padding:3px 12px;border-radius:0 0 10px 0;">${label}</div>
-                <div style="display:flex;align-items:flex-start;gap:16px;width:100%;margin-top:12px;">
-                  <div class="rec-icon ${iconClass}" style="flex-shrink:0;">${icon}</div>
-                  <div style="flex:1;">
-                    <h4 style="color:${acColor};font-size:17px;margin-bottom:6px;">${sanitize(rec.title || 'توصية')}</h4>
-                    <p style="font-size:14px;color:var(--text-gray);line-height:1.7;font-weight:600;">${sanitize(rec.desc || '')}</p>
-                    ${whyNowHtml}
-                    ${bulletsHtml}
-                    ${roiHtml}
-                  </div>
-                </div>
-              </div>`;
-
-            if (priority === 'high')         highHtml += cardHtml;
-            else if (priority === 'low')     lowHtml  += cardHtml;
-            else                             medHtml  += cardHtml;
-          });
-
-          if (recHighList) recHighList.innerHTML = highHtml || `<div style="padding:20px;color:var(--green);font-weight:700;">✅ أداء ممتاز! لا توجد مشاكل عاجلة.</div>`;
-          if (recMedList)  recMedList.innerHTML  = medHtml  || `<div style="padding:20px;color:var(--text-gray);font-weight:700;">لا توجد مهام متوسطة حالياً.</div>`;
-          if (recLowList)  recLowList.innerHTML  = lowHtml  || `<div style="padding:20px;color:var(--text-gray);font-weight:700;">لا توجد تحسينات مستقبلية محددة.</div>`;
-        } else {
-          if (recHighList) recHighList.innerHTML = `<div style="padding:20px;color:var(--text-gray);font-weight:700;">لا توجد بيانات — تأكد من اكتمال التحليل.</div>`;
-        }
-      } // ← closes `if (path.includes('recommendations.html'))` opened above (was missing — caused parse failure for the entire file)
 
       // ==========================================
       // PAGE: detailed-analysis.html (ULTIMATE AUDIT)
@@ -972,17 +1265,79 @@ document.addEventListener("DOMContentLoaded", () => {
         const _gi = document.getElementById('gridInstagram'); if (!instagramUrl && _gi) _gi.classList.add('card-disabled');
 
         const igData = srObj.instagram || {};
-        if (document.getElementById('igFollowers') && igData.followers) {
-           document.getElementById('igFollowers').textContent = parseInt(igData.followers).toLocaleString();
+        // Instagram Followers - المزيد من التفقد للحالات المختلفة
+        if (document.getElementById('igFollowers')) {
+           const el = document.getElementById('igFollowers');
+           if (igData.followers !== undefined && igData.followers !== null && igData.followers !== '') {
+             el.textContent = parseInt(igData.followers).toLocaleString();
+           } else {
+             el.textContent = '--';
+           }
         }
-        if (document.getElementById('igER') && igData.engagement_rate) {
-           const er = parseFloat(igData.engagement_rate);
-           const el = document.getElementById('igER');
-           el.textContent = er + '%';
-           el.className = er >= 2 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        if (document.getElementById('badge-ig-er')) {
+           const er = igData.engagement_rate !== undefined && igData.engagement_rate !== null ? parseFloat(igData.engagement_rate) : null;
+           const el = document.getElementById('badge-ig-er');
+           if (er !== null && !isNaN(er)) {
+             el.textContent = er.toFixed(2) + '%';
+             el.className = er >= 2 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+           } else {
+             el.textContent = '--';
+             el.className = 'si-badge badge-warn';
+           }
         }
-        if (document.getElementById('igLikes') && igData.avg_likes) {
-           document.getElementById('igLikes').textContent = parseInt(igData.avg_likes).toLocaleString();
+
+        // Dynamically update other badges from scan_result (srObj)
+        const updateDetailedBadges = (sr) => {
+          const updateBadge = (id, condition, okText, warnText) => {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+            if (condition === undefined || condition === null || condition === '') {
+              badge.className = 'si-badge badge-warn data-missing';
+              // Keep original textContent as fallback, no need to reassign
+            } else {
+              badge.classList.remove('data-missing');
+              badge.textContent = condition ? okText : warnText;
+              badge.className = condition ? 'si-badge badge-ok' : 'si-badge badge-warn';
+            }
+          };
+
+          // TikTok Pixel
+          const hasTTPixel = sr.hasTikTokPixel !== undefined ? sr.hasTikTokPixel : sr.tiktok_pixel;
+          updateBadge('badge-tiktok-pixel', hasTTPixel, 'مفعل', 'غير مركب');
+
+          // Pagespeed
+          const speedBadge = document.getElementById('badge-pagespeed');
+          if (speedBadge) {
+            const speed = sr.load_time || sr.pagespeed || sr.performance_score;
+            if (speed === undefined || speed === null || speed === '') {
+              speedBadge.classList.add('data-missing');
+              speedBadge.className = 'si-badge badge-warn data-missing';
+            } else {
+              speedBadge.classList.remove('data-missing');
+              const sNum = parseFloat(speed);
+              speedBadge.textContent = (!isNaN(sNum)) ? sNum + (sNum > 10 ? ' / 100' : ' ثانية') : speed;
+              speedBadge.className = (!isNaN(sNum) && (sNum < 3 || sNum > 80)) ? 'si-badge badge-ok' : 'si-badge badge-warn';
+            }
+          }
+
+          // IG Badges
+          const ig = sr.instagram || {};
+          updateBadge('badge-ig-avatar', (ig.profile_pic_url || ig.has_avatar !== false), 'احترافية', 'مفقود');
+          const hasBio = ig.biography ? ig.biography.length > 10 : (ig.has_bio !== undefined ? ig.has_bio : undefined);
+          updateBadge('badge-ig-value', hasBio, 'واضح', 'غير واضح/قصير');
+          const hasCta = ig.has_cta_button !== undefined ? ig.has_cta_button : undefined;
+          updateBadge('badge-ig-cta', hasCta, 'موجود', 'مفقود');
+          updateBadge('badge-ig-link', (ig.external_url || ig.website), 'موجود', 'مفقود');
+        };
+        updateDetailedBadges(srObj);
+        // Instagram Likes
+        if (document.getElementById('igLikes')) {
+           const el = document.getElementById('igLikes');
+           if (igData.avg_likes !== undefined && igData.avg_likes !== null && igData.avg_likes !== '') {
+             el.textContent = parseInt(igData.avg_likes).toLocaleString();
+           } else {
+             el.textContent = '--';
+           }
         }
 
         // --- 3. Facebook Audit ---
@@ -994,6 +1349,489 @@ document.addEventListener("DOMContentLoaded", () => {
         if (document.getElementById('fbAdsCount')) {
            document.getElementById('fbAdsCount').textContent = adsObj.total_ads !== undefined ? adsObj.total_ads : '0';
         }
+
+        // --- 3.5 TikTok Audit ---
+        const tiktokUrl = data.tiktok_url || (srObj.tiktok ? srObj.tiktok.url : '') || '';
+        const urlTT = document.getElementById('auditTikTokUrl');
+        if (urlTT) urlTT.innerHTML = tiktokUrl ? `<a href="${tiktokUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${tiktokUrl}</a>` : 'لم يتم العثور على حساب';
+        const _gtt = document.getElementById('gridTikTok'); if (!tiktokUrl && _gtt) _gtt.classList.add('card-disabled');
+
+        const ttData = srObj.tiktok || {};
+        // Followers
+        if (document.getElementById('ttFollowers')) {
+          const el = document.getElementById('ttFollowers');
+          el.textContent = ttData.followers ? parseInt(ttData.followers).toLocaleString() : '--';
+        }
+        // Likes (tt-likes في HTML)
+        if (document.getElementById('tt-likes')) {
+          const el = document.getElementById('tt-likes');
+          el.textContent = ttData.likes ? parseInt(ttData.likes).toLocaleString() : '--';
+        }
+        // Following (tt-following في HTML)
+        if (document.getElementById('tt-following')) {
+          const el = document.getElementById('tt-following');
+          el.textContent = ttData.following ? parseInt(ttData.following).toLocaleString() : '--';
+        }
+        // Total Likes
+        if (document.getElementById('tt-likes')) {
+          const el = document.getElementById('tt-likes');
+          el.textContent = ttData.likes ? parseInt(ttData.likes).toLocaleString() : '--';
+        }
+        // Videos
+        if (document.getElementById('ttVideos')) {
+          const el = document.getElementById('ttVideos');
+          if (ttData.video_count) {
+            el.textContent = ttData.video_count + ' فيديو';
+            el.className = parseInt(ttData.video_count) > 20 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+          } else {
+            el.textContent = '--';
+          }
+        }
+        // Average Likes
+        if (document.getElementById('ttAvgLikes')) {
+          const el = document.getElementById('ttAvgLikes');
+          if (ttData.avg_likes) {
+            el.textContent = parseFloat(ttData.avg_likes).toLocaleString();
+            el.className = 'si-badge badge-ok';
+          } else {
+            el.textContent = '--';
+          }
+        }
+        // Average Comments
+        if (document.getElementById('ttAvgComments')) {
+          const el = document.getElementById('ttAvgComments');
+          if (ttData.avg_comments) {
+            el.textContent = parseFloat(ttData.avg_comments).toFixed(1);
+            el.className = 'si-badge badge-ok';
+          } else {
+            el.textContent = '--';
+          }
+        }
+        // Engagement Rate
+        if (document.getElementById('ttEngagement')) {
+          const el = document.getElementById('ttEngagement');
+          if (ttData.engagement_rate) {
+            el.textContent = parseFloat(ttData.engagement_rate).toFixed(2) + '%';
+            el.className = parseFloat(ttData.engagement_rate) >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+          } else {
+            el.textContent = '--';
+          }
+        }
+        // Bio
+        if (document.getElementById('ttBio')) {
+          const el = document.getElementById('ttBio');
+          const hasBio = ttData.bio && ttData.bio.length > 10;
+          el.textContent = hasBio ? 'مكتمل (' + ttData.bio.length + ' حرف)' : 'قصير/فارغ';
+          el.className = hasBio ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // Verified
+        if (document.getElementById('ttVerified')) {
+          const el = document.getElementById('ttVerified');
+          el.textContent = ttData.is_verified ? 'موثق ✅' : 'غير موثق';
+          el.className = ttData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // Website
+        if (document.getElementById('ttWebsite')) {
+          const el = document.getElementById('ttWebsite');
+          el.textContent = ttData.website ? 'موجود' : 'مفقود';
+          el.className = ttData.website ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // Avatar
+        if (document.getElementById('ttAvatar')) {
+          const el = document.getElementById('ttAvatar');
+          el.textContent = ttData.avatar ? 'موجودة' : 'مفقودة';
+          el.className = ttData.avatar ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // TikTok Score
+        if (document.getElementById('tt-score')) {
+          const ttFollowers = ttData.followers || 0;
+          const ttER = ttData.engagement_rate || 0;
+          const ttVideos = ttData.video_count || 0;
+          let ttScore = Math.min(100, Math.round(
+            (ttFollowers > 10000 ? 30 : ttFollowers > 1000 ? 20 : ttFollowers > 100 ? 10 : 5) +
+            (ttER >= 3 ? 30 : ttER >= 1 ? 20 : ttER >= 0.5 ? 10 : 5) +
+            (ttVideos >= 30 ? 20 : ttVideos >= 10 ? 15 : ttVideos >= 5 ? 10 : 5) +
+            (ttData.is_verified ? 10 : 0) +
+            (ttData.website ? 10 : 0)
+          ));
+          document.getElementById('tt-score').textContent = ttScore;
+          const progTT = document.getElementById('prog-tt');
+          if (progTT) {
+            progTT.style.width = ttScore + '%';
+            progTT.className = 'progress-fill ' + (ttScore >= 70 ? 'green' : ttScore >= 40 ? 'yellow' : 'red');
+          }
+        }
+
+        // --- 3.6 Twitter/X Audit ---
+        const twitterUrl = data.twitter_url || (srObj.twitter ? srObj.twitter.url : '') || '';
+        const urlTW = document.getElementById('auditTwitterUrl');
+        if (urlTW) urlTW.innerHTML = twitterUrl ? `<a href="${twitterUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${twitterUrl}</a>` : 'لم يتم العثور على حساب';
+        const _gtw = document.getElementById('gridTwitter'); if (!twitterUrl && _gtw) _gtw.classList.add('card-disabled');
+
+        const twData = srObj.twitter || {};
+        // Followers
+        if (document.getElementById('twFollowers')) {
+          const el = document.getElementById('twFollowers');
+          el.textContent = twData.followers ? parseInt(twData.followers).toLocaleString() : '--';
+        }
+        // Following (tw-following في HTML)
+        if (document.getElementById('tw-following')) {
+          const el = document.getElementById('tw-following');
+          el.textContent = twData.following ? parseInt(twData.following).toLocaleString() : '--';
+        }
+        // Ratio (tw-ratio في HTML)
+        if (document.getElementById('tw-ratio')) {
+          const el = document.getElementById('tw-ratio');
+          const f = twData.followers || 0;
+          const fg = twData.following || 1;
+          const ratio = fg > 0 ? Math.round(f / fg) : 0;
+          el.textContent = ratio > 1 ? ratio + ':1' : '--';
+          el.style.color = ratio >= 10 ? 'var(--green)' : ratio >= 3 ? 'var(--yellow)' : 'var(--red)';
+        }
+        // Tweets count
+        if (document.getElementById('twTweets')) {
+          const el = document.getElementById('twTweets');
+          if (twData.posts_count) {
+            el.textContent = twData.posts_count + ' تغريدة';
+            el.className = parseInt(twData.posts_count) > 100 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+          } else {
+            el.textContent = '--';
+          }
+        }
+        // Bio
+        if (document.getElementById('twBio')) {
+          const el = document.getElementById('twBio');
+          const bioText = twData.description || twData.bio || '';
+          const hasBio = bioText.length > 5;
+          el.textContent = hasBio ? 'مكتمل' : 'قصير/فارغ';
+          el.className = hasBio ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // Location
+        if (document.getElementById('twLocation')) {
+          const el = document.getElementById('twLocation');
+          el.textContent = twData.location ? twData.location : 'غير محدد';
+          el.className = twData.location ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // Created date
+        if (document.getElementById('twCreated')) {
+          const el = document.getElementById('twCreated');
+          el.textContent = twData.created_at ? twData.created_at : 'غير متوفر';
+          el.className = 'si-badge badge-ok';
+        }
+        // Verified
+        if (document.getElementById('twVerified')) {
+          const el = document.getElementById('twVerified');
+          el.textContent = twData.is_verified ? 'موثق ✅' : 'غير موثق';
+          el.className = twData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        // Media & Link Pct
+        if (document.getElementById('twMediaPct')) {
+          const mp = twData.media_percent || 0;
+          document.getElementById('twMediaPct').textContent = mp > 0 ? mp + '%' : '--';
+        }
+        if (document.getElementById('twLinkPct')) {
+          const lp = twData.link_percent || 0;
+          document.getElementById('twLinkPct').textContent = lp > 0 ? lp + '%' : '--';
+        }
+        // Twitter Score
+        if (document.getElementById('tw-score')) {
+          const twFollowers = twData.followers || 0;
+          const twPosts = twData.posts_count || 0;
+          const bioText = twData.description || twData.bio || '';
+          let twScore = Math.min(100, Math.round(
+            (twFollowers > 5000 ? 30 : twFollowers > 500 ? 20 : twFollowers > 50 ? 10 : 5) +
+            (twPosts >= 500 ? 25 : twPosts >= 100 ? 15 : twPosts >= 20 ? 10 : 5) +
+            (twData.is_verified ? 15 : 0) +
+            (bioText.length > 10 ? 15 : 5) +
+            (twData.location ? 5 : 0) +
+            (twData.website ? 10 : 0)
+          ));
+          document.getElementById('tw-score').textContent = twScore;
+          const progTW = document.getElementById('prog-tw');
+          if (progTW) {
+            progTW.style.width = twScore + '%';
+            progTW.className = 'progress-fill ' + (twScore >= 70 ? 'green' : twScore >= 40 ? 'yellow' : 'red');
+          }
+        }
+
+        // ═════════════════════════════════════════════════════════
+        // بيانات تفصيلية إضافية للموقع
+        // ═════════════════════════════════════════════════════════
+        const wsData = srObj.website_scan || {};
+
+        // SEO fields
+        const updateSeoBadge = (id, condition, okText, warnText) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.textContent = condition ? okText : warnText;
+          el.className = condition ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        };
+
+        updateSeoBadge('badge-meta-desc', wsData.description && wsData.description.length > 50, 'مكتمل', 'ناقص');
+        updateSeoBadge('badge-og', wsData.has_og_tags, 'موجود', 'مفقود');
+        updateSeoBadge('badge-schema', wsData.has_schema, 'مثبت', 'غير مثبت');
+        updateSeoBadge('badge-h1', wsData.h1, 'موجود', 'مفقود');
+        updateSeoBadge('badge-contact-form', wsData.has_contact_form, 'موجود', 'مفقود');
+        updateSeoBadge('badge-phone', wsData.has_phone, 'ظاهر', 'مخفي');
+        updateSeoBadge('badge-cta', wsData.has_cta, 'واضح', 'غائب');
+        updateSeoBadge('badge-services', wsData.services_list && wsData.services_list.length > 0, wsData.services_list?.length + ' خدمة', 'لا توجد');
+
+        // Word count
+        if (document.getElementById('badge-wordcount')) {
+          const wc = wsData.word_count || 0;
+          const wcEl = document.getElementById('badge-wordcount');
+          wcEl.textContent = wc > 0 ? wc + ' كلمة' : 'غير محسوب';
+          wcEl.className = wc > 500 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+
+        // Metrics
+        if (document.getElementById('metric-pages')) {
+          document.getElementById('metric-pages').textContent = wsData.pages_count || '--';
+        }
+        if (document.getElementById('metric-words')) {
+          document.getElementById('metric-words').textContent = wsData.word_count || '--';
+        }
+
+        // Website score
+        if (document.getElementById('website-score')) {
+          const webScore = data.score || 0;
+          document.getElementById('website-score').textContent = webScore;
+          const progWeb = document.getElementById('prog-website');
+          if (progWeb) {
+            progWeb.style.width = webScore + '%';
+            progWeb.className = 'progress-fill ' + (webScore >= 70 ? 'green' : webScore >= 40 ? 'yellow' : 'red');
+          }
+        }
+
+        // Issues/warnings
+        if (document.getElementById('metric-issues')) {
+          const issues = (!srObj.hasSSL ? 1 : 0) + (!srObj.hasPixel ? 1 : 0) + (!srObj.hasGA ? 1 : 0) + (!srObj.hasWhatsApp ? 1 : 0);
+          document.getElementById('metric-issues').textContent = issues;
+        }
+        if (document.getElementById('metric-warnings')) {
+          const warnings = (!wsData.has_og_tags ? 1 : 0) + (!wsData.has_schema ? 1 : 0) + (!wsData.h1 ? 1 : 0);
+          document.getElementById('metric-warnings').textContent = warnings;
+        }
+
+        // ═════════════════════════════════════════════════════════
+        // بيانات تفصيلية إضافية لإنستقرام
+        // ═════════════════════════════════════════════════════════
+        if (document.getElementById('ig-following')) {
+          document.getElementById('ig-following').textContent = igData.following ? parseInt(igData.following).toLocaleString() : '--';
+        }
+        if (document.getElementById('ig-ratio')) {
+          const f = igData.followers || 0;
+          const fg = igData.following || 1;
+          const ratio = fg > 0 ? Math.round(f / fg) : '--';
+          const ratioEl = document.getElementById('ig-ratio');
+          ratioEl.textContent = ratio > 1 ? ratio + ':1' : '--';
+          ratioEl.style.color = ratio >= 10 ? 'var(--green)' : ratio >= 3 ? 'var(--yellow)' : 'var(--red)';
+        }
+        if (document.getElementById('igComments')) {
+          const c = igData.avg_comments || 0;
+          const cEl = document.getElementById('igComments');
+          cEl.textContent = c > 0 ? parseFloat(c).toFixed(1) : '--';
+          cEl.className = c >= 5 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('igSaves')) {
+          const s = igData.avg_saves || igData.saves_rate || 0;
+          document.getElementById('igSaves').textContent = s > 0 ? parseFloat(s).toFixed(1) + '%' : '--';
+        }
+        if (document.getElementById('igPosts')) {
+          const pc = igData.posts_count || 0;
+          const pcEl = document.getElementById('igPosts');
+          pcEl.textContent = pc > 0 ? pc + ' منشور' : '--';
+          pcEl.className = pc >= 50 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('igPostsWeek')) {
+          const pw = igData.posts_per_week || 0;
+          const pwEl = document.getElementById('igPostsWeek');
+          pwEl.textContent = pw > 0 ? pw + '/أسبوع' : '--';
+          pwEl.className = pw >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('igLastPost')) {
+          const lp = igData.last_post_days || 0;
+          const lpEl = document.getElementById('igLastPost');
+          lpEl.textContent = lp > 0 ? lp + ' يوم' : '--';
+          lpEl.className = lp <= 7 ? 'si-badge badge-ok' : lp <= 21 ? 'si-badge badge-warn' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('igVideoPct')) {
+          const vp = igData.deep_analysis?.types_percent?.video || igData.video_percent || 0;
+          const vpEl = document.getElementById('igVideoPct');
+          vpEl.textContent = vp > 0 ? vp + '%' : '--';
+          vpEl.className = vp >= 30 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('igHighlights')) {
+          const hl = igData.highlights_count || 0;
+          document.getElementById('igHighlights').textContent = hl > 0 ? hl : '--';
+        }
+
+        // IG Business/Verified
+        if (document.getElementById('igBusiness')) {
+          const ibEl = document.getElementById('igBusiness');
+          ibEl.textContent = igData.is_business ? 'نعم ✅' : 'لا (شخصي)';
+          ibEl.className = igData.is_business ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('igVerified')) {
+          const ivEl = document.getElementById('igVerified');
+          ivEl.textContent = igData.is_verified ? 'موثق ✅' : 'غير موثق';
+          ivEl.className = igData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+
+        // IG Score
+        if (document.getElementById('ig-score')) {
+          const igFollowers = igData.followers || 0;
+          const igER = igData.engagement_rate || 0;
+          const igPosts = igData.posts_count || 0;
+          let igScore = Math.min(100, Math.round(
+            (igFollowers > 10000 ? 30 : igFollowers > 1000 ? 20 : igFollowers > 100 ? 10 : 5) +
+            (igER >= 3 ? 30 : igER >= 1 ? 20 : igER >= 0.5 ? 10 : 5) +
+            (igPosts >= 50 ? 20 : igPosts >= 20 ? 15 : igPosts >= 10 ? 10 : 5) +
+            (igData.is_business ? 10 : 5) +
+            (igData.is_verified ? 10 : 0)
+          ));
+          document.getElementById('ig-score').textContent = igScore;
+          const progIg = document.getElementById('prog-ig');
+          if (progIg) {
+            progIg.style.width = igScore + '%';
+            progIg.className = 'progress-fill ' + (igScore >= 70 ? 'green' : igScore >= 40 ? 'yellow' : 'red');
+          }
+        }
+
+        // ═════════════════════════════════════════════════════════
+        // بيانات تفصيلية إضافية لفيسبوك
+        // ═════════════════════════════════════════════════════════
+        // ✅ إصلاح: البيانات قد تكون في srObj.facebook أو srObj.social أو في جذر srObj مباشرة (عند سحب رابط فيسبوك مباشرة)
+        const fbData = srObj.facebook || srObj.social || (srObj.platform === 'facebook' ? srObj : {});
+
+        if (document.getElementById('fbFollowers')) {
+          document.getElementById('fbFollowers').textContent = fbData.followers ? parseInt(fbData.followers).toLocaleString() : '--';
+        }
+        if (document.getElementById('fb-likes')) {
+          document.getElementById('fb-likes').textContent = fbData.likes ? parseInt(fbData.likes).toLocaleString() : '--';
+        }
+        if (document.getElementById('fb-checkins')) {
+          document.getElementById('fb-checkins').textContent = fbData.checkins || fbData.were_here_count || '--';
+        }
+        if (document.getElementById('fbVerified')) {
+          const fbvEl = document.getElementById('fbVerified');
+          fbvEl.textContent = fbData.is_verified ? 'موثق ✅' : 'غير موثق';
+          fbvEl.className = fbData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbRating')) {
+          const rating = fbData.rating || 0;
+          const frEl = document.getElementById('fbRating');
+          if (rating > 0) {
+            frEl.textContent = rating + '/5 ⭐';
+            frEl.className = rating >= 4 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+          } else {
+            frEl.textContent = 'لا توجد';
+            frEl.className = 'si-badge badge-warn';
+          }
+        }
+        if (document.getElementById('fbCompleteness')) {
+          let comp = 0;
+          if (fbData.about) comp += 25;
+          if (fbData.phone) comp += 25;
+          if (fbData.email) comp += 25;
+          if (fbData.website) comp += 25;
+          const fcEl = document.getElementById('fbCompleteness');
+          fcEl.textContent = comp + '%';
+          fcEl.className = comp >= 75 ? 'si-badge badge-ok' : comp >= 50 ? 'si-badge badge-warn' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbEngagement')) {
+          const eng = fbData.avg_engagement || 0;
+          const feEl = document.getElementById('fbEngagement');
+          feEl.textContent = eng > 0 ? parseFloat(eng).toFixed(1) : '--';
+          feEl.className = eng >= 50 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbPosts')) {
+          const fbp = fbData.posts_count || 0;
+          const fbpEl = document.getElementById('fbPosts');
+          fbpEl.textContent = fbp > 0 ? fbp + ' منشور' : '--';
+          fbpEl.className = fbp >= 50 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbPostsWeek')) {
+          const fbpw = fbData.posts_per_week || 0;
+          const fbpwEl = document.getElementById('fbPostsWeek');
+          fbpwEl.textContent = fbpw > 0 ? fbpw + '/أسبوع' : '--';
+          fbpwEl.className = fbpw >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbLastPost')) {
+          const fblp = fbData.last_post_days || 0;
+          const fblpEl = document.getElementById('fbLastPost');
+          fblpEl.textContent = fblp > 0 ? fblp + ' يوم' : '--';
+          fblpEl.className = fblp <= 7 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbHashtags')) {
+          const fht = fbData.deep_analysis?.top_hashtags?.length || 0;
+          const fhtEl = document.getElementById('fbHashtags');
+          fhtEl.textContent = fht > 0 ? fht + ' هاشتاق' : '--';
+          fhtEl.className = fht >= 5 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+
+        // FB Communication
+        if (document.getElementById('fbWhatsapp')) {
+          const fwa = fbData.whatsapp || srObj.hasWhatsApp;
+          const fwaEl = document.getElementById('fbWhatsapp');
+          fwaEl.textContent = fwa ? 'مرتبط ✅' : 'غير مرتبط';
+          fwaEl.className = fwa ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbPhone')) {
+          const fphEl = document.getElementById('fbPhone');
+          fphEl.textContent = fbData.phone ? 'ظاهر' : 'مخفي';
+          fphEl.className = fbData.phone ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbEmail')) {
+          const femEl = document.getElementById('fbEmail');
+          femEl.textContent = fbData.email ? 'متاح' : 'غير متاح';
+          femEl.className = fbData.email ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbWebsite')) {
+          const fweEl = document.getElementById('fbWebsite');
+          fweEl.textContent = fbData.website ? 'موجود' : 'مفقود';
+          fweEl.className = fbData.website ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+
+        // FB Ads details
+        if (document.getElementById('fbAdsVideo')) {
+          const vidAds = adsObj.video_ads || adsObj.ads?.filter(a => a.type === 'video')?.length || 0;
+          const favEl = document.getElementById('fbAdsVideo');
+          favEl.textContent = vidAds > 0 ? vidAds : '0';
+          favEl.className = vidAds > 0 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbAdsImage')) {
+          const imgAds = adsObj.image_ads || (adsObj.total_ads || 0) - (adsObj.video_ads || 0);
+          const faiEl = document.getElementById('fbAdsImage');
+          faiEl.textContent = imgAds > 0 ? imgAds : '0';
+          faiEl.className = imgAds > 0 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+        }
+        if (document.getElementById('fbAdsObjective')) {
+          const obj = adsObj.ads?.[0]?.objective || adsObj.primary_objective || 'متنوع';
+          document.getElementById('fbAdsObjective').textContent = obj;
+        }
+
+        // FB Score
+        if (document.getElementById('fb-score')) {
+          const fbFollowers = fbData.followers || 0;
+          const fbRating = fbData.rating || 0;
+          const fbPosts = fbData.posts_count || 0;
+          let fbScore = Math.min(100, Math.round(
+            (fbFollowers > 5000 ? 30 : fbFollowers > 1000 ? 20 : fbFollowers > 100 ? 10 : 5) +
+            (fbRating >= 4 ? 20 : fbRating > 0 ? 15 : 5) +
+            (fbPosts >= 50 ? 20 : fbPosts >= 20 ? 15 : fbPosts >= 10 ? 10 : 5) +
+            (fbData.is_verified ? 15 : 5) +
+            (adsObj.total_ads > 0 ? 15 : 5)
+          ));
+          document.getElementById('fb-score').textContent = fbScore;
+          const progFb = document.getElementById('prog-fb');
+          if (progFb) {
+            progFb.style.width = fbScore + '%';
+            progFb.className = 'progress-fill ' + (fbScore >= 70 ? 'green' : fbScore >= 40 ? 'yellow' : 'red');
+          }
+        }
+
+
 
         // --- 4. Deep Diagnosis (AI Paragraphs) ---
         const diagContainer = document.getElementById('auditDeepDiagnosis');
@@ -1138,7 +1976,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
           // إعادة رسم قسم الإعلانات بالبيانات الحية
                 renderAdsSection(data, srObj, clientName, resp.data.ai || null);
-                // إظهار التقرير الكامل من NVIDIA
+                // إظهار التقرير الكامل من OpenAI
                 if (resp.data.full_report) {
                   const box = document.getElementById('deepReportSection');
                   const cnt = document.getElementById('fullReportContent');
@@ -1176,9 +2014,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // PAGE: content.html
       // ==========================================
       if (path.includes('content.html')) {
-        const score = data.score || 50;
-        const fb = sr.facebook || {};
-        const ig = sr.instagram || {};
+        const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
+        // ✅ إصلاح: استخدام srObj المتاح فعلياً (sr قد لا يكون معرَّفاً في هذا السياق)
+        const fb = srObj.facebook || srObj.social || (srObj.platform === 'facebook' ? srObj : {});
+        const ig = srObj.instagram || srObj.social || (srObj.platform === 'instagram' ? srObj : {});
 
         // محاولة جلب التحليل العميق (نفضل إنستجرام لأنه أدق في توزيع الأنواع عادةً)
         const da = ig.deep_analysis || fb.deep_analysis || {};
@@ -1203,12 +2042,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (types.image > 5) typeCount++;
         if (types.sidecar > 5) typeCount++;
         let cVar = typeCount === 3 ? 95 : typeCount === 2 ? 75 : 45;
-
-        // إضافة لمسة عشوائية بسيطة جداً للجمالية
-        cVisual += Math.floor(Math.random() * 3);
-        cMsg    += Math.floor(Math.random() * 3);
-        cEng    += Math.floor(Math.random() * 3);
-        cVar    += Math.floor(Math.random() * 3);
 
         if (cVisual > 100) cVisual = 100;
         if (cMsg > 100) cMsg = 100;
@@ -1236,6 +2069,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (answerEl && item.answer) {
               answerEl.textContent = item.answer;
+              answerEl.setAttribute('data-ai', 'true');
             }
           });
 
@@ -1279,15 +2113,18 @@ document.addEventListener("DOMContentLoaded", () => {
         // Global Sanitization & Overrides
         // Executes for BOTH AI text and Fallback
         // =====================================
-          // Fallback: If AI fails to return content_analysis, sanitize the hardcoded mock data so it doesn't look fake
+          // Fallback: If AI fails to return content_analysis, sanitize legacy placeholder text.
           const typeStr = ai.page_type || data.project_type || 'تجاري';
           const isService = (typeStr.includes('Service') || typeStr.includes('Business') || typeStr.includes('تسويق') || typeStr.includes('شركة') || typeStr.includes('عقارات') || typeStr.includes('Influencer') || /marketing|agency|وكالة|b2b/i.test(typeStr));
 
           document.querySelectorAll('.q-answer, .q-label, .insight-box p, .insight-box h4, .bar-label, .pill, .j-card-title, .j-stat-label, .problem-desc, .f-label, .dc-sub').forEach(el => {
+              // ── تخطي العناصر التي ملأها الذكاء الاصطناعي ببيانات حقيقية ──
+              if (el.getAttribute('data-ai') === 'true') return;
+
               let txt = el.innerHTML;
 
-              // Global String Sanitization (Runs on Fallback AND AI text)
-              txt = txt.replace(/ناتشورال بيوتي/g, clientName);
+              // Global String Sanitization (Runs on Fallback text ONLY)
+              txt = txt.replace(/اسم تجريبي قديم/g, clientName);
               txt = txt.replace(/منتجات تجميل طبيعية/g, 'منتجات/خدمات مميزة');
               txt = txt.replace(/تجميل/g, 'هذا المجال');
               txt = txt.replace(/منتجات عناية/g, 'ما تقدمه');
@@ -1308,7 +2145,7 @@ document.addEventListener("DOMContentLoaded", () => {
               txt = txt.replace(/لا يوجد بعد عنصر "توقيع" يميّز الحساب/g, 'يُنصح بإيجاد عنصر بصري أو نمط محتوى فريد يميز الحساب');
               txt = txt.replace(/يحتاج تحسيناً — البايو الحالي عام\./g, 'تحتاج النبذة التعريفية إلى تحسين لتكون أكثر دقة وتحديداً.');
               txt = txt.replace(/ماذا تبيع \+ لمن \+ ما الميزة الفريدة \+ كيف تطلب/g, isService ? 'نوع الخدمة + لمن + الميزة التنافسية + دعوة للحجز أو التواصل' : 'ما هو المنتج + لمن + الميزة التنافسية + دعوة للطلب');
-              txt = txt.replace(/نعم — "ناتشورال بيوتي" يوحي مباشرة بالمنتجات الطبيعية والتجميل\. سهل التذكر والبحث عنه\./g, 'نعم، الاسم مناسب وسهل التذكر ويعكس مجال النشاط بوضوح، مما يسهل على الجمهور البحث عنه.');
+              txt = txt.replace(/نص تجريبي قديم عن اسم النشاط\./g, 'غير متوفر من بيانات التقرير.');
 
               txt = txt.replace(/المستهلك السعودي/g, 'المستهلك المحلي');
               txt = txt.replace(/الريلز الذي يعرض "طريقة استخدام" المنتج حصل على 3x وصول مقارنة بصور الكتالوج — إشارة واضحة لنوع المحتوى المطلوب\./g, 'المحتوى المرئي القصير الذي يقدم فائدة عملية مباشرة يتفوق في الوصول والتفاعل مقارنة بالمحتوى الترويجي الجامد.');
@@ -1379,9 +2216,28 @@ document.addEventListener("DOMContentLoaded", () => {
             });
           }
 
-          // Update balance wheel from customer_journey stages if available (real AI data)
+          // Update balance wheel and journey descriptions from customer_journey stages if available (real AI data)
           const cj = data.ai_report && data.ai_report.customer_journey;
+          
+          // Update Journey Text in journey.html
+          const journeyDescs = document.querySelectorAll('.j-card-desc[data-field]');
+          if (journeyDescs.length > 0) {
+            journeyDescs.forEach(descEl => {
+              const field = descEl.getAttribute('data-field');
+              const stageData = cj && cj.stages ? cj.stages[field] : null;
+              const textContent = stageData ? (stageData.description || stageData.reason || stageData.analysis || stageData.text) : null;
+              
+              if (textContent) {
+                descEl.textContent = textContent;
+                descEl.classList.remove('is-placeholder');
+              } else {
+                descEl.classList.add('is-placeholder');
+              }
+            });
+          }
+
           if (cj && cj.stages) {
+            // Update Balance Wheel in report.html
             const bwMap = {
               'awareness': ['bc_awareness_fill','bc_awareness_pct'],
               'attraction': ['bc_attraction_fill','bc_attraction_pct'],
@@ -1392,13 +2248,52 @@ document.addEventListener("DOMContentLoaded", () => {
             Object.keys(bwMap).forEach(stage => {
               const stageData = cj.stages[stage];
               if (!stageData) return;
-              const val = stageData.score;
+              const val = stageData.score || stageData.value || 0;
               const [fillId, pctId] = bwMap[stage];
               const fillEl = document.getElementById(fillId);
               const pctEl = document.getElementById(pctId);
               if (fillEl) fillEl.style.width = val + '%';
               if (pctEl) pctEl.textContent = val + '%';
             });
+
+            // Update Journey Scores in journey.html
+            const jScoreMap = {
+              'awareness': 'stage1Score',
+              'attraction': 'stage2Score',
+              'trust': 'stage3Score',
+              'purchase': 'stage4Score',
+              'loyalty': 'stage5Score'
+            };
+            Object.keys(jScoreMap).forEach(stage => {
+              const stageData = cj.stages[stage];
+              if (!stageData) return;
+              const val = stageData.score || stageData.value || 0;
+              const scoreEl = document.getElementById(jScoreMap[stage]);
+              if (scoreEl) {
+                scoreEl.setAttribute('data-val', val);
+                scoreEl.textContent = val + '%';
+                // Trigger ring animation if the ring is there
+                const ringEl = scoreEl.closest('.j-card-stats')?.querySelector('.score-circle');
+                if (ringEl) ringEl.setAttribute('data-percent', val);
+              }
+            });
+            
+            // Update the main journey circle score
+            const journeyCircle = document.getElementById('journeyCircle');
+            const journeyScoreNum = document.getElementById('journeyScore');
+            let totalVal = 0;
+            let stagesCount = 0;
+            Object.values(cj.stages).forEach(s => {
+              if (s && (s.score || s.value)) { totalVal += (s.score || s.value); stagesCount++; }
+            });
+            if (stagesCount > 0) {
+              const avgScore = Math.round(totalVal / stagesCount);
+              if (journeyCircle) journeyCircle.setAttribute('data-percent', avgScore);
+              if (journeyScoreNum) {
+                journeyScoreNum.setAttribute('data-val', avgScore);
+                journeyScoreNum.textContent = avgScore;
+              }
+            }
           } else {
             // Fallback balance wheel from score
             const bcFills = document.querySelectorAll('.bc-fill');
@@ -1479,16 +2374,22 @@ document.addEventListener("DOMContentLoaded", () => {
           // Fallback: Dynamic Engagement Cards based on score and followers
           const ecVals = document.querySelectorAll('.ec-val');
           if (ecVals.length === 6) {
-              const baseER = Math.max(0.5, (score / 100) * 5.5).toFixed(1); // 0.5% to 5.5% based on score
+              const baseER = realER > 0 ? realER.toFixed(1) : null;
+              if (baseER == null) {
+                ecVals.forEach(el => { el.textContent = '--'; });
+                document.querySelectorAll('.ec-status').forEach(el => {
+                  el.className = 'ec-status';
+                  el.textContent = 'غير متوفر';
+                });
+              } else {
               ecVals[0].textContent = baseER + '%';
               ecVals[1].textContent = (baseER * 0.15).toFixed(1) + '%'; // Comments
               ecVals[2].textContent = (baseER * 0.25).toFixed(1) + '%'; // Shares
               ecVals[3].textContent = (baseER * 0.35).toFixed(1) + '%'; // Saves
 
-              const followers = scan.social?.followers || scan.followers || data.scan_result?.og?.followers || 5000;
-              let reach = Math.floor(followers * (score/100) * 0.4);
-              if (reach < 100) reach = Math.floor((score/100) * 1500); // fallback if followers is 0
-              ecVals[4].textContent = reach > 1000 ? (reach/1000).toFixed(1) + 'K' : reach; // Reach
+              const followers = scan.social?.followers || scan.followers || data.scan_result?.og?.followers || 0;
+              const reach = followers ? Math.floor(followers * (Number(baseER) / 100)) : null;
+              ecVals[4].textContent = reach == null ? '--' : (reach > 1000 ? (reach/1000).toFixed(1) + 'K' : reach); // Reach
 
               ecVals[5].textContent = (baseER * 0.08).toFixed(1) + '%'; // DMs
 
@@ -1505,6 +2406,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   setSt(ecStatuses[3], score > 60 ? 'good' : 'bad', score > 60 ? 'جيد' : 'منخفض', score > 60 ? '✅' : '❌');
                   setSt(ecStatuses[4], score > 50 ? 'good' : 'warn', score > 50 ? 'جيد' : 'محدود', score > 50 ? '✅' : '⚠️');
                   setSt(ecStatuses[5], score > 80 ? 'good' : 'bad', score > 80 ? 'جيد' : 'منخفض جداً', score > 80 ? '✅' : '❌');
+              }
               }
           }
         // END GLOBAL OVERRIDES
@@ -1621,13 +2523,71 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         }
+
+        if (!ca) {
+          const unavailable = 'غير متوفر من تحليل المحتوى لهذا التقرير. لا يتم عرض إجابة تقديرية بدون بيانات OpenAI.';
+          document.querySelectorAll('.q-status').forEach(el => {
+            el.className = el.className.replace(/\b(good|warn|bad|neu)\b/g, '').trim() + ' neu';
+            el.textContent = '--';
+          });
+          document.querySelectorAll('.q-answer').forEach(el => {
+            el.textContent = unavailable;
+          });
+          document.querySelectorAll('.bar-fill[data-width]').forEach(el => {
+            el.setAttribute('data-width', '0');
+            el.style.width = '0%';
+            el.className = el.className.replace(/\b(green|yellow|red|blue)\b/g, '').trim();
+          });
+          document.querySelectorAll('.bar-val').forEach(el => {
+            el.textContent = '--';
+            el.className = el.className.replace(/\b(green|yellow|red|blue)\b/g, '').trim();
+          });
+          document.querySelectorAll('.bc-fill').forEach(el => {
+            el.style.width = '0%';
+          });
+          document.querySelectorAll('.bc-pct').forEach(el => {
+            el.textContent = '--';
+          });
+          document.querySelectorAll('.ec-val').forEach(el => {
+            el.textContent = '--';
+          });
+          document.querySelectorAll('.ec-status').forEach(el => {
+            el.className = el.className.replace(/\b(good|warn|bad)\b/g, '').trim();
+            el.textContent = 'غير متوفر';
+          });
+          ['contentScore','bentoVisualScore','bentoMsgScore','bentoEngScore','bentoVarScore'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+              el.removeAttribute('data-val');
+              el.textContent = '--';
+            }
+          });
+          const contentCircle = document.getElementById('contentCircle');
+          if (contentCircle) {
+            contentCircle.setAttribute('data-percent', '0');
+            contentCircle.setAttribute('data-color', 'var(--yellow)');
+          }
+          const contentStatusTitle = document.getElementById('contentStatusTitle');
+          const contentStatusDesc = document.getElementById('contentStatusDesc');
+          if (contentStatusTitle) {
+            contentStatusTitle.textContent = 'تحليل المحتوى غير متوفر';
+            contentStatusTitle.style.color = 'var(--yellow)';
+          }
+          if (contentStatusDesc) {
+            contentStatusDesc.textContent = 'هذه الصفحة لا تعرض تقييماً تقديرياً للمحتوى بدون بيانات OpenAI الخاصة بهذا التقرير.';
+          }
+          const aiStrategy = document.getElementById('contentAiStrategy');
+          if (aiStrategy) {
+            aiStrategy.innerHTML = missingDataHtml('استراتيجية المحتوى غير متوفرة', 'لم يرجع OpenAI استراتيجية محتوى لهذا التقرير، لذلك تم إخفاء أي خطة عامة أو ثابتة.');
+          }
+        }
       }
 
       // ==========================================
       // PAGE: strengths.html & weaknesses.html
       // ==========================================
       if (path.includes('strengths.html') || path.includes('weaknesses.html')) {
-        const score = data.score || 50;
+        const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
         const typeStr = (ai.page_type || data.project_type || 'تجاري').toLowerCase();
         const isService = (typeStr.includes('service') || typeStr.includes('business') || typeStr.includes('تسويق') || typeStr.includes('شركة') || typeStr.includes('عقارات') || typeStr.includes('influencer') || /marketing|agency|وكالة|b2b/i.test(typeStr));
 
@@ -1651,17 +2611,17 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           if (strTitle) {
             if (score > 70) {
-              strTitle.innerHTML = '😊 ممتاز';
+              strTitle.textContent = '😊 ممتاز';
               strTitle.style.color = 'var(--green)';
-              if (strDesc) strDesc.innerHTML = 'حسابك مبني على أساس قوي جداً، وهذه النقاط تمثل أصولك التسويقية الرابحة.';
+              if (strDesc) strDesc.textContent = 'حسابك مبني على أساس قوي جداً، وهذه النقاط تمثل أصولك التسويقية الرابحة.';
             } else if (score > 40) {
-              strTitle.innerHTML = '🤔 جيد';
+              strTitle.textContent = '🤔 جيد';
               strTitle.style.color = 'var(--yellow)';
-              if (strDesc) strDesc.innerHTML = 'لديك بعض النقاط الجيدة، ولكن تحتاج لتعزيزها لتصبح أصولاً مربحة.';
+              if (strDesc) strDesc.textContent = 'لديك بعض النقاط الجيدة، ولكن تحتاج لتعزيزها لتصبح أصولاً مربحة.';
             } else {
-              strTitle.innerHTML = '❌ ضعيف';
+              strTitle.textContent = '❌ ضعيف';
               strTitle.style.color = 'var(--red)';
-              if (strDesc) strDesc.innerHTML = 'نقاط القوة نادرة جداً حالياً، يجب العمل على بناء ميزة تنافسية واضحة.';
+              if (strDesc) strDesc.textContent = 'نقاط القوة نادرة جداً حالياً، يجب العمل على بناء ميزة تنافسية واضحة.';
             }
           }
 
@@ -1693,9 +2653,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // لو الـ object يحمل score خاص نستعمله، وإلا نشتق من الترتيب
                 const score = (isObj && typeof str.score === 'number') ? str.score : (95 - (index * 5));
-                strengths.push({ title: title, desc: desc, score: score, icon: icon });
+                // ── حفظ جميع الحقول الأصلية (bullets, metric, action, evidence, ...) ──
+                strengths.push(Object.assign({}, isObj ? str : {}, { title: title, desc: desc, score: score, icon: icon }));
               });
-            } else {
+            } else if (false) {
               if (srObj.hasSSL) strengths.push({ title: isService ? 'بيئة آمنة وموثوقة' : 'بيئة شراء آمنة', desc: isService ? 'موقعك محمي بشهادة SSL فعالة، مما يمنع رسائل (غير آمن) ويزيد من ثقة العميل في التعامل معك.' : 'متجرك محمي بشهادة SSL فعالة، مما يمنع رسائل (غير آمن) ويزيد من ثقة العميل بالشراء.', score: score + 12, icon: '🔒' });
               if (srObj.hasPixel) strengths.push({ title: 'جاهزية الاستهداف (Pixel)', desc: 'البيكسل مركب بنجاح، مما يسمح لك بتتبع الزوار وإعادة استهدافهم بحملات متقدمة.', score: score + 10, icon: '🎯' });
               if (ig.is_business) strengths.push({ title: 'حساب احترافي للأعمال', desc: 'استخدامك لحساب أعمال يفتح لك أدوات التحليل والإعلانات بشكل كامل لبناء علامتك.', score: score + 5, icon: '📊' });
@@ -1704,54 +2665,165 @@ document.addEventListener("DOMContentLoaded", () => {
               if (ig.followers && ig.followers > 5000) strengths.push({ title: 'قاعدة جماهيرية جيدة', desc: 'يوجد عدد جيد من المتابعين يمكن استغلاله كشريحة أولية للاختبار وبناء الثقة.', score: score + 6, icon: '👥' });
               if (fb.has_ads) strengths.push({ title: 'تواجد إعلاني نشط', desc: 'أنت تستثمر بالفعل في جلب الزيارات عبر الإعلانات، نحتاج فقط لمضاعفة العائد (ROAS).', score: score + 9, icon: '🚀' });
 
-              if (strengths.length < 4) {
-                strengths.push({ title: 'هوية بصرية متناسقة', desc: 'الألوان والخطوط المستخدمة تعكس طبيعة المشروع بشكل جيد ومريح للعين.', score: score + 4, icon: '🎨' });
-                strengths.push({ title: 'جودة المحتوى البصري', desc: 'الصور والفيديوهات المستخدمة ذات جودة عالية وتلفت الانتباه مبدئياً.', score: score + 2, icon: '🖼️' });
-                strengths.push({ title: 'انتظام في النشر', desc: 'الاستمرارية في النشر تعطي إشارات إيجابية لخوارزميات المنصة.', score: score + 3, icon: '📅' });
-                strengths.push({ title: 'استخدام التنسيقات الحديثة', desc: 'الاعتماد على الفيديوهات القصيرة (Reels/TikTok) يزيد من احتمالية الانتشار.', score: score + 4, icon: '📱' });
-              }
+              // No padding with generic strengths. Empty results are rendered as missing data.
             }
 
             // Sort by highest score
             strengths.sort((a, b) => b.score - a.score);
 
-            // --- AI Deep Analysis Box (Strengths) ---
-            if (ai.strengths && Array.isArray(ai.strengths) && ai.strengths.length > 0) {
-              const existingAiBox = document.querySelector('.ai-str-box');
-              if (!existingAiBox) {
-                const aiBlock = document.createElement('div');
-                aiBlock.className = 'ai-str-box';
-                aiBlock.style.cssText = 'background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 24px; border-radius: 16px; margin-bottom: 24px;';
-                let aiListHtml = ai.strengths.map(s => `<li style="margin-bottom:12px; display:flex; gap:10px; align-items:start;"><span style="color:var(--green); font-size:18px;">✨</span> <span>${sanitize(extractText(s, 'نقطة قوة'))}</span></li>`).join('');
-                aiBlock.innerHTML = `
-                  <h4 style="color:var(--green); margin-bottom:12px; font-size:18px; display:flex; align-items:center; gap:8px;"><span>🧠</span> التحليل العميق (AI Diagnostics)</h4>
-                  <p style="color:var(--text-gray); font-size:15px; margin-bottom:16px;"><strong>ما الذي يميز حسابك ويمكن البناء عليه؟</strong></p>
-                  <ul style="list-style:none; padding:0; margin:0; font-size:15px; line-height:1.6;">${aiListHtml}</ul>
-                `;
-                strList.parentNode.insertBefore(aiBlock, strList);
-              }
+            if (strengths.length === 0) {
+              appendMissingData(strList, 'لا توجد نقاط قوة مؤكدة', 'لم ترجع بيانات الفحص أو OpenAI نقاط قوة قابلة للتحقق لهذا التقرير.');
             }
 
-            let html = '';
-            strengths.slice(0, 5).forEach(s => {
-              const val = Math.min(Math.round(s.score), 99);
-              let cls = val >= 85 ? 'd-excellent' : val >= 70 ? 'd-vgood' : 'd-good';
-              let text = val >= 85 ? 'ممتاز' : val >= 70 ? 'جيد جداً' : 'جيد';
-              html += `
-                <div class="detail-item ${cls}">
-                  <div class="d-icon">${s.icon || '✔'}</div>
-                  <div class="d-content">
-                    <h4>${s.title}</h4>
-                    <p>${s.desc}</p>
-                  </div>
-                  <div class="d-score">
-                    <span class="d-score-text">${text}</span>
-                    <span class="d-score-num" data-val="${val}">${val}</span>
-                  </div>
-                </div>
-              `;
+            // ═══════════════════════════════════════════════════════════
+            // دالة بناء بطاقة التحليل العميق (7 عناصر) - نقاط القوة
+            // ═══════════════════════════════════════════════════════════
+            // دالة بناء بطاقة التحليل العميق - نقاط القوة (بـ createElement — آمن مع CSP)
+            // ═══════════════════════════════════════════════════════════
+            const buildDeepStrengthCard = (item) => {
+              const s = item;
+              const val = Math.min(Math.round(s.score || 85), 99);
+              const priority = s.priority || (val >= 85 ? 'high' : val >= 70 ? 'medium' : 'low');
+              const priorityText = priority === 'high' ? 'عالية' : priority === 'medium' ? 'متوسطة' : 'منخفضة';
+
+              // الأيقونة بناءً على المحتوى
+              let icon = s.icon || '✨';
+              const text = (s.title || '') + ' ' + (s.desc || s.analysis || '');
+              if (text.includes('توثيق') || text.includes('موثق')) icon = '✅';
+              else if (text.includes('جمهور') || text.includes('متابع')) icon = '👥';
+              else if (text.includes('تفاعل')) icon = '💬';
+              else if (text.includes('Pixel') || text.includes('تتبع')) icon = '📊';
+              else if (text.includes('واتساب') || text.includes('تواصل')) icon = '💬';
+              else if (text.includes('إعلان')) icon = '🚀';
+              else if (text.includes('تقييم') || text.includes('مراجع')) icon = '⭐';
+              else if (text.includes('محتوى') || text.includes('فيديو')) icon = '🎬';
+              else if (text.includes('هوية') || text.includes('Bio')) icon = '🎨';
+
+              // ── بناء البطاقة بالكامل بـ createElement ──
+              const card = document.createElement('div');
+              card.className = 'deep-card';
+
+              // header
+              const header = document.createElement('div');
+              header.className = 'deep-header';
+
+              const iconDiv = document.createElement('div');
+              iconDiv.className = 'deep-icon';
+              iconDiv.textContent = icon;
+
+              const titleGroup = document.createElement('div');
+              titleGroup.className = 'deep-title-group';
+
+              const titleDiv = document.createElement('div');
+              titleDiv.className = 'deep-title';
+              // دعم النوع (type) كشارة إضافية
+              if (s.type) {
+                const typeSpan = document.createElement('span');
+                typeSpan.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.25);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;color:var(--green);margin-right:8px;';
+                typeSpan.textContent = s.type;
+                titleDiv.appendChild(typeSpan);
+              }
+              titleDiv.appendChild(document.createTextNode(s.title || s.name || 'نقطة قوة'));
+
+              const prioritySpan = document.createElement('span');
+              prioritySpan.className = 'deep-priority ' + priority;
+              prioritySpan.textContent = '🔺 أولوية ' + priorityText;
+
+              titleGroup.appendChild(titleDiv);
+              titleGroup.appendChild(prioritySpan);
+
+              const scoreBadge = document.createElement('div');
+              scoreBadge.className = 'deep-score-badge';
+              const scoreNum = document.createElement('div');
+              scoreNum.className = 'deep-score-num';
+              scoreNum.textContent = val;
+              const scoreLabel = document.createElement('div');
+              scoreLabel.className = 'deep-score-label';
+              scoreLabel.textContent = 'درجة';
+              scoreBadge.appendChild(scoreNum);
+              scoreBadge.appendChild(scoreLabel);
+
+              header.appendChild(iconDiv);
+              header.appendChild(titleGroup);
+              header.appendChild(scoreBadge);
+
+              // body
+              const body = document.createElement('div');
+              body.className = 'deep-body';
+
+              // دالة مساعدة لإنشاء صف (row)
+              const makeRow = (labelClass, labelText, valueText) => {
+                const row = document.createElement('div');
+                row.className = 'deep-row';
+                const label = document.createElement('div');
+                label.className = 'deep-label ' + labelClass;
+                label.textContent = labelText;
+                const value = document.createElement('div');
+                value.className = 'deep-value';
+                value.textContent = valueText;
+                row.appendChild(label);
+                row.appendChild(value);
+                return row;
+              };
+
+              // صف الوصف + bullets
+              const descRow = document.createElement('div');
+              descRow.className = 'deep-row';
+              const descLabel = document.createElement('div');
+              descLabel.className = 'deep-label analysis';
+              descLabel.textContent = '📋 الوصف';
+              const descValue = document.createElement('div');
+              descValue.className = 'deep-value';
+              descValue.textContent = s.desc || s.analysis || s.description || 'تحليل هذه النقطة...';
+              // إضافة النقاط الفرعية (bullets) إن وجدت
+              if (s.bullets && s.bullets.length) {
+                const bulletsUl = document.createElement('ul');
+                bulletsUl.style.cssText = 'margin:8px 0 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;';
+                s.bullets.forEach(b => {
+                  const bLi = document.createElement('li');
+                  bLi.style.cssText = 'font-size:13px;color:var(--text-gray);font-weight:600;display:flex;align-items:flex-start;gap:7px;';
+                  const bMark = document.createElement('span');
+                  bMark.style.cssText = 'color:var(--green);flex-shrink:0;margin-top:2px;';
+                  bMark.textContent = '◈';
+                  bLi.appendChild(bMark);
+                  bLi.appendChild(document.createTextNode(b));
+                  bulletsUl.appendChild(bLi);
+                });
+                descValue.appendChild(bulletsUl);
+              }
+              descRow.appendChild(descLabel);
+              descRow.appendChild(descValue);
+
+              body.appendChild(descRow);
+              body.appendChild(makeRow('evidence', '📊 الدليل', s.evidence || s.metric || 'بناءً على البيانات الفعلية'));
+              body.appendChild(makeRow('impact', '💥 التأثير', s.impact || 'تأثير إيجابي على الأداء العام'));
+              body.appendChild(makeRow('cause', '🔍 السبب', s.root_cause || s.cause || 'نتيجة الجهود التسويقية الحالية'));
+
+              // صندوق الإجراء
+              const actionBox = document.createElement('div');
+              actionBox.className = 'deep-action-box';
+              const actionIcon = document.createElement('div');
+              actionIcon.className = 'action-icon';
+              actionIcon.textContent = '✅';
+              const actionText = document.createElement('div');
+              actionText.className = 'action-text';
+              actionText.textContent = s.action || 'استمر في تعزيز هذه النقطة واستثمارها';
+              actionBox.appendChild(actionIcon);
+              actionBox.appendChild(actionText);
+              body.appendChild(actionBox);
+
+              card.appendChild(header);
+              card.appendChild(body);
+              return card;
+            };
+
+            // عرض جميع نقاط القوة بدون حد أقصى — كل النقاط مهما كانت الدرجة
+            while (strList.firstChild) strList.removeChild(strList.firstChild);
+            strengths.forEach((s) => {
+              strList.appendChild(buildDeepStrengthCard(s));
             });
-            strList.innerHTML = html;
+            // تشغيل العداد والحلقات على البطاقات المولودة ديناميكياً
+            setTimeout(() => { animateCounters(); animateRings(); }, 100);
           }
         }
 
@@ -1776,17 +2848,17 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           if (weakTitle) {
             if (riskIndex > 60) {
-              weakTitle.innerHTML = '⚠ نزيف خطير';
+              weakTitle.textContent = '⚠ نزيف خطير';
               weakTitle.style.color = 'var(--red)';
-              if (weakDesc) weakDesc.innerHTML = 'يوجد نقاط اختناق حرجة تسبب في <strong>هدر المبيعات اليومية</strong>.';
+              if (weakDesc) weakDesc.textContent = 'يوجد نقاط اختناق حرجة تسبب في هدر المبيعات اليومية.';
             } else if (riskIndex > 30) {
-              weakTitle.innerHTML = '⚠ خطر متوسط';
+              weakTitle.textContent = '⚠ خطر متوسط';
               weakTitle.style.color = 'var(--yellow)';
-              if (weakDesc) weakDesc.innerHTML = 'الوضع مستقر لكن يوجد تسريبات مالية تمنعك من مضاعفة أرباحك.';
+              if (weakDesc) weakDesc.textContent = 'الوضع مستقر لكن يوجد تسريبات مالية تمنعك من مضاعفة أرباحك.';
             } else {
-              weakTitle.innerHTML = '✅ وضع آمن';
+              weakTitle.textContent = '✅ وضع آمن';
               weakTitle.style.color = 'var(--green)';
-              if (weakDesc) weakDesc.innerHTML = 'النقاط السلبية طفيفة ولا تؤثر بشكل كارثي على المبيعات.';
+              if (weakDesc) weakDesc.textContent = 'النقاط السلبية طفيفة ولا تؤثر بشكل كارثي على المبيعات.';
             }
           }
 
@@ -1821,7 +2893,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // لو الـ object يحمل score خاص نستعمله، وإلا نشتق من الترتيب
                 const wScore = (isObj && typeof str.score === 'number') ? str.score : (30 + (index * 5));
-                weaknesses.push({ title: title, desc: desc, score: wScore, icon: icon });
+                // ── حفظ جميع الحقول الأصلية (bullets, metric, action, evidence, ...) ──
+                weaknesses.push(Object.assign({}, isObj ? str : {}, { title: title, desc: desc, score: wScore, icon: icon }));
               });
             } else {
               if (srObj.hasSSL === false) weaknesses.push({ title: 'ثغرة أمنية (SSL مفقود)', desc: isService ? 'الزوار يتلقون رسالة (الموقع غير آمن) ويغادرون فوراً قبل التعرف على خدماتك.' : 'كارثة حقيقية: الزوار يتلقون رسالة (الموقع غير آمن) من المتصفح ويغادرون فوراً قبل رؤية منتجاتك.', score: score - 20, icon: '🔓' });
@@ -1832,54 +2905,165 @@ document.addEventListener("DOMContentLoaded", () => {
               if (fb.has_ads === false) weaknesses.push({ title: 'غياب التواجد الإعلاني', desc: isService ? 'لا يوجد لك أي حملات نشطة في مكتبة الإعلانات. أنت تعتمد فقط على الحظ في جلب العملاء.' : 'لا يوجد لك أي حملات نشطة في مكتبة الإعلانات. أنت تعتمد فقط على الحظ في جلب المبيعات.', score: score - 14, icon: '📉' });
               if (ws.has_checkout === false) weaknesses.push({ title: isService ? 'صعوبة التواصل والطلب' : 'انهيار مسار الدفع', desc: isService ? 'عدم وجود وسيلة واضحة وسريعة لطلب الخدمة يجعل العميل يتراجع في اللحظة الأخيرة.' : 'عدم وجود صفحة إتمام شراء واضحة يجعل العميل يتراجع في اللحظة الأخيرة مما يرفع السلات المتروكة.', score: score - 11, icon: isService ? '☎️' : '🛒' });
 
-              if (weaknesses.length < 4) {
-                weaknesses.push({ title: 'ضعف المحفزات (CTA)', desc: 'الزائر يصل لموقعك ولا يعرف ماذا يفعل بعد ذلك لغياب العروض المقنعة ونداء الإجراء الواضح.', score: score - 6, icon: '🛑' });
-                weaknesses.push({ title: 'غياب الدليل الاجتماعي (Social Proof)', desc: isService ? 'لا توجد تجارب ونماذج أعمال سابقة كافية لطمأنة الزائر مما يجعله يتردد في التعامل.' : 'لا توجد تجارب عملاء سابقة كافية لطمأنة الزائر الجديد مما يجعله يتردد في الشراء.', score: score - 5, icon: '🤷' });
-                weaknesses.push({ title: 'تجربة مستخدم معقدة', desc: isService ? 'الوصول لتفاصيل الخدمة يتطلب خطوات كثيرة، مما يصيب العميل بالملل.' : 'الوصول للمنتجات يتطلب خطوات كثيرة، مما يصيب العميل بالملل.', score: score - 7, icon: '🧩' });
-                weaknesses.push({ title: 'الرسالة التسويقية مبهمة', desc: isService ? 'لا يوجد سبب مقنع يجعل العميل يختارك ويترك المنافسين. القيمة المضافة غير واضحة.' : 'لا يوجد سبب مقنع يجعل العميل يشتري منك ويترك المنافسين. القيمة المضافة غير واضحة.', score: score - 4, icon: '🎯' });
-              }
+              // No padding with generic weaknesses. Empty results are rendered as missing data.
             }
 
             // Sort by lowest score (worst weaknesses first)
             weaknesses.sort((a, b) => a.score - b.score);
 
-            // --- AI Deep Analysis Box (Weaknesses) ---
-            if (ai.weaknesses && Array.isArray(ai.weaknesses) && ai.weaknesses.length > 0) {
-              const existingAiBox = document.querySelector('.ai-weak-box');
-              if (!existingAiBox) {
-                const aiBlock = document.createElement('div');
-                aiBlock.className = 'ai-weak-box';
-                aiBlock.style.cssText = 'background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 24px; border-radius: 16px; margin-bottom: 24px;';
-                let aiListHtml = ai.weaknesses.map(s => `<li style="margin-bottom:12px; display:flex; gap:10px; align-items:start;"><span style="color:var(--red); font-size:18px;">⚠️</span> <span>${sanitize(extractText(s, 'نقطة ضعف'))}</span></li>`).join('');
-                aiBlock.innerHTML = `
-                  <h4 style="color:var(--red); margin-bottom:12px; font-size:18px; display:flex; align-items:center; gap:8px;"><span>🧠</span> التحليل العميق (AI Diagnostics)</h4>
-                  <p style="color:var(--text-gray); font-size:15px; margin-bottom:16px;"><strong>ما هي نقاط الاختناق الحرجة التي تستنزف ميزانيتك؟</strong></p>
-                  <ul style="list-style:none; padding:0; margin:0; font-size:15px; line-height:1.6;">${aiListHtml}</ul>
-                `;
-                weakList.parentNode.insertBefore(aiBlock, weakList);
-              }
+            if (weaknesses.length === 0) {
+              appendMissingData(weakList, 'لا توجد نقاط ضعف مؤكدة', 'لم ترجع بيانات الفحص أو OpenAI نقاط ضعف قابلة للتحقق لهذا التقرير.');
             }
 
-            let html = '';
-            weaknesses.slice(0, 5).forEach(w => {
-              const val = Math.max(Math.round(w.score), 5);
-              let cls = val <= 40 ? 'd-weak' : 'd-avg';
-              let text = val <= 40 ? 'ضعيف جداً' : 'يحتاج تحسين';
-              html += `
-                <div class="detail-item ${cls}">
-                  <div class="d-icon">${w.icon || '✖'}</div>
-                  <div class="d-content">
-                    <h4>${w.title}</h4>
-                    <p>${w.desc}</p>
-                  </div>
-                  <div class="d-score">
-                    <span class="d-score-text">${text}</span>
-                    <span class="d-score-num" data-val="${val}">${val}</span>
-                  </div>
-                </div>
-              `;
+            // ═══════════════════════════════════════════════════════════
+            // دالة بناء بطاقة التحليل العميق (7 عناصر) - نقاط الضعف
+            // ═══════════════════════════════════════════════════════════
+            // دالة بناء بطاقة التحليل العميق - نقاط الضعف (بـ createElement — آمن مع CSP)
+            // ═══════════════════════════════════════════════════════════
+            const buildDeepWeaknessCard = (item) => {
+              const w = item;
+              const val = Math.max(Math.round(w.score || 30), 5);
+              const priority = w.priority || (val <= 25 ? 'critical' : val <= 40 ? 'high' : val <= 60 ? 'medium' : 'low');
+              const priorityText = priority === 'critical' ? 'حرجة' : priority === 'high' ? 'عالية' : priority === 'medium' ? 'متوسطة' : 'منخفضة';
+
+              // الأيقونة بناءً على المحتوى
+              let icon = w.icon || '⚠️';
+              const text = (w.title || '') + ' ' + (w.desc || w.analysis || '');
+              if (text.includes('Pixel') || text.includes('تتبع')) icon = '📊';
+              else if (text.includes('واتساب') || text.includes('تواصل')) icon = '💬';
+              else if (text.includes('SSL') || text.includes('أمان')) icon = '🔓';
+              else if (text.includes('تفاعل')) icon = '📉';
+              else if (text.includes('توثيق') || text.includes('موثق')) icon = '❌';
+              else if (text.includes('جمهور') || text.includes('متابع')) icon = '👥';
+              else if (text.includes('تقييم') || text.includes('مراجع')) icon = '⭐';
+              else if (text.includes('محتوى')) icon = '📝';
+              else if (text.includes('CTA') || text.includes('تحويل')) icon = '🎯';
+
+              // ── بناء البطاقة بالكامل بـ createElement ──
+              const card = document.createElement('div');
+              card.className = 'deep-card';
+
+              // header
+              const header = document.createElement('div');
+              header.className = 'deep-header';
+
+              const iconDiv = document.createElement('div');
+              iconDiv.className = 'deep-icon';
+              iconDiv.textContent = icon;
+
+              const titleGroup = document.createElement('div');
+              titleGroup.className = 'deep-title-group';
+
+              const titleDiv = document.createElement('div');
+              titleDiv.className = 'deep-title';
+              // دعم النوع (type) كشارة إضافية
+              if (w.type) {
+                const typeSpan = document.createElement('span');
+                typeSpan.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.25);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;color:var(--red);margin-right:8px;';
+                typeSpan.textContent = w.type;
+                titleDiv.appendChild(typeSpan);
+              }
+              titleDiv.appendChild(document.createTextNode(w.title || w.name || 'نقطة ضعف'));
+
+              const prioritySpan = document.createElement('span');
+              prioritySpan.className = 'deep-priority ' + priority;
+              prioritySpan.textContent = '🚨 أولوية ' + priorityText;
+
+              titleGroup.appendChild(titleDiv);
+              titleGroup.appendChild(prioritySpan);
+
+              const scoreBadge = document.createElement('div');
+              scoreBadge.className = 'deep-score-badge';
+              const scoreNum = document.createElement('div');
+              scoreNum.className = 'deep-score-num';
+              scoreNum.textContent = val;
+              const scoreLabel = document.createElement('div');
+              scoreLabel.className = 'deep-score-label';
+              scoreLabel.textContent = 'خطورة';
+              scoreBadge.appendChild(scoreNum);
+              scoreBadge.appendChild(scoreLabel);
+
+              header.appendChild(iconDiv);
+              header.appendChild(titleGroup);
+              header.appendChild(scoreBadge);
+
+              // body
+              const body = document.createElement('div');
+              body.className = 'deep-body';
+
+              // دالة مساعدة لإنشاء صف (row)
+              const makeRow = (labelClass, labelText, valueText) => {
+                const row = document.createElement('div');
+                row.className = 'deep-row';
+                const label = document.createElement('div');
+                label.className = 'deep-label ' + labelClass;
+                label.textContent = labelText;
+                const value = document.createElement('div');
+                value.className = 'deep-value';
+                value.textContent = valueText;
+                row.appendChild(label);
+                row.appendChild(value);
+                return row;
+              };
+
+              // صف الوصف + bullets
+              const descRow = document.createElement('div');
+              descRow.className = 'deep-row';
+              const descLabel = document.createElement('div');
+              descLabel.className = 'deep-label analysis';
+              descLabel.textContent = '📋 الوصف';
+              const descValue = document.createElement('div');
+              descValue.className = 'deep-value';
+              descValue.textContent = w.desc || w.analysis || w.description || 'تحليل هذه النقطة...';
+              // إضافة النقاط الفرعية (bullets) إن وجدت
+              if (w.bullets && w.bullets.length) {
+                const bulletsUl = document.createElement('ul');
+                bulletsUl.style.cssText = 'margin:8px 0 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;';
+                w.bullets.forEach(b => {
+                  const bLi = document.createElement('li');
+                  bLi.style.cssText = 'font-size:13px;color:var(--text-gray);font-weight:600;display:flex;align-items:flex-start;gap:7px;';
+                  const bMark = document.createElement('span');
+                  bMark.style.cssText = 'color:var(--red);flex-shrink:0;margin-top:2px;';
+                  bMark.textContent = '◈';
+                  bLi.appendChild(bMark);
+                  bLi.appendChild(document.createTextNode(b));
+                  bulletsUl.appendChild(bLi);
+                });
+                descValue.appendChild(bulletsUl);
+              }
+              descRow.appendChild(descLabel);
+              descRow.appendChild(descValue);
+
+              body.appendChild(descRow);
+              body.appendChild(makeRow('evidence', '📊 الدليل', w.evidence || w.metric || 'بناءً على البيانات الفعلية'));
+              body.appendChild(makeRow('impact', '💥 التأثير', w.impact || 'تأثير سلبي على الأداء العام'));
+              body.appendChild(makeRow('cause', '🔍 السبب', w.root_cause || w.cause || 'يحتاج تحديد السبب الجذري'));
+
+              // صندوق الإجراء
+              const actionBox = document.createElement('div');
+              actionBox.className = 'deep-action-box';
+              const actionIcon = document.createElement('div');
+              actionIcon.className = 'action-icon';
+              actionIcon.textContent = '🔧';
+              const actionText = document.createElement('div');
+              actionText.className = 'action-text';
+              actionText.textContent = w.action || 'اتخذ إجراءً فورياً لمعالجة هذه النقطة';
+              actionBox.appendChild(actionIcon);
+              actionBox.appendChild(actionText);
+              body.appendChild(actionBox);
+
+              card.appendChild(header);
+              card.appendChild(body);
+              return card;
+            };
+
+            // عرض جميع نقاط الضعف بدون حد أقصى — كل النقاط مهما كانت الدرجة
+            while (weakList.firstChild) weakList.removeChild(weakList.firstChild);
+            weaknesses.forEach((w) => {
+              weakList.appendChild(buildDeepWeaknessCard(w));
             });
-            weakList.innerHTML = html;
+            // تشغيل العداد والحلقات على البطاقات المولودة ديناميكياً
+            setTimeout(() => { animateCounters(); animateRings(); }, 100);
           }
         }
       }
@@ -1993,6 +3177,176 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // ==========================================
+      // PAGE: recommendations.html
+      // ==========================================
+      if (path.includes('recommendations.html')) {
+        const recClientName = document.getElementById('recClientName');
+        const recHandle = document.getElementById('recHandle');
+        const recTotalCount = document.getElementById('recTotalCount');
+        const recProfileImg = document.getElementById('recProfileImg');
+
+        if (recClientName) recClientName.textContent = clientName;
+        if (recHandle) recHandle.textContent = clientUrl ? '@' + clientUrl.replace('https://', '').replace('www.', '').split('/')[0] : '@' + clientName.replace(/\s+/g, '');
+        if (recProfileImg && clientName) recProfileImg.textContent = Array.from(clientName)[0].toUpperCase();
+
+        const recHighList = document.getElementById('recHighList');
+        const recMedList = document.getElementById('recMedList');
+        const recLowList = document.getElementById('recLowList');
+
+        if (ai.recommendations && Array.isArray(ai.recommendations) && ai.recommendations.length > 0) {
+          let highHtml = '';
+          let medHtml = '';
+          let lowHtml = '';
+          let totalRecs = 0;
+
+          // ── Free tier: عرض 3 توصيات بالضبط (slice(0, 3)). Paid: القائمة كاملة. ──
+          const isPaidTier  = true; // data.package_tier === 'paid'; // معطل مؤقتاً لغرض التصميم
+          const visibleRecs = isPaidTier ? ai.recommendations : ai.recommendations.slice(0, 3);
+          const totalCount  = ai.recommendations.length;
+
+          // ═══════════════════════════════════════════════════════════════════
+          // دالة بناء بطاقة التوصية التفصيلية
+          // ═══════════════════════════════════════════════════════════════════
+          const buildRecCard = (rec, index) => {
+            totalRecs++;
+            const priority = rec.priority ? rec.priority.toLowerCase() : (totalRecs <= 2 ? 'high' : totalRecs <= 4 ? 'medium' : 'low');
+            // تحديد الفئة: critical أولاً، ثم high، ثم med، ثم low
+            const iconClass = priority.includes('critical') ? 'critical' : priority.includes('high') ? 'high' : priority.includes('med') ? 'med' : 'low';
+            const iconEmoji = rec.icon || (priority.includes('critical') ? '🛑' : priority.includes('high') ? '🔴' : priority.includes('med') ? '🟡' : '🟢');
+            const priorityText = priority.includes('critical') ? 'حرجة' : priority.includes('high') ? 'قصوى' : priority.includes('med') ? 'متوسطة' : 'مستقبلية';
+
+            const title = sanitize(rec.title || 'توصية هامة');
+            const desc = sanitize(rec.desc || rec.description || '');
+            const whyNow = sanitize(rec.why_now || '');
+            const evidence = sanitize(rec.evidence || '');
+            const roi = sanitize(rec.roi || '');
+            const time = sanitize(rec.time_to_implement || '');
+            const difficulty = sanitize(rec.difficulty || '');
+            const scoreImpact = sanitize(rec.score_impact || '');
+            const strategicContext = sanitize(rec.strategic_context || '');
+
+            // الخطوات (bullets)
+            let bulletsHtml = '';
+            if (rec.bullets && Array.isArray(rec.bullets) && rec.bullets.length > 0) {
+              bulletsHtml = `<div class="rec-steps">
+                <div class="rec-steps-title">📋 خطوات التنفيذ:</div>
+                ${rec.bullets.map(b => `<div class="rec-step">${sanitize(b)}</div>`).join('')}
+              </div>`;
+            }
+
+            return `
+              <div class="rec-card-detailed ${iconClass}">
+                <div class="rec-header">
+                  <div class="rec-icon-large ${iconClass}">${iconEmoji}</div>
+                  <div class="rec-header-content">
+                    <div class="rec-priority-badge ${iconClass}">🚨 أولوية ${priorityText}</div>
+                    <h4 class="rec-title">${title}</h4>
+                  </div>
+                </div>
+                <div class="rec-body">
+                  <div class="rec-desc">${desc}</div>
+
+                  ${strategicContext ? `<div class="rec-meta strategic"><span class="meta-label">🎯 السياق الاستراتيجي:</span> ${strategicContext}</div>` : ''}
+                  ${evidence ? `<div class="rec-meta"><span class="meta-label">📊 الدليل:</span> ${evidence}</div>` : ''}
+                  ${whyNow ? `<div class="rec-meta highlight"><span class="meta-label">⚡ لماذا الآن:</span> ${whyNow}</div>` : ''}
+
+                  ${bulletsHtml}
+
+                  <div class="rec-metrics">
+                    ${roi ? `<div class="rec-metric"><span class="metric-icon">💰</span><span class="metric-label">العائد:</span> ${roi}</div>` : ''}
+                    ${time ? `<div class="rec-metric"><span class="metric-icon">⏱️</span><span class="metric-label">الوقت:</span> ${time}</div>` : ''}
+                    ${difficulty ? `<div class="rec-metric"><span class="metric-icon">🔧</span><span class="metric-label">الصعوبة:</span> ${difficulty}</div>` : ''}
+                    ${scoreImpact ? `<div class="rec-metric"><span class="metric-icon">📈</span><span class="metric-label">التأثير:</span> ${scoreImpact}</div>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          };
+
+          visibleRecs.forEach((rec, i) => {
+            const priority = rec.priority ? rec.priority.toLowerCase() : 'medium';
+            const cardHtml = buildRecCard(rec, i);
+            // critical توضع في high (القصوى)، وكذلك high
+            if (priority.includes('critical') || priority.includes('high')) highHtml += cardHtml;
+            else if (priority.includes('med')) medHtml += cardHtml;
+            else lowHtml += cardHtml;
+          });
+
+          if (recHighList) recHighList.innerHTML = highHtml || '<div style="padding: 20px; color: var(--text-gray);">✅ لا توجد توصيات قصوى حالياً — وضع ممتاز!</div>';
+          if (recMedList) recMedList.innerHTML = medHtml || '<div style="padding: 20px; color: var(--text-gray);">لا توجد توصيات متوسطة.</div>';
+          if (recLowList) recLowList.innerHTML = lowHtml || '<div style="padding: 20px; color: var(--text-gray);">لا توجد توصيات مستقبلية حالياً.</div>';
+          
+          if (recTotalCount) {
+            recTotalCount.textContent = isPaidTier
+              ? totalCount + ' إجراء'
+              : visibleRecs.length + ' من ' + totalCount + ' إجراء (باقة مجانية)';
+          }
+        } else {
+          // Fallback if no recommendations array
+          if (recHighList) recHighList.innerHTML = '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة نقاط الضعف لمزيد من التفاصيل.</div>';
+          if (recMedList) recMedList.innerHTML = '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة خطة العمل لمزيد من التفاصيل.</div>';
+          if (recLowList) recLowList.innerHTML = '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة نقاط القوة لمزيد من التفاصيل.</div>';
+          if (recTotalCount) recTotalCount.textContent = '... إجراء';
+        }
+      }
+
+      // ==========================================
+      // GLOBAL: INNER PAGES PROFILE TAGS
+      // ==========================================
+      const profileAccTypes = document.querySelectorAll('#profileAccountType');
+      const isBusinessAcc = srObj.instagram ? srObj.instagram.is_business : false;
+      profileAccTypes.forEach(el => el.textContent = isBusinessAcc ? 'حساب أعمال' : 'حساب تجاري');
+
+      const profileNiches = document.querySelectorAll('#profileNiche');
+      const pt = ai.page_type || data.project_type || 'غير محدد';
+      profileNiches.forEach(el => el.textContent = sanitize(pt));
+
+      // ==========================================
+      // PAGE: roadmap-30d.html
+      // ==========================================
+      if (path.includes('roadmap-30d.html')) {
+        const roadmap = (data.ai_report && (data.ai_report.action_month || data.ai_report.roadmap_30d || data.ai_report.plan_30d)) || data.action_month || null;
+        const getWeek = (num) => {
+          if (!roadmap) return null;
+          return roadmap['week' + num] || roadmap['w' + num] || (Array.isArray(roadmap.weeks) ? roadmap.weeks[num - 1] : null) || null;
+        };
+        const asArray = (value) => Array.isArray(value) ? value : (typeof value === 'string' && value.trim() ? [value] : []);
+
+        if (!roadmap) {
+          for (let i = 1; i <= 4; i++) {
+            setTextIf('titleW' + i, 'غير متوفر من بيانات التقرير');
+            const goals = document.getElementById('goalsW' + i);
+            if (goals) goals.innerHTML = '<span class="goal-tag">غير متوفر</span>';
+            const tasks = document.getElementById('tasksW' + i);
+            if (tasks) tasks.innerHTML = missingDataHtml('خطة الأسبوع غير متوفرة', 'لم يرجع OpenAI خطة 30 يوم لهذا التقرير، لذلك لا يتم عرض مهام عامة أو ثابتة.');
+            setTextIf('kpiW' + i, 'غير متوفر بدون خطة شهرية صادرة من بيانات التقرير.');
+          }
+          setTextIf('expectedResultText', 'النتيجة المتوقعة غير متوفرة لأن خطة 30 يوم لم ترجع ضمن بيانات هذا التقرير.');
+        } else {
+          for (let i = 1; i <= 4; i++) {
+            const week = getWeek(i) || {};
+            setTextIf('titleW' + i, week.title || week.name || `الأسبوع ${i}`);
+            const goals = document.getElementById('goalsW' + i);
+            const weekGoals = asArray(week.goals || week.objectives || week.tags);
+            if (goals) {
+              goals.innerHTML = weekGoals.length
+                ? weekGoals.map(goal => `<span class="goal-tag">${sanitize(goal)}</span>`).join('')
+                : '<span class="goal-tag">غير محدد من البيانات</span>';
+            }
+            const tasks = document.getElementById('tasksW' + i);
+            const weekTasks = asArray(week.tasks || week.actions || week.steps);
+            if (tasks) {
+              tasks.innerHTML = weekTasks.length
+                ? weekTasks.map(task => `<div class="task-item"><div class="task-check">✓</div><div class="task-text">${sanitize(task)}</div></div>`).join('')
+                : missingDataHtml('مهام الأسبوع غير متوفرة', 'هذا الأسبوع موجود في الخطة لكن لم ترجع له مهام واضحة.');
+            }
+            setTextIf('kpiW' + i, week.kpi || week.success_metric || week.metric || 'غير محدد من البيانات');
+          }
+          setTextIf('expectedResultText', roadmap.expected_result || roadmap.expected_outcome || data.expected_result || 'غير محدد من البيانات');
+        }
+      }
+
+      // ==========================================
       // PAGE: plan.html
       // ==========================================
       if (path.includes('plan.html')) {
@@ -2012,200 +3366,79 @@ document.addEventListener("DOMContentLoaded", () => {
         const phase2 = document.getElementById('tasksPhase2');
         if (phase2 && data.recommendations && data.recommendations.length > 0) {
           const coreTasks = data.recommendations
-            .filter(r => r.priority === 'high' || r.priority === 'medium')
+            .filter(r => r.priority === 'critical' || r.priority === 'high' || r.priority === 'medium')
             .map(r => r.title);
           if (coreTasks.length > 0) {
             phase2.innerHTML = coreTasks.slice(0, 6).map(title =>
               `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${title}</div>`
             ).join('');
           } else {
-            phase2.innerHTML = `<div class="rm-task"><i>✓</i> تحسين استراتيجية المحتوى بشكل عام</div>`;
+            phase2.innerHTML = `<div class="rm-task"><i>!</i> لا توجد توصيات مؤكدة من بيانات التقرير لهذه المرحلة.</div>`;
           }
         }
 
-        // Phase 3: Scaling (Generic + Strengths)
+        // Phase 3: Scaling (Dynamic from data)
         const phase3 = document.getElementById('tasksPhase3');
         if (phase3) {
-          let scaleTasks = [
-            'مضاعفة الميزانية (Scaling) للحملات الرابحة',
-            'إطلاق برامج ولاء العملاء لزيادة LTV',
-            'التوسع في استهداف شرائح جمهور جديدة'
-          ];
+          let scaleTasks = [];
+
+          // بناءً على نقاط القوة
           if (data.strengths && data.strengths.length > 0) {
-            scaleTasks.unshift(`استغلال نقطة القوة: ${data.strengths[0].title || data.strengths[0]}`);
+            const topStrength = data.strengths[0].title || data.strengths[0].name || data.strengths[0];
+            scaleTasks.push('استغلال نقطة القوة: ' + topStrength);
           }
-          phase3.innerHTML = scaleTasks.slice(0, 4).map(task =>
-            `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${task}</div>`
-          ).join('');
+
+          // بناءً على حالة الإعلانات
+          if (sr.ads_library && sr.ads_library.total_ads > 0) {
+            scaleTasks.push('مضاعفة ميزانية الحملات الرابحة من ' + sr.ads_library.total_ads + ' إعلان حالي');
+          } else if (sr.hasPixel || sr.has_fb_pixel) {
+            scaleTasks.push('إطلاق أول حملة إعلانية — البنية التحتية جاهزة');
+          }
+
+          // بناءً على عدد المتابعين
+          const totalF = (sr.facebook?.followers || 0) + (sr.instagram?.followers || 0) + (sr.tiktok?.followers || 0);
+          if (totalF >= 1000) {
+            scaleTasks.push('إطلاق Retargeting لـ ' + totalF.toLocaleString() + ' متابع حالي');
+          }
+
+          // بناءً على التقييمات
+          if (sr.facebook && sr.facebook.rating > 0) {
+            scaleTasks.push('بناء برنامج ولاء — تقييمك ' + sr.facebook.rating + '/5 يعطي أساساً');
+          } else if (sr.facebook && sr.facebook.rating === 0) {
+            scaleTasks.push('بناء برنامج ولاء بعد جمع 10+ تقييمات');
+          }
+
+          // بناءً على المنصات
+          const activePlats = [];
+          if (sr.facebook?.followers > 0) activePlats.push('Facebook');
+          if (sr.instagram?.followers > 0) activePlats.push('Instagram');
+          if (sr.tiktok?.followers > 0) activePlats.push('TikTok');
+          if (activePlats.length >= 2) {
+            scaleTasks.push('التوسع في استهداف شرائح جديدة على ' + activePlats.join(' و'));
+          }
+
+          phase3.innerHTML = scaleTasks.length
+            ? scaleTasks.slice(0, 4).map(task => `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${task}</div>`).join('')
+            : `<div class="rm-task"><i>!</i> لا توجد بيانات توسع مؤكدة لهذا التقرير.</div>`;
         }
 
-        // Dynamic ROI Projection based on score
+        // ROI from real Meta Ads Manager metrics only.
         const roiVals = document.querySelectorAll('.roi-card .val');
-        if (roiVals.length >= 3 && data.score != null) {
-          // Score 0-100 logic: Higher score -> harder to improve but better baseline
-          const cr = (0.8 + ((100 - data.score) / 100) * 2.0).toFixed(1); // 0.8% to 2.8% expected improvement
-          const roas = (1.5 + ((100 - data.score) / 100) * 3.5).toFixed(1); // 1.5x to 5.0x
-          const cac = Math.floor(10 + ((100 - data.score) / 100) * 15); // $10 to $25 reduction
-
-          roiVals[0].textContent = cr + '%';
-          roiVals[1].textContent = roas + 'x';
-          roiVals[2].textContent = '-$' + cac;
-        }
-      }
-
-      // ==========================================
-      // P2-2 PAGE: ads.html — بيانات إعلانات حقيقية
-      // ==========================================
-      if (path.includes('ads.html')) {
-        const adsLib   = sr.ads_library || sr.ads || {};
-        const adsList  = adsLib.ads || [];
-        const adsCount = adsLib.total_count || adsList.length || 0;
-        const isActive = adsLib.active_ads > 0;
-
-        // تحديث مؤشر نشاط الإعلانات
-        const metricVals = document.querySelectorAll('.m-val');
-        const metricStatuses = document.querySelectorAll('.m-status');
-        if (metricVals[0]) {
-          metricVals[0].textContent  = adsCount > 0 ? adsCount + ' إعلان' : 'لا إعلانات';
-          metricVals[0].className    = 'm-val ' + (adsCount > 5 ? 'val-green' : adsCount > 0 ? 'val-yellow' : 'val-red');
-        }
-        if (metricStatuses[0]) {
-          metricStatuses[0].textContent = adsCount > 5 ? '▲ نشط ومنتج' : adsCount > 0 ? '▶ نشاط منخفض' : '▼ لا يوجد إعلانات';
-          metricStatuses[0].className   = 'm-status ' + (adsCount > 5 ? 'status-green' : adsCount > 0 ? 'status-yellow' : 'status-red');
-        }
-
-        // تحديث اسم الإعلان في المحاكاة
-        const adNameMock = document.querySelector('.ad-name');
-        if (adNameMock) adNameMock.textContent = clientName;
-
-        // إذا توفر أول إعلان حقيقي — اعرض نصه
-        if (adsList.length > 0) {
-          const firstAd   = adsList[0];
-          const adFooter  = document.querySelector('.ad-footer');
-          if (adFooter && firstAd.body) {
-            const textMock = adFooter.querySelector('.ad-text-mock');
-            if (textMock) {
-              textMock.outerHTML = `<p style="font-size:11px;color:#ccc;line-height:1.5;margin-bottom:8px;">${firstAd.body.substring(0,80)}${firstAd.body.length>80?'...':''}</p>`;
-            }
-          }
-          // تحديث حالة الإعلان في المؤشر
-          const statusLabel = document.querySelector('.score-text');
-          if (statusLabel) statusLabel.textContent = isActive ? 'إعلانات نشطة' : 'مؤشر الإعلانات';
-        }
-      }
-
-      // ==========================================
-      // P2-2 PAGE: competitors.html — بيانات منافسين حقيقية
-      // ==========================================
-      if (path.includes('competitors.html')) {
-        const compRadar = sr.competitor_radar || sr.competitors || [];
-
-        // تحديث بطاقة "هذا أنت" بالبيانات الحقيقية
-        const youCard = document.querySelector('.comp-card.is-you');
-        if (youCard) {
-          const statVals = youCard.querySelectorAll('.c-stat-val');
-          // معدل التفاعل من IG أو FB
-          const engRate  = ig.engagement_rate || fb.engagement_rate || null;
-          if (statVals[0] && engRate) {
-            statVals[0].innerHTML = parseFloat(engRate).toFixed(1) + '% <span style="color:var(--yellow)">▶</span>';
-          }
-          // المتابعون
-          const followers = ig.followers || fb.followers || null;
-          if (statVals[1] && followers) {
-            const fmt = followers > 1000 ? (followers/1000).toFixed(1)+'K' : followers;
-            statVals[1].textContent = fmt + ' متابع';
-            statVals[1].style.color = followers > 10000 ? 'var(--green)' : followers > 1000 ? 'var(--yellow)' : 'var(--red)';
-          }
-          // الدرجة الكلية
-          if (data.score != null) {
-            const strengthBox = youCard.querySelector('.c-strength');
-            const scoreClass  = data.score >= 70 ? 'bg-green' : data.score >= 40 ? 'bg-yellow' : 'bg-red';
-            if (strengthBox) {
-              strengthBox.className = `c-strength ${scoreClass}`;
-              strengthBox.textContent = `درجتك الإجمالية: ${data.score}/100 — ${data.score >= 70 ? 'أداء جيد' : data.score >= 40 ? 'يحتاج تحسين' : 'يحتاج تدخل عاجل'}`;
-            }
-          }
-        }
-
-        // عرض المنافسين الحقيقيين من Competitor Radar (إذا توفروا)
-        if (compRadar.length > 0) {
-          const compGrid = document.querySelector('.comp-grid');
-          if (compGrid) {
-            // إضافة المنافسين الحقيقيين
-            const existingYouCard = compGrid.querySelector('.is-you');
-            compGrid.innerHTML = ''; // clear mock
-            if (existingYouCard) compGrid.appendChild(existingYouCard);
-
-            compRadar.slice(0, 2).forEach((comp, i) => {
-              const icons  = ['👑', '🚀'];
-              const colors = ['bg-green', 'bg-yellow'];
-              compGrid.insertAdjacentHTML('afterbegin', `
-                <div class="comp-card">
-                  <div class="c-head">
-                    <div class="c-img">${icons[i] || '🏆'}</div>
-                    <div>
-                      <div class="c-name">${comp.name || 'منافس ' + (i+1)}</div>
-                      <div class="c-handle">${comp.domain || comp.url || ''}</div>
-                    </div>
-                  </div>
-                  <div class="c-stats">
-                    <div class="c-stat-row">
-                      <span class="c-stat-label">القوة التنافسية:</span>
-                      <span class="c-stat-val">${comp.strength || 'متوسط'}</span>
-                    </div>
-                    <div class="c-stat-row">
-                      <span class="c-stat-label">التخصص:</span>
-                      <span class="c-stat-val">${comp.specialty || '—'}</span>
-                    </div>
-                  </div>
-                  <div class="c-strength ${colors[i] || 'bg-yellow'}">${comp.insight || 'منافس مباشر في نفس السوق'}</div>
-                </div>`);
-            });
+        if (roiVals.length >= 3) {
+          const metrics = sr.ads_library && sr.ads_library.real_metrics ? sr.ads_library.real_metrics : null;
+          if (metrics) {
+            roiVals[0].textContent = metrics.conversion_rate != null ? String(metrics.conversion_rate) : 'غير متوفر';
+            roiVals[1].textContent = metrics.roas != null ? String(metrics.roas) : 'غير متوفر';
+            roiVals[2].textContent = metrics.cpa != null ? String(metrics.cpa) : 'غير متوفر';
+          } else {
+            roiVals[0].textContent = 'غير متوفر';
+            roiVals[1].textContent = 'غير متوفر';
+            roiVals[2].textContent = 'غير متوفر';
           }
         }
       }
 
-      // ==========================================
-      // P2-2 PAGE: content.html — بيانات محتوى حقيقية
-      // ==========================================
-      if (path.includes('content.html')) {
-        const igFollowers = ig.followers   || null;
-        const igPosts     = ig.posts_count || null;
-        const igEng       = ig.engagement_rate || null;
-        const fbFollowers = fb.followers   || null;
 
-        // تحديث أي بطاقات إحصاء موجودة
-        const statCards = document.querySelectorAll('.metric-box, .stat-card, .content-stat');
-        statCards.forEach((card, i) => {
-          const val = card.querySelector('.m-val, .stat-val, h3');
-          if (!val) return;
-          if (i === 0 && igFollowers) val.textContent = igFollowers > 1000 ? (igFollowers/1000).toFixed(1)+'K' : igFollowers;
-          if (i === 1 && igPosts)     val.textContent = igPosts;
-          if (i === 2 && igEng)       val.textContent = parseFloat(igEng).toFixed(1) + '%';
-          if (i === 3 && fbFollowers) val.textContent = fbFollowers > 1000 ? (fbFollowers/1000).toFixed(1)+'K' : fbFollowers;
-        });
-      }
-
-      // ==========================================
-      // P2-2 PAGE: journey.html — بيانات رحلة العميل
-      // ==========================================
-      if (path.includes('journey.html')) {
-        const hasSSL   = sr.hasSSL   || ws.has_ssl;
-        const hasPixel = sr.hasPixel || ws.has_fb_pixel;
-        const hasCTA   = ws.has_cta  || null;
-
-        // تحديث نقاط رحلة العميل بناءً على الفحص الفعلي
-        const journeySteps = document.querySelectorAll('.journey-step, .stage-card, .step-card');
-        journeySteps.forEach((step, i) => {
-          const badge = step.querySelector('.step-badge, .stage-badge, .status-badge');
-          if (!badge) return;
-          const checks = [!!clientUrl, !!hasSSL, !!hasPixel, !!hasCTA, data.score >= 60];
-          const ok = checks[i] ?? false;
-          badge.textContent  = ok ? '✅ مكتمل' : '❌ مفقود';
-          badge.style.color  = ok ? 'var(--green)' : 'var(--red)';
-          badge.style.background = ok ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
-        });
-      }
 
       // ==========================================
       // P2-3 PAGE: packages.html — شخصنة بالدرجة الحقيقية
@@ -2350,6 +3583,121 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================================================
   // renderAdsSection — رسم قسم الإعلانات بالبيانات الحقيقية أو الاحتياطية
   // ============================================================
+  function buildDetailedAdsAnalysis(data, srObj, clientName) {
+    const sr = srObj || {};
+    const adsLib = sr.ads_library || {};
+    const mappedAds = Array.isArray(adsLib.ads) ? adsLib.ads : [];
+    const rawAds = Array.isArray(adsLib.raw_items) ? adsLib.raw_items : [];
+    const sourceAds = (rawAds.length ? rawAds : mappedAds).slice(0, 30);
+    const allAds = sourceAds.map((item, index) => {
+      const text = item.body || item.text || item.primary_text || item.title || item.headline || item.linkTitle || '';
+      const headline = item.linkTitle || item.headline || item.title || '';
+      const landing = item.linkUrl || item.ctaUrl || item.landing_url || item.url || '';
+      const cta = item.ctaText || item.cta_type || item.cta || '';
+      const platforms = Array.isArray(item.platforms) ? item.platforms : (item.platform ? [item.platform] : []);
+      const active = item.active !== undefined ? !!item.active : item.is_active !== false;
+      return {
+        index,
+        text: String(text || '').trim(),
+        headline: String(headline || '').trim(),
+        landing: String(landing || '').trim(),
+        cta: String(cta || '').trim(),
+        platforms,
+        active,
+        start: item.startDate || item.start_date || '',
+        end: item.endDate || item.end_date || '',
+        impressions: item.total_impressions || item.impressions || '',
+        spend: item.spend || item.spend_range || ''
+      };
+    });
+
+    const activeAds = allAds.filter(ad => ad.active);
+    const inactiveAds = allAds.filter(ad => !ad.active);
+    const joinedText = allAds.map(ad => `${ad.text} ${ad.headline} ${ad.cta} ${ad.landing}`).join(' ').toLowerCase();
+    const platforms = [...new Set(allAds.flatMap(ad => ad.platforms).filter(Boolean).map(String))];
+    const withLanding = allAds.filter(ad => ad.landing).length;
+    const hasPixel = !!(sr.hasPixel || sr.pixel || sr.meta_pixel || (sr.website_scan && (sr.website_scan.has_pixel || sr.website_scan.hasPixel)));
+    const hasSsl = !!(sr.hasSSL || sr.ssl || (sr.website_scan && (sr.website_scan.has_ssl || sr.website_scan.ssl)));
+    const hasContact = !!(sr.hasWhatsApp || sr.whatsapp || sr.contact || (sr.website_scan && (sr.website_scan.has_whatsapp || sr.website_scan.has_contact)));
+    const hasSiteCta = !!(sr.hasCTA || sr.cta || (sr.website_scan && (sr.website_scan.has_cta || sr.website_scan.cta_count > 0)));
+    const duplicateCount = (() => {
+      const seen = new Set();
+      let dupes = 0;
+      allAds.forEach(ad => {
+        const key = (ad.text || ad.headline).replace(/\s+/g, ' ').trim().slice(0, 120).toLowerCase();
+        if (!key) return;
+        if (seen.has(key)) dupes++;
+        else seen.add(key);
+      });
+      return dupes;
+    })();
+    const directSale = /(shop|buy|order|purchase|sale|خصم|اطلب|اشتري|تسوق|احجز|عرض|سعر)/i.test(joinedText);
+    const leadGen = /(whatsapp|message|contact|lead|form|call|استشارة|تواصل|واتساب|احجز|سجل|اتصل)/i.test(joinedText);
+    const trustTerms = /(review|testimonial|case|before|after|guarantee|تقييم|آراء|ضمان|نتائج|قبل|بعد|قصة|ثقة)/i.test(joinedText);
+    const awarenessTerms = /(learn|discover|brand|story|تعرف|اكتشف|قصة|وعي|معلومة)/i.test(joinedText);
+    const campaignType = directSale && leadGen ? 'حملة مختلطة بين البيع وتوليد العملاء'
+      : directSale ? 'حملة بيع مباشر'
+      : leadGen ? 'حملة توليد عملاء محتملين'
+      : awarenessTerms ? 'حملة وعي وتثقيف'
+      : 'حملة غير واضحة الهدف من النصوص المتاحة';
+    const objective = directSale ? 'تحويلات ومبيعات'
+      : leadGen ? 'رسائل / عملاء محتملون'
+      : awarenessTerms ? 'وعي بالعلامة وبناء ثقة'
+      : 'يحتاج تأكيد من إعدادات Ads Manager';
+    const conversionReadyScore = [withLanding > 0, hasPixel, hasSsl, hasContact || hasSiteCta].filter(Boolean).length;
+    const conversionReady = conversionReadyScore >= 3 ? 'نعم، الصفحة تبدو قابلة للتحويل مع تحسينات بسيطة'
+      : conversionReadyScore === 2 ? 'جزئياً، توجد عناصر تحويل لكن التتبع أو الثقة يحتاجان تقوية'
+      : 'لا، الإعلان يرسل حركة بدون بنية تحويل كافية';
+    const hasRealMetrics = !!(adsLib.real_metrics && (adsLib.real_metrics.spend || adsLib.real_metrics.roas));
+    const budgetSignal = hasRealMetrics
+      ? `الأرقام دقيقة من الحساب المربوط: الإنفاق ${adsLib.real_metrics.spend || 'غير متاح'}، ROAS ${adsLib.real_metrics.roas || 'غير متاح'}، CPC ${adsLib.real_metrics.cpc || 'غير متاح'}.`
+      : 'لا يمكن الحكم رقمياً من مكتبة Meta العامة؛ يلزم ربط Ads Manager لمعرفة الإنفاق وROAS';
+    const wasteItems = [];
+    if (duplicateCount > 0) wasteItems.push(`تكرار واضح في ${duplicateCount} رسالة/إعلان`);
+    if (withLanding < Math.max(1, Math.ceil(allAds.length * 0.6))) wasteItems.push('عدد كبير من الإعلانات بلا رابط هبوط واضح');
+    if (!hasPixel) wasteItems.push('لا يوجد تتبع Pixel مؤكد');
+    if (directSale && !trustTerms) wasteItems.push('بيع مباشر قبل بناء الثقة');
+    if (!platforms.length) wasteItems.push('المنصات غير ظاهرة في البيانات المسحوبة');
+    const messages = [...new Map(allAds.map(ad => {
+      const msg = [ad.headline, ad.text, ad.cta ? `CTA: ${ad.cta}` : ''].filter(Boolean).join(' — ').trim();
+      return [msg.replace(/\s+/g, ' ').slice(0, 220), msg];
+    }).filter(([key]) => key).slice(0, 8)).values()];
+    const businessGoal = data.business_goal || data.goal || data.objective || sr.business_goal || '';
+    const goalFit = businessGoal
+      ? `الهدف التجاري المسجل: ${businessGoal}. الحملة الحالية تميل إلى ${objective}، ويجب مطابقة KPI معها.`
+      : `لا يوجد هدف تجاري صريح في البيانات؛ الحملة الظاهرة تميل إلى ${objective}.`;
+    const platformFit = platforms.length
+      ? `المنصات المرصودة: ${platforms.join('، ')}. مناسبة غالباً للوعي والرسائل، ويجب فصل البيع المباشر عن إعادة الاستهداف.`
+      : 'لا توجد منصات كافية للحكم؛ نحتاج بيانات المنصة من كل إعلان أو من الحساب الإعلاني.';
+    const rawCount = Number(adsLib.raw_count || rawAds.length || 0);
+    const mappedCount = mappedAds.length;
+
+    return {
+      summary: `تم تحليل ${allAds.length} إعلان من آخر البيانات المتاحة: ${activeAds.length} نشط و${inactiveAds.length} متوقف. ${campaignType}، والهدف المرجح: ${objective}.`,
+      meta: [
+        hasRealMetrics ? 'المصدر: Meta Ads Manager المربوط' : 'المصدر: مكتبة الإعلانات العامة',
+        `آخر ${allAds.length || 0} إعلان`,
+        `Raw: ${rawCount}`,
+        `Mapped: ${mappedCount}`,
+        adsLib.actor_used ? `Actor: ${adsLib.actor_used}` : ''
+      ].filter(Boolean),
+      cards: [
+        { title: 'نوع الحملة الحالية', body: campaignType, evidence: `بناء على CTA، النصوص، وروابط الهبوط في آخر ${allAds.length} إعلان.` },
+        { title: 'الهدف الإعلاني', body: objective, evidence: 'هذا استنتاج من مكتبة الإعلانات، وليس بديلاً عن Objective داخل Ads Manager.' },
+        { title: 'توافق الحملة مع الهدف التجاري', body: goalFit, evidence: businessGoal ? 'تمت المقارنة مع الهدف المخزن في التقرير.' : 'ينصح بإضافة هدف تجاري صريح للفحص.' },
+        { title: 'توافق الإعلان مع الصفحة', body: withLanding ? `يوجد رابط هبوط في ${withLanding} من ${allAds.length} إعلان.` : 'لا توجد روابط هبوط كافية، وهذا يضعف الحكم والتحويل.', evidence: hasSsl ? 'SSL ظاهر.' : 'SSL غير مؤكد من بيانات الفحص.' },
+        { title: 'جاهزية الصفحة للتحويل', body: conversionReady, evidence: `Pixel: ${hasPixel ? 'موجود' : 'غير مؤكد'}، CTA/تواصل: ${(hasContact || hasSiteCta) ? 'موجود' : 'ضعيف'}، SSL: ${hasSsl ? 'موجود' : 'غير مؤكد'}.` },
+        { title: 'هل يبيع قبل بناء الثقة؟', body: directSale && !trustTerms ? 'نعم، الرسائل تميل للبيع المباشر بدون دلائل ثقة كافية.' : 'لا يظهر خطر كبير، أو توجد مؤشرات ثقة في الرسائل.', evidence: trustTerms ? 'تم رصد كلمات ثقة/نتائج.' : 'لم ترصد كلمات تقييمات أو ضمان أو نتائج بوضوح.' },
+        { title: 'الهدر المحتمل', body: wasteItems.length ? wasteItems.join('، ') : 'لا يظهر هدر كبير من البيانات العامة، لكن يلزم ربط الحساب للحسم.', evidence: 'تم فحص التكرار، الروابط، التتبع، وطبيعة الرسالة.' },
+        { title: 'هل الميزانية مناسبة؟', body: budgetSignal, evidence: 'مكتبة الإعلانات لا تعطي إنفاقاً دقيقاً دائماً.' },
+        { title: 'هل المنصة مناسبة؟', body: platformFit, evidence: platforms.length ? 'مستخرج من حقل platforms في الإعلانات.' : 'البيانات تحتاج إكمال من المصدر.' },
+        { title: 'التعديل المقترح', body: directSale ? 'افصل حملة الثقة/التثقيف عن حملة التحويل، واجعل البيع المباشر لإعادة الاستهداف أو جمهور دافئ.' : 'ابدأ باختبار رسائل بيع واضحة مع صفحة هبوط جاهزة وتتبع كامل.', evidence: 'التوصية مبنية على طبيعة الرسائل وجاهزية الصفحة.' },
+        { title: 'هل الجمهور مناسب؟', body: leadGen || directSale ? 'الجمهور قد يكون مناسباً إذا كان مستهدفاً حسب نية الشراء، لكن البيانات العامة لا تكشف الاستهداف بدقة.' : 'الجمهور يبدو واسعاً أو غير محدد من الرسائل الحالية.', evidence: 'يلزم فحص Ad Set داخل Ads Manager لتأكيد العمر، المنطقة، والاهتمامات.' }
+      ],
+      messages
+    };
+  }
+
   function renderAdsSection(data, srObj, clientName, liveAiAnalysis) {
     const sr = srObj || {};
 
@@ -2383,7 +3731,7 @@ document.addEventListener("DOMContentLoaded", () => {
             score: 55, status: "⚠️ أداء متوسط (يحتاج تحسين)",
             desc: `تم رصد ${adCount} إعلانات نشطة. التتبع موجود، لكن المادة الإعلانية تحتاج لتحسين لرفع العائد.`,
             metrics: [
-              { title: "معدل التحويل المتوقع", val: "1.2%", status: "▼ أقل من السوق", status_class: "status-red", val_class: "val-red", desc: "الزيارات موجودة لكن المبيعات قليلة. الخلل في العرض أو صفحة الهبوط." },
+              { title: "معدل التحويل", val: "غير متوفر", status: "يتطلب Ads Manager", status_class: "status-yellow", val_class: "val-yellow", desc: "لا يتم عرض معدل تحويل تقديري بدون بيانات الحساب الإعلاني المربوط." },
               { title: "حالة الحملة", val: "نشطة", status: "▲ مستقرة", status_class: "status-green", val_class: "val-green", desc: "الحملات تعمل والبيانات تُجمع بشكل صحيح." },
               { title: "الاستحواذ (CPA)", val: "مكلف", status: "▶ يحتاج تقليل", status_class: "status-yellow", val_class: "val-yellow", desc: "تكلفة شراء العميل أعلى من الطبيعي بسبب ضعف الـ CTA." }
             ],
@@ -2392,7 +3740,7 @@ document.addEventListener("DOMContentLoaded", () => {
               { type: "red", icon: "❌", title: "العرض (Offer) غير كافي", desc: "العميل يحتاج سبباً مقنعاً للشراء (الآن). أضف عنصر الاستعجال (Scarcity)." },
               { type: "green", icon: "✅", title: "التتبع مفعل", desc: "ميزة ممتازة تتيح لنا إعادة استهداف من زار الموقع ولم يشتري." }
             ],
-            strategy: { desc: "لدينا الأساسيات، حان وقت مضاعفة الأرباح (Scaling):", steps: ["<strong>تجديد الدماء (Creatives):</strong> إطلاق 5 فيديوهات UGC جديدة لاختبار الخوارزمية وتخفيض التكلفة.", "<strong>إعادة الاستهداف (Retargeting):</strong> استهداف الزوار السابقين بعرض (خصم 15%) لتحويلهم لمشترين.", "<strong>تبسيط الشراء:</strong> تقليل خطوات الدفع في موقعك (Checkout) لرفع التحويل المباشر."] }
+            strategy: { desc: "لا توجد أرقام مالية مؤكدة في هذا المسار:", steps: ["<strong>تحليل الرسائل:</strong> استخدم نصوص الإعلانات المرصودة لتحديد الزوايا المتكررة.", "<strong>ربط الحساب:</strong> اربط Meta Ads Manager قبل اعتماد أي قرار ميزانية أو خصومات.", "<strong>صفحة الهبوط:</strong> تحقق من جاهزية الصفحة من بيانات الفحص قبل توسيع الحملة."] }
           };
         }
       } else {
@@ -2409,9 +3757,13 @@ document.addEventListener("DOMContentLoaded", () => {
             { type: "yellow", icon: "⚠️", title: "بطء مقلق", desc: "النمو العضوي ممتاز ولكنه لا يبني إمبراطورية تجارية بسرعة." },
             { type: "red", icon: "❌", title: "لا يوجد جمع بيانات", desc: "لأنك لا تشغل إعلانات، بيكسلات التتبع الخاصة بك لا تتعلم من هو عميلك المثالي." }
           ],
-          strategy: { desc: "خطة الإطلاق الفورية لاكتساح السوق:", steps: ["<strong>ميزانية اختبارية:</strong> إطلاق حملة بـ 20$ يومياً لاختبار استجابة السوق لمنتجك الأساسي.", "<strong>بناء الجمهور:</strong> إطلاق حملات وعي (Awareness) لجمع بيانات المهتمين وتجهيزهم للشراء.", "<strong>عروض لا تقاوم:</strong> تقديم عرض الافتتاح (شحن مجاني + هدية) لاصطياد المشترين الأوائل بسرعة."] }
+          strategy: { desc: "لا توجد بيانات إعلانات مؤكدة لهذا التقرير:", steps: ["<strong>التحقق أولاً:</strong> اسحب مكتبة الإعلانات أو اربط الحساب الإعلاني قبل اقتراح ميزانية.", "<strong>بناء الجمهور:</strong> لا يتم اقتراح حملة محددة بدون هدف تجاري وبيانات صفحة هبوط.", "<strong>العرض:</strong> لا يتم اقتراح خصم أو عرض ثابت بدون بيانات المنتج والهامش."] }
         };
       }
+    }
+
+    if (!data.ads_analysis && !liveAiAnalysis) {
+      adsAnalysis = buildPublicAdsOverview(sr);
     }
 
     if (adsAnalysis) {
@@ -2465,11 +3817,53 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ── Ad Gallery (مكتبة الإعلانات الحقيقية) ────────────────
+    const detailedAds = buildDetailedAdsAnalysis(data || {}, sr, clientName);
+    const adsCampaignSummary = document.getElementById('adsCampaignSummary');
+    const adsDeepMeta = document.getElementById('adsDeepMeta');
+    const adsDeepAnalysisGrid = document.getElementById('adsDeepAnalysisGrid');
+    const adsMessagesList = document.getElementById('adsMessagesList');
+
+    if (adsCampaignSummary) adsCampaignSummary.textContent = detailedAds.summary;
+    if (adsDeepMeta) {
+      adsDeepMeta.innerHTML = detailedAds.meta.map(item => `<span class="ads-chip">${sanitize(item)}</span>`).join('');
+    }
+    if (adsDeepAnalysisGrid) {
+      adsDeepAnalysisGrid.innerHTML = detailedAds.cards.map(card => `
+        <div class="ads-deep-card">
+          <strong>${sanitize(card.title)}</strong>
+          <p>${sanitize(card.body)}</p>
+          <span class="evidence">${sanitize(card.evidence)}</span>
+        </div>
+      `).join('');
+    }
+    if (adsMessagesList) {
+      adsMessagesList.innerHTML = detailedAds.messages.length
+        ? detailedAds.messages.map((msg, i) => `<div class="ads-message-item"><strong style="color:var(--primary);display:block;margin-bottom:5px;">رسالة ${i + 1}</strong>${sanitize(msg)}</div>`).join('')
+        : '<div class="ads-message-item">لا توجد رسائل إعلانية كافية في البيانات المسحوبة.</div>';
+    }
+
     const actualAdsGrid = document.getElementById('actualAdsGrid');
     if (actualAdsGrid) {
       let realAds = [];
       if (sr.ads_library && sr.ads_library.ads && sr.ads_library.ads.length > 0) {
         realAds = sr.ads_library.ads;
+      } else if (sr.ads_library && sr.ads_library.raw_items && sr.ads_library.raw_items.length > 0) {
+        realAds = sr.ads_library.raw_items.map(item => ({
+          page_name: item.brand,
+          is_active: item.active,
+          start_date: item.startDate,
+          end_date: item.endDate,
+          title: item.linkTitle || item.body,
+          text: item.body || item.linkDescription,
+          headline: item.linkTitle,
+          description: item.linkDescription,
+          image_url: item.images && item.images[0] ? (item.images[0].url || item.images[0]) : '',
+          video_url: item.videos && item.videos[0] ? (item.videos[0].url || item.videos[0]) : '',
+          landing_url: item.linkUrl || item.ctaUrl,
+          cta_type: item.ctaText,
+          platforms: item.platforms,
+          impressions: item.total_impressions || item.impressions
+        }));
       } else if (sr.facebook && sr.facebook.ads) {
         realAds = sr.facebook.ads;
       }

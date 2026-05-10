@@ -56,7 +56,10 @@ return [
     // كاحتياط نهائي لو الاثنان معطّلان أو مستهلك كان كامل)، وأخيراً pekpik.
     // إن استُهلك Gemini بـ 429 فالنظام يقفز إلى Groq ثم OpenAI تلقائياً.
     'analysis' => [
-        'ai_priority'        => $csv('AI_PRIORITY') ?: ['gemini', 'groq', 'openai', 'pekpik'],
+        'ai_priority'        => ['openai'],
+        'enable_openai'      => filter_var($get('ENABLE_OPENAI', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'enable_gemini'      => false,
+        'enable_groq'        => false,
         // ── علامات تشغيل Apify scrapers ────────────────────────
         // الإعلانات والمنافسين مُفعَّلان افتراضياً (true). ضع ENABLE_APIFY=false
         // أو ENABLE_ADS_LIBRARY=false في .env لتعطيلها (تقليل التكلفة/الحصة).
@@ -93,8 +96,12 @@ return [
         // Fallbacks إضافية
         'deepseek_key'   => $get('DEEPSEEK_KEY', ''),
         'deepseek_model' => $get('DEEPSEEK_MODEL', 'deepseek-chat'),
-        'openai_key'     => $get('OPENAI_KEY', ''),
-        'openai_model'   => $get('OPENAI_MODEL', 'gpt-4o-mini'),
+        'openai_key'              => $get('OPENAI_KEY', ''),
+        'openai_model'            => $get('OPENAI_MODEL', 'gpt-4o-mini'),
+        'openai_timeout'          => (int)$get('OPENAI_TIMEOUT', '120'),
+        'openai_connect_timeout'  => (int)$get('OPENAI_CONNECT_TIMEOUT', '15'),
+        'openai_prompt_max_chars' => (int)$get('OPENAI_PROMPT_MAX_CHARS', '12000'),
+        'openai_max_tokens'       => (int)$get('OPENAI_MAX_TOKENS', '3500'),
         'nvidia_keys'    => $csv('NVIDIA_KEYS'),
 
         // Apify — Tokens + Actor IDs
@@ -105,7 +112,8 @@ return [
         'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/free-tiktok-scraper'),
         'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'u6ppkMWAx2E2MpEuF'),
         'apify_actor_website' => $get('APIFY_ACTOR_WEBSITE', 'apify/website-content-crawler'),
-        'apify_actor_ads_fb'  => $get('APIFY_ACTOR_ADS_FB', 'curious_coder/facebook-ads-library-scraper'),
+        'apify_actor_ads_fb'  => $get('APIFY_ACTOR_ADS_FB', 'whoareyouanas/meta-ad-scraper'),
+        'ads_default_country' => $get('ADS_DEFAULT_COUNTRY', 'SA'),
 
         // Meta / Facebook
         'facebook_access_token' => $get('FACEBOOK_ACCESS_TOKEN', ''),

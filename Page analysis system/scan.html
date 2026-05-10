@@ -155,7 +155,7 @@
       <p class="card-subtitle">أدخل بياناتك ودع الذكاء الاصطناعي يكشف نقاط الضعف والفرص.</p>
     </div>
 
-    <form id="scanForm" onsubmit="handleScan(event)" novalidate>
+    <form id="scanForm" novalidate>
 
       <!-- ── البيانات الشخصية ── -->
       <div class="input-grid">
@@ -180,7 +180,7 @@
       <div class="input-grid">
         <div class="form-group">
           <label class="form-label">مجال العمل/النشاط (مطلوب)</label>
-          <select id="project_type" class="form-control" required onchange="toggleOtherProject(this.value)">
+          <select id="project_type" class="form-control" required>
             <option value="" disabled selected>اختر مجال عملك</option>
             <option value="ecommerce">تجارة إلكترونية ومتاجر</option>
             <option value="realestate">عقارات وتطوير عقاري</option>
@@ -288,124 +288,7 @@
     </form>
   </div>
 
-  <script>
-    // ── التحكم في حقل "أخرى" لمجال العمل ────────────────────────
-    function toggleOtherProject(val) {
-      const wrap = document.getElementById('other_project_wrap');
-      wrap.style.display = (val === 'other') ? 'block' : 'none';
-    }
-
-    // ── اختيار الجمهور المستهدف (Pills) ──────────────────────────
-    const audiencePills = document.querySelectorAll('#audienceWrap .pill');
-    const audienceHidden = document.getElementById('audience-hidden');
-    const otherAudienceWrap = document.getElementById('other_audience_wrap');
-    let selectedAudience = [];
-
-    audiencePills.forEach(pill => {
-      pill.addEventListener('click', () => {
-        pill.classList.toggle('active');
-        const val = pill.dataset.audience;
-        
-        if (selectedAudience.includes(val)) {
-          selectedAudience = selectedAudience.filter(x => x !== val);
-        } else {
-          selectedAudience.push(val);
-        }
-        audienceHidden.value = selectedAudience.join(',');
-
-        // إظهار حقل "أخرى" إذا تم اختياره
-        if (val === 'other') {
-          otherAudienceWrap.style.display = pill.classList.contains('active') ? 'block' : 'none';
-        }
-      });
-    });
-
-    // ── اختيار الأهداف التسويقية ───────────────────────────────────────
-    const goalPills = document.querySelectorAll('#goalsWrap .pill');
-    const goalsHidden = document.getElementById('goals-hidden');
-    let selectedGoals = [];
-
-    goalPills.forEach(pill => {
-      pill.addEventListener('click', () => {
-        pill.classList.toggle('active');
-        const g = pill.dataset.goal;
-        if (selectedGoals.includes(g)) {
-          selectedGoals = selectedGoals.filter(x => x !== g);
-        } else {
-          selectedGoals.push(g);
-        }
-        goalsHidden.value = selectedGoals.join(',');
-      });
-    });
-
-    // ── تقديم النموذج ────────────────────────────────────────
-    async function handleScan(e) {
-      e.preventDefault();
-
-      const fullName = document.getElementById('full_name').value.trim();
-      const phone    = document.getElementById('phone').value.trim();
-      const email    = document.getElementById('email').value.trim();
-      const country  = document.getElementById('country').value.trim();
-      const city     = document.getElementById('city').value.trim();
-      
-      const web      = document.getElementById('url-web').value.trim();
-      const ig       = document.getElementById('url-ig').value.trim();
-      const fb       = document.getElementById('url-fb').value.trim();
-      const tk       = document.getElementById('url-tk').value.trim();
-      const tw       = document.getElementById('url-tw').value.trim();
-
-      const primaryUrl = web || ig || fb || tk || tw;
-
-      // معالجة "مجال العمل"
-      let projectType = document.getElementById('project_type').value;
-      if (projectType === 'other') {
-        projectType = 'أخرى: ' + document.getElementById('project_type_other').value.trim();
-      }
-
-      // معالجة "الجمهور المستهدف"
-      let audienceFinal = selectedAudience.join(', ');
-      if (selectedAudience.includes('other')) {
-        const otherVal = document.getElementById('audience_other').value.trim();
-        audienceFinal = audienceFinal.replace('other', 'أخرى: ' + otherVal);
-      }
-
-      // التحقق
-      if (!fullName) { alert('الرجاء إدخال اسمك الكريم.'); return; }
-      if (!phone)    { alert('الرجاء إدخال رقم الواتساب.'); return; }
-      if (!country)  { alert('الرجاء إدخال الدولة.'); return; }
-      if (!city)     { alert('الرجاء إدخال المدينة.'); return; }
-      if (!primaryUrl) { alert('الرجاء إدخال رابط منصة واحدة على الأقل.'); return; }
-      if (selectedGoals.length === 0) { alert('الرجاء اختيار هدف تسويقي واحد على الأقل.'); return; }
-
-      // تعطيل الزر أثناء الإرسال
-      const btn = document.getElementById('submitBtn');
-      btn.disabled = true;
-      btn.innerHTML = 'جاري التجهيز... ⏳';
-
-      // حفظ البيانات كاملة في sessionStorage
-      const leadData = {
-        full_name:       fullName,
-        phone:           phone,
-        email:           email,
-        url:             primaryUrl,
-        website_url:     web,
-        instagram_url:   ig,
-        facebook_url:    fb,
-        tiktok_url:      tk,
-        twitter_url:     tw,
-        objective:       selectedGoals.join(','),
-        project_type:    projectType,
-        target_audience: audienceFinal,
-        ad_budget:       document.getElementById('ad_budget').value,
-        country:         country,
-        city:            city,
-      };
-
-      sessionStorage.setItem('lead_data', JSON.stringify(leadData));
-
-      // الانتقال لصفحة التحليل
-      window.location.href = 'analyzing.html?url=' + encodeURIComponent(primaryUrl);
-    }
-  </script>
+  <script src="js/scan-page.js?v=1.0"></script>
+  <!-- v1.0: Inline script extracted to js/scan-page.js for CSP compliance -->
 </body>
 </html>

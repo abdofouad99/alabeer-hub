@@ -154,7 +154,7 @@ class Cache {
                     $this->driver = new class($cacheConfig['ttl']) implements CacheInterface {
                         private $defaultTtl;
                         public function __construct(int $ttl) { $this->defaultTtl = $ttl; }
-                        public function get(string $key) { return apcu_fetch($key) ?: null; }
+                        public function get(string $key) { $val = apcu_fetch($key, $success); return $success ? $val : null; }
                         public function set(string $key, $value, int $ttl = null): bool { return apcu_store($key, $value, $ttl ?? $this->defaultTtl); }
                         public function delete(string $key): bool { return apcu_delete($key); }
                         public function clear(): bool { return apcu_clear_cache(); }

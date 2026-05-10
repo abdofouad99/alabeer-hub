@@ -122,9 +122,11 @@ function scrapeAdsLibrary(
         : "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&q=" . urlencode($cleanQuery) . "&search_type=keyword_unordered";
 
     $input = [
-        'startUrls'       => [['url' => $urlToSearch]],
-        'maxItems'        => 30,
-        'resultsPerPage'  => 30
+        'start_urls'          => [['url' => $urlToSearch]],
+        'max_results_per_url' => 50,
+        'total_max_results'   => 50,
+        'timeout_secs'        => 110,
+        'proxy_country'       => '',
     ];
 
     $fallbackReturn = [
@@ -137,16 +139,12 @@ function scrapeAdsLibrary(
         'ads'            => [],
     ];
 
-    // ── حماية الرصيد: لا تقم بتشغيل الساحب المكلف إذا كنا متأكدين من عدم وجود إعلانات ──
-    // فقط إذا نجح سحب فيسبوك وأكد أنه لا توجد إعلانات، نتوقف.
-    if ($fbAdsActive === false && $fbAdsCount === 0) {
-        return $fallbackReturn;
-    }
+    // Always run Apify actor to get real ad data — don't rely on Facebook's ads_running field
 
     $runId = _apifyStartRun($actorId, json_encode($input), $token);
     if (!$runId) return $fallbackReturn;
 
-    $items = _apifyWaitAndFetch($runId, $token, 90);
+    $items = _apifyWaitAndFetch($runId, $token, 120);  // 120s > Actor timeout (110s)
     if ($items === null) return $fallbackReturn;
 
     $ads = [];
@@ -513,6 +511,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         'cover_photo'    => $page['cover'] ?? $page['cover_photo'] ?? '',
         'posts_per_week' => calcPostsPerWeek($posts),
         'last_post_days' => calcLastPostDays($posts),
+        'posts'          => array_slice($posts, 0, 10),  // للعرض في التقرير
     ];
 
     // فقط أضف الـ signals إذا كانت حقيقية (حتى لا نمسح ما يجده الـ Scraper العام)
@@ -602,7 +601,7 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
 
     if (!$username) return ['success' => false, 'error' => 'لم يتم استخراج TikTok username'];
 
-    logInfo("Starting TikTok scrape", ["username" => $username, "actor" => $actorId]);
+    logInfo("Starting TikTok scrape via Apify", ["username" => $username, "actor" => $actorId]);
     $input = json_encode([
         'profiles'       => ['https://www.tiktok.com/@' . $username],
         'resultsPerPage' => 30,
@@ -649,8 +648,7 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
     ];
 }
 
-// ============================================================
-// Twitter (X) Scraper
+
 // ============================================================
 function scrapeTwitter(string $url, string $token, array $cfg): array {
     // ملاحظة: قائمة الـ Apify actors لتويتر تتغير بسرعة (التحول من twitter.com → x.com
@@ -660,7 +658,8 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
     $candidates = array_values(array_unique(array_filter([
         $primaryActor,
         'apidojo~twitter-scraper-lite',
-        'quacker~twitter-url-scraper',
+        'kaitoeasyapi~twitter-x-profile-scraper',
+        'shanes~twitter-profile-scraper',
     ])));
 
     // ── استخراج username (يدعم: user, @user, twitter.com/user, x.com/user) ──

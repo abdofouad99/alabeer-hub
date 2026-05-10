@@ -476,7 +476,7 @@ function genRecommendations(int $score, array $breakdown, ?array $scanResult, ar
             : 'وضعك التسويقي قوي — التحسينات الآن تُضاعف عائد استثمارك الإعلاني بشكل ملموس.');
 
     ['strengths' => $strengths, 'weaknesses' => $weaknesses] = genInsights($breakdown, $map, $scanResult ?? []);
-    $actionWeek = buildActionWeek($score, $scanResult, $scanResult ?? []);
+    $actionWeek = buildActionWeek($score, $scanResult, $map);
 
     $detailedBreakdown = genDetailedBreakdown($breakdown, $scanResult ?? []);
 
@@ -532,9 +532,31 @@ function buildActionWeek(int $score, ?array $scan, array $map): array {
 function runAnalysis(int $assessmentId): array {
     logInfo('Starting analysis run', ['assessment_id' => $assessmentId]);
 
-    ini_set('max_execution_time', 600); // P0-3: رفع الـ Timeout إلى 10 دقائق
-    set_time_limit(600);
+    ini_set('max_execution_time', 0); // ✅ Unlimited — server hard limit is the actual cap
+    set_time_limit(0);
+    $analysisStartTime = microtime(true);
+    $maxAnalysisTime = 900; // ✅ Effectively unlimited — server hard limit applies, register_shutdown_function catches fatal errors
     $db  = getDB();
+
+    // ✅ Register shutdown handler to catch fatal errors and update status
+    $GLOBALS['_analysis_id'] = $assessmentId;
+    $GLOBALS['_analysis_db'] = $db;
+    register_shutdown_function(function() {
+        $id = $GLOBALS['_analysis_id'] ?? null;
+        $db = $GLOBALS['_analysis_db'] ?? null;
+        if (!$id || !$db) return;
+
+        $error = error_get_last();
+        if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+            logError('Fatal shutdown in runAnalysis', ['assessment_id' => $id, 'error' => $error]);
+            try {
+                $db->prepare("UPDATE assessments SET status='failed', scan_error=? WHERE id=?")
+                   ->execute(['Fatal error: ' . $error['message'], $id]);
+            } catch (\Throwable $e) {
+                logError('Failed to update status on shutdown', ['error' => $e->getMessage()]);
+            }
+        }
+    });
     $cfg = require __DIR__ . '/config.php';
 
     // ── DB Migration: معالج مركزياً في migrate.php ─────────────
@@ -631,9 +653,12 @@ function runAnalysis(int $assessmentId): array {
     }
 
     // ─── 4) Apify Facebook — فقط إذا لم تُجلب بعد ────────────
+    // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
+    // if ((microtime(true) - $analysisStartTime) > $maxAnalysisTime) { goto skip_apify; }
+
     $apifyFb = null;
-    // نعتبر أن لدينا بيانات حقيقية فقط إذا كان لدينا المتابعين (وليس مجرد page id من فحص HTML المبدئي)
-    $hasFbData = !empty($scanResult['facebook']['followers']);
+    // نعتبر أن لدينا بيانات حقيقية وعميقة فقط إذا كان لدينا عدد المنشورات
+    $hasFbData = !empty($scanResult['facebook']['followers']) && isset($scanResult['facebook']['posts_count']) && $scanResult['facebook']['posts_count'] !== null;
     $updateStep(3); // step 3: يسحب بيانات Facebook
 
     if ($detectedFbUrl && !$hasFbData && ($cfg['analysis']['enable_apify'] ?? false)) {
@@ -700,74 +725,94 @@ function runAnalysis(int $assessmentId): array {
     }
 
     // ─── 5b) TikTok — من رابط مُدخل يدوياً أو مُكتشف تلقائياً ────
+    // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
+    // if ((microtime(true) - $analysisStartTime) > $maxAnalysisTime) { goto skip_tiktok; }
+
     $tkUrlFinal = $tkUrl ?: ($scanResult['tiktok']['url'] ?? '');
     $hasTkData  = !empty($scanResult['tiktok']['followers']);
-    if ($tkUrlFinal && !$hasTkData && ($cfg['analysis']['enable_apify'] ?? false)) {
+    if ($tkUrlFinal && !$hasTkData) {
         try {
-            $token = getValidApifyToken($cfg);
-            if ($token) {
-                $r = scrapeTikTok($tkUrlFinal, $token, $cfg);
-                if ($r['success'] ?? false) {
-                    $scanResult['tiktok'] = $r;
-                    $saveScanProgress('tiktok', $r); // ✅ حفظ فوري
-                    // اكتشاف الموقع من تيك توك إذا لم نكن قد فحصناه
-                    if (empty($scanResult['website_scan']) && !empty($r['website'])) {
-                        $newWebUrl = $r['website'];
-                        $ws = _fetchAndScanWebsite($newWebUrl, $cfg);
-                        $scanResult['website'] = $newWebUrl;
-                        $scanResult['website_scan'] = $ws;
-                    }
+            // نستخدم scanTikTokPublic التي تتضمن Apify + Public fallback
+            $r = scanTikTokPublic($tkUrlFinal, $cfg);
+            if ($r['success'] ?? false) {
+                $scanResult['tiktok'] = $r;
+                $saveScanProgress('tiktok', $r); // ✅ حفظ فوري
+                // اكتشاف الموقع من تيك توك إذا لم نكن قد فحصناه
+                if (empty($scanResult['website_scan']) && !empty($r['website'])) {
+                    $newWebUrl = $r['website'];
+                    $ws = _fetchAndScanWebsite($newWebUrl, $cfg);
+                    $scanResult['website'] = $newWebUrl;
+                    $scanResult['website_scan'] = $ws;
                 }
+            } else {
+                // احفظ البيانات مع عنوان URL حتى لو فشل
+                $scanResult['tiktok'] = array_merge($r, ['url' => $tkUrlFinal]);
+                $saveScanProgress('tiktok', $scanResult['tiktok']);
+                logInfo('TikTok scan returned partial/failed', ['url' => $tkUrlFinal, 'error' => $r['error'] ?? 'unknown']);
             }
         } catch (\Throwable $e) {
             logError('TikTok scrape failed', ['url' => $tkUrlFinal, 'error' => $e->getMessage()]);
+            $scanResult['tiktok'] = [
+                'success'  => false,
+                'platform' => 'tiktok',
+                'url'      => $tkUrlFinal,
+                'error'    => 'تعذّر جلب بيانات تيك توك',
+            ];
+            $saveScanProgress('tiktok', $scanResult['tiktok']);
         }
     }
 
+    skip_tiktok:
+
     // ─── 5c) Twitter — من رابط مُدخل يدوياً أو مُكتشف تلقائياً ──
+    // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
+    // if ((microtime(true) - $analysisStartTime) > $maxAnalysisTime) { goto skip_twitter; }
+
     $twUrlFinal = $twUrl ?: ($scanResult['twitter']['url'] ?? '');
     $hasTwData  = !empty($scanResult['twitter']['followers']);
-    if ($twUrlFinal && !$hasTwData && ($cfg['analysis']['enable_apify'] ?? false)) {
+    if ($twUrlFinal && !$hasTwData) {
         try {
-            $token = getValidApifyToken($cfg);
-            if ($token) {
-                $r = scrapeTwitter($twUrlFinal, $token, $cfg);
-                if ($r['success'] ?? false) {
-                    $scanResult['twitter'] = $r;
-                    $saveScanProgress('twitter', $r); // ✅ حفظ فوري
-                    // اكتشاف الموقع من تويتر إذا لم نكن قد فحصناه
-                    if (empty($scanResult['website_scan']) && !empty($r['website'])) {
-                        $newWebUrl = $r['website'];
-                        $ws = _fetchAndScanWebsite($newWebUrl, $cfg);
-                        $scanResult['website'] = $newWebUrl;
-                        $scanResult['website_scan'] = $ws;
-                    }
-                } else {
-                    // احفظ الفشل أيضاً ليعرض الفرونت "تعذّر جلب بيانات تويتر"
-                    // بدل الأصفار. (المستخدم أبلغ عن "0/—" بدون أي إشارة لخطأ.)
-                    $scanResult['twitter'] = $r + ['url' => $twUrlFinal];
-                    $saveScanProgress('twitter', $scanResult['twitter']);
-                    logError('Twitter scrape returned failure', [
-                        'url'   => $twUrlFinal,
-                        'error' => $r['error'] ?? 'unknown',
-                    ]);
+            // نستخدم scanTwitterPublic التي تتضمن Apify + Public fallback
+            $r = scanTwitterPublic($twUrlFinal, $cfg);
+            if ($r['success'] ?? false) {
+                $scanResult['twitter'] = $r;
+                $saveScanProgress('twitter', $r); // ✅ حفظ فوري
+                // اكتشاف الموقع من تويتر إذا لم نكن قد فحصناه
+                if (empty($scanResult['website_scan']) && !empty($r['website'])) {
+                    $newWebUrl = $r['website'];
+                    $ws = _fetchAndScanWebsite($newWebUrl, $cfg);
+                    $scanResult['website'] = $newWebUrl;
+                    $scanResult['website_scan'] = $ws;
                 }
+            } else {
+                // احفظ الفشل أيضاً ليعرض الفرونت "تعذّر جلب بيانات تويتر"
+                $scanResult['twitter'] = array_merge($r, ['url' => $twUrlFinal]);
+                $saveScanProgress('twitter', $scanResult['twitter']);
+                logInfo('Twitter scan returned partial/failed', ['url' => $twUrlFinal, 'error' => $r['error'] ?? 'unknown']);
             }
         } catch (\Throwable $e) {
             $scanResult['twitter'] = [
                 'success'  => false,
                 'platform' => 'twitter',
                 'url'      => $twUrlFinal,
-                'error'    => 'تعذّر جلب بيانات تويتر — استثناء داخلي.',
+                'error'    => 'تعذّر جلب بيانات تويتر',
             ];
             $saveScanProgress('twitter', $scanResult['twitter']);
             logError('Twitter scrape exception', ['url' => $twUrlFinal, 'error' => $e->getMessage()]);
         }
     }
 
+    skip_twitter:
+
     // ─── 6) الإعلانات ─────────────────────────────────────────
+    // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
+    // if ((microtime(true) - $analysisStartTime) > $maxAnalysisTime) { goto skip_ads; }
+
     // استخدم بيانات runPageScan + Apify إذا لم تكن كافية
-    $adsData = $scanResult['ads_library'] ?? null;
+    $adsRaw  = $scanResult['ads_library'] ?? null;
+    // ✅ الإصلاح: لا نتخطى Apify إلا إذا كان total_ads > 0 — البيانات الفارغة تعني أننا لم نسحب بعد
+    $adsHasRealData = !empty($adsRaw) && (($adsRaw['total_ads'] ?? 0) > 0 || ($adsRaw['active_ads'] ?? 0) > 0);
+    $adsData = $adsHasRealData ? $adsRaw : null;
     $updateStep(5); // step 5: يسحب بيانات الإعلانات
 
     if (!$adsData && ($cfg['analysis']['enable_ads_library'] ?? false)) {
@@ -822,7 +867,11 @@ function runAnalysis(int $assessmentId): array {
         }
     }
 
+    skip_ads:
+
     // ─── 7) رادار المنافسين (Google Search Scraper) ───────────
+    // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
+    // if ((microtime(true) - $analysisStartTime) > ($maxAnalysisTime - 60)) { goto skip_competitors; }
     // ── DB Migration: معالج مركزياً في migrate.php ─────────────
     // (يشتغل تلقائياً مرة واحدة عبر init.php)
     $compRadar = null;
@@ -931,6 +980,12 @@ function runAnalysis(int $assessmentId): array {
     $scanResult['description']  = $ws['description']       ?? $scanResult['og']['description'] ?? '';
     $scanResult['h1']           = $ws['h1']                ?? '';
 
+    // ✅ Label for time budget skip
+    skip_apify:
+
+    if (function_exists('normalizeScanResult')) {
+        $scanResult = normalizeScanResult($scanResult);
+    }
 
     // ── المعلومات المجمّعة من كل المنصات ──────────────────────
     $fbContact = $scanResult['facebook']['has_contact'] ?? false;
@@ -941,6 +996,8 @@ function runAnalysis(int $assessmentId): array {
 
 
 
+    skip_competitors:
+
     // ─── 8) حساب الدرجة ──────────────────────────────────────
     ['score' => $finalScore, 'breakdown' => $breakdown] = scoreFromScanData($scanResult);
 
@@ -949,13 +1006,22 @@ function runAnalysis(int $assessmentId): array {
     $gen      = genRecommendations($finalScore, $breakdown, $scanResult, []);
     $insights = genInsights($breakdown, [], $scanResult);
 
-    // ─── 10) Gemini AI ────────────────────────────────────────
+    // ─── 10) OpenAI analysis ───────────────────────────────────
     $aiResult = null;
     $updateStep(6); // step 6: يكتب التقرير بالذكاء الاصطناعي
-    if ($cfg['analysis']['enable_gemini'] ?? false) {
+
+    // ✅ Check time budget - skip AI if running low on time (use fallback instead)
+    $skipAiDueToTimeout = false;
+    if ((microtime(true) - $analysisStartTime) > ($maxAnalysisTime - 30)) { // Need 30s for fallback
+        logInfo('Skipping AI analysis due to time budget, using fallback', ['elapsed' => round(microtime(true) - $analysisStartTime, 2)]);
+        $skipAiDueToTimeout = true;
+    }
+
+    $openAiEnabled = $cfg['analysis']['enable_openai'] ?? ($cfg['analysis']['enable_gemini'] ?? false);
+    if (!$skipAiDueToTimeout && $openAiEnabled) {
         try {
             require_once __DIR__ . '/ai-analyze.php';
-            $aiResult = runGeminiAnalysis([
+            $aiResult = runOpenAIAnalysis([
                 'id'              => $assessmentId,
                 'score'           => $finalScore,
                 'breakdown'       => $breakdown,

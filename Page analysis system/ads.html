@@ -253,6 +253,52 @@
     #fullReportContent { font-size:14px; color:var(--text-gray); line-height:2; font-weight:600; white-space:pre-wrap; }
     #fullReportContent strong { color:#fff; }
     #fullReportContent h2,#fullReportContent h3 { color:var(--primary); margin:16px 0 8px; }
+    .ads-deep-wrap {
+      margin: 34px 0 40px;
+      padding: 28px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+    }
+    .ads-deep-head {
+      display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;
+      margin-bottom: 22px;
+    }
+    .ads-deep-head h4 { margin:0; color:#fff; font-size:24px; font-weight:900; }
+    .ads-deep-head p { margin:8px 0 0; color:var(--text-gray); font-size:14px; font-weight:700; line-height:1.7; }
+    .ads-deep-meta { display:flex; flex-wrap:wrap; gap:10px; }
+    .ads-chip {
+      border:1px solid rgba(245,142,26,0.28);
+      background: rgba(245,142,26,0.08);
+      color:#fff;
+      border-radius:999px;
+      padding:8px 12px;
+      font-size:12px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .ads-deep-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+    .ads-deep-card {
+      background: rgba(0,0,0,0.26);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px;
+      padding:18px;
+      min-height:138px;
+    }
+    .ads-deep-card strong { display:block; color:var(--primary); font-size:14px; font-weight:900; margin-bottom:8px; }
+    .ads-deep-card p { color:#fff; font-size:13px; font-weight:700; line-height:1.75; margin:0; }
+    .ads-deep-card .evidence { display:block; margin-top:10px; color:var(--text-gray); font-size:12px; font-weight:700; line-height:1.55; }
+    .ads-messages-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:16px; }
+    .ads-message-item {
+      border-right:3px solid var(--primary);
+      background:rgba(255,255,255,0.035);
+      border-radius:10px;
+      padding:13px 14px;
+      color:#fff;
+      font-size:12px;
+      font-weight:700;
+      line-height:1.65;
+    }
   </style>
 </head>
 <body>
@@ -270,7 +316,7 @@
     </div>
     
     <nav class="nav-menu">
-      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="report.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
       <a href="strengths.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
       <a href="weaknesses.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> نقاط الضعف</a>
       <a href="journey.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h12v2H3v-2zm0 4h12v2H3v-2zm0 4h8v2H3v-2z"/></svg> رحلة العميل</a>
@@ -308,7 +354,7 @@
         <h4>اربط حساب Meta Ads للحصول على أرقام حقيقية</h4>
         <p>بدون ربط الحساب، البيانات مستخرجة من مكتبة الإعلانات العامة فقط (بدون ROAS أو Spend).<br>بعد الربط سنجلب: <strong style="color:#fff">ROAS، الإنفاق، CPC، CPM، معدل التحويل</strong> من حسابك الفعلي.</p>
       </div>
-      <button class="btn-link-meta" id="btnLinkMeta" onclick="handleMetaLink()">
+      <button class="btn-link-meta" id="btnLinkMeta">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12.073h2.54V9.786c0-2.507 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12.073h2.773l-.443 2.89h-2.33V21.95C20.343 21.201 24 17.064 24 12.073z"/></svg>
         ربط حساب Meta Ads
       </button>
@@ -386,6 +432,23 @@
         <div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--text-gray);">جاري استخراج بيانات الإعلانات...</div>
       </div>
 
+      <!-- Detailed Paid Ads Analysis -->
+      <div class="ads-deep-wrap">
+        <div class="ads-deep-head">
+          <div>
+            <h4>تحليل الإعلانات الممولة</h4>
+            <p id="adsCampaignSummary">جاري تحليل آخر 30 إعلان والحملات الحالية من البيانات المسحوبة...</p>
+          </div>
+          <div class="ads-deep-meta" id="adsDeepMeta">
+            <span class="ads-chip">آخر 30 إعلان</span>
+          </div>
+        </div>
+        <div class="ads-deep-grid" id="adsDeepAnalysisGrid">
+          <div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--text-gray);font-weight:800;">جاري بناء التحليل التفصيلي...</div>
+        </div>
+        <div class="ads-messages-list" id="adsMessagesList"></div>
+      </div>
+
       <!-- Ad Gallery (Real Ads) -->
       <div>
         <h4 style="font-size:22px; font-weight:900; color:#fff; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
@@ -425,11 +488,11 @@
         </div>
       </div>
 
-      <!-- ═══ التقرير الكامل من NVIDIA AI ═══ -->
+      <!-- ═══ التقرير الكامل من OpenAI ═══ -->
       <div class="deep-report-box" id="deepReportSection" style="display:none;">
         <h4>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-          التقرير العميق — NVIDIA Llama 3.1 (12 محور تحليلي)
+          التقرير العميق — OpenAI (12 محور تحليلي)
         </h4>
         <div id="fullReportContent">جاري توليد التقرير...</div>
       </div>
@@ -438,99 +501,8 @@
 
   </main>
 
-  <script>
-    // ═══ ربط حساب Meta Ads ═══
-    function handleMetaLink() {
-      const token = prompt('الصق Access Token من Meta Ads Manager هنا:\n(من: business.facebook.com > الإعدادات > رموز الوصول)');
-      if (!token || token.trim().length < 20) return;
-
-      const btn = document.getElementById('btnLinkMeta');
-      btn.innerHTML = '⏳ جاري الاتصال...';
-      btn.disabled = true;
-
-      // استخراج id من الـ URL
-      const id = new URLSearchParams(window.location.search).get('id');
-      if (!id) { alert('لم يتم تحديد معرّف الفحص في الرابط.'); btn.disabled=false; return; }
-
-      fetch(`api/ads-fetch.php?id=${id}&action=real-metrics&meta_token=${encodeURIComponent(token)}`)
-        .then(r => r.json())
-        .then(resp => {
-          if (resp.success && resp.real_metrics && resp.real_metrics.connected) {
-            const m = resp.real_metrics;
-            // إظهار قسم الأرقام
-            document.getElementById('realMetricsSection').style.display = 'block';
-            document.getElementById('metaLinkBanner').style.display = 'none';
-            document.getElementById('rmAccountName').textContent = m.account_name || 'حسابك';
-            document.getElementById('rmRoas').textContent    = m.roas    || '—';
-            document.getElementById('rmSpend').textContent   = m.spend   || '—';
-            document.getElementById('rmRevenue').textContent = m.revenue || '—';
-            document.getElementById('rmCpc').textContent     = m.cpc     || '—';
-            document.getElementById('rmCpm').textContent     = m.cpm     || '—';
-            document.getElementById('rmCtr').textContent     = m.ctr     || '—';
-            const statEl = document.getElementById('rmRoasStat');
-            if (statEl) { statEl.textContent = m.status_label || ''; statEl.style.color = m.roas_raw >= 3 ? 'var(--green)' : m.roas_raw >= 1.5 ? 'var(--yellow)' : 'var(--red)'; }
-            const lbl = document.getElementById('rmStatusLabel');
-            if (lbl) { lbl.textContent = m.status_label; lbl.style.background = m.roas_raw >= 3 ? 'rgba(16,185,129,0.15)' : 'rgba(234,179,8,0.15)'; lbl.style.color = m.roas_raw >= 3 ? 'var(--green)' : 'var(--yellow)'; }
-          } else {
-            const err = resp.real_metrics?.error || 'فشل الاتصال. تحقق من صحة التوكن وصلاحياته.';
-            alert('❌ ' + err);
-            btn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12.073h2.54V9.786c0-2.507 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12.073h2.773l-.443 2.89h-2.33V21.95C20.343 21.201 24 17.064 24 12.073z"/></svg> ربط حساب Meta Ads';
-            btn.disabled = false;
-          }
-        })
-        .catch(e => { alert('خطأ: ' + e.message); btn.disabled=false; });
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      // Number Counter
-      const animateValue = (obj, start, end, duration) => {
-        let startTimestamp = null;
-        const step = (timestamp) => {
-          if (!startTimestamp) startTimestamp = timestamp;
-          const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-          const easeOut = 1 - Math.pow(1 - progress, 3);
-          obj.innerHTML = Math.floor(easeOut * (end - start) + start);
-          if (progress < 1) window.requestAnimationFrame(step);
-          else obj.innerHTML = end;
-        };
-        window.requestAnimationFrame(step);
-      };
-
-      setTimeout(() => {
-        const numberElements = document.querySelectorAll('.score-num[data-val]');
-        numberElements.forEach(el => {
-          const target = parseInt(el.getAttribute('data-val'));
-          if(!isNaN(target)) animateValue(el, 0, target, 2000);
-        });
-      }, 500);
-
-      // Ring Charts
-      setTimeout(() => {
-        const rings = document.querySelectorAll('.score-circle[data-percent]');
-        rings.forEach(ring => {
-          const percent = parseInt(ring.getAttribute('data-percent'));
-          const color = ring.getAttribute('data-color');
-          let currentPercent = 0;
-          const animateRing = () => {
-            currentPercent += (percent - currentPercent) * 0.08;
-            ring.style.background = `conic-gradient(${color} ${currentPercent}%, rgba(255,255,255,0.1) 0)`;
-            if (percent - currentPercent > 0.5) requestAnimationFrame(animateRing);
-            else ring.style.background = `conic-gradient(${color} ${percent}%, rgba(255,255,255,0.1) 0)`;
-          };
-          requestAnimationFrame(animateRing);
-        });
-      }, 800);
-
-      // Parallax Orbs
-      const orbs = document.querySelectorAll('.bg-orb');
-      window.addEventListener('scroll', () => {
-        const scrolled = window.scrollY;
-        if(orbs[0]) orbs[0].style.transform = `translateY(${scrolled * 0.2}px)`;
-        if(orbs[1]) orbs[1].style.transform = `translateY(${scrolled * 0.15}px)`;
-        if(orbs[2]) orbs[2].style.transform = `translateY(${scrolled * -0.1}px) translateX(${scrolled * 0.05}px)`;
-      });
-    });
-  </script>
-  <script src="js/report-connect.js?v=2.5"></script>
+  <script src="js/ads-page.js?v=1.0"></script>
+  <!-- v1.0: Inline script extracted to js/ads-page.js for CSP compliance -->
+ <script src="js/report-connect.js?v=5.4"></script>
 </body>
 </html>

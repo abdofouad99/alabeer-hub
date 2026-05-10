@@ -8,6 +8,7 @@
 // السجلات القديمة المخزّنة قبل #8 (strengths/weaknesses كـ kalimat).
 // ============================================================
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/page-scan.php';
 setCors();
 
 // ── طبقة تطبيع دفاعية: مكافِئ للـ normalizeStrengthWeakness في ai-analyze.php ──
@@ -85,9 +86,29 @@ foreach ($jsonFields as $f) {
     }
 }
 
+if (!empty($row['scan_result']) && is_array($row['scan_result']) && function_exists('normalizeScanResult')) {
+    $row['scan_result'] = normalizeScanResult($row['scan_result']);
+}
+
 // ── استخراج بيانات الذكاء الاصطناعي من ai_report ──────────
 // ai_report يحتوي على كامل مخرجات الذكاء الاصطناعي
 $aiReport = is_array($row['ai_report']) ? $row['ai_report'] : [];
+if (!is_array($row['ai_report'])) {
+    $row['ai_report'] = [];
+}
+
+$__hasRenderableValue = static function($value): bool {
+    if (is_array($value)) return count($value) > 0;
+    if (is_string($value)) return trim($value) !== '';
+    return $value !== null;
+};
+
+$__copyAiFieldToRoot = static function(array &$row, array $aiReport, string $field, ?string $target = null) use ($__hasRenderableValue): void {
+    $target = $target ?: $field;
+    if (array_key_exists($field, $aiReport) && $__hasRenderableValue($aiReport[$field])) {
+        $row[$target] = $aiReport[$field];
+    }
+};
 
 // أولوية: strengths/weaknesses من ai_report (الذكاء الاصطناعي الحقيقي)
 // وإلا من الحقول المستقلة (التي حفظها analyze.php)
@@ -104,6 +125,57 @@ if (empty($row['ai_report']['strengths']) && !empty($row['strengths'])) {
 }
 if (empty($row['ai_report']['weaknesses']) && !empty($row['weaknesses'])) {
     $row['ai_report']['weaknesses'] = is_array($row['weaknesses']) ? $row['weaknesses'] : json_decode($row['weaknesses'], true) ?? [];
+}
+
+// Prefer the final AI JSON for all render-facing fields.
+// Root columns may contain older local/fallback data, while ai_report carries
+// the final report shape consumed by the frontend.
+$aiReport = is_array($row['ai_report']) ? $row['ai_report'] : [];
+if (!($__hasRenderableValue($aiReport['summary'] ?? null)) && $__hasRenderableValue($aiReport['final_report'] ?? null)) {
+    $row['ai_report']['summary'] = $aiReport['final_report'];
+    $aiReport['summary'] = $aiReport['final_report'];
+}
+foreach ([
+    'summary',
+    'strengths',
+    'weaknesses',
+    'recommendations',
+    'action_week',
+    'action_month',
+    'competitor_analysis',
+    'score_insight',
+    'competitor_note',
+    'ads_analysis',
+    'competitor_radar',
+    'content_strategy',
+    'customer_journey',
+    'market_opportunity',
+    'platform_strategy',
+    'quick_wins',
+    'kpis_to_track',
+    'executive_plan',
+] as $__aiField) {
+    $__copyAiFieldToRoot($row, $aiReport, $__aiField);
+}
+if ($__hasRenderableValue($row['action_week'] ?? null)) {
+    $row['next_steps'] = $row['action_week'];
+}
+
+// ── مزامنة عكسية: انسخ strengths/weaknesses من ai_report إلى جذر الـ row ──
+// الـ inline script في report.html يقرأ data.strengths (الجذر) مباشرة
+// لذلك لا بد من ضمان وجود البيانات في الموقعين
+if (!empty($row['ai_report']['strengths']) && empty($row['strengths'])) {
+    $row['strengths'] = $row['ai_report']['strengths'];
+}
+if (!empty($row['ai_report']['weaknesses']) && empty($row['weaknesses'])) {
+    $row['weaknesses'] = $row['ai_report']['weaknesses'];
+}
+// في كل الأحوال، تأكد أن الجذر يحتوي على أحدث البيانات (ai_report أقوى)
+if (!empty($row['ai_report']['strengths'])) {
+    $row['strengths'] = $row['ai_report']['strengths'];
+}
+if (!empty($row['ai_report']['weaknesses'])) {
+    $row['weaknesses'] = $row['ai_report']['weaknesses'];
 }
 
 // ── content_analysis ─────────────────────────────────────────
@@ -185,6 +257,10 @@ $row['_debug'] = [
     'recommendations_count'   => count($row['recommendations']              ?? []),
     'has_high_priority_rec'   => count(array_filter($row['recommendations'] ?? [], fn($r) => ($r['priority'] ?? '') === 'high')),
     'has_content_analysis'    => !empty($row['ai_report']['content_analysis']),
+    'data_quality'            => $row['scan_result']['data_quality'] ?? null,
+    'ads_actor_used'          => $row['scan_result']['ads_library']['actor_used'] ?? null,
+    'ads_raw_count'           => $row['scan_result']['ads_library']['raw_count'] ?? 0,
+    'ads_mapped_count'        => count($row['scan_result']['ads_library']['ads'] ?? []),
 ];
 
 jsonOut($row);

@@ -181,7 +181,7 @@
     </div>
     
     <nav class="nav-menu">
-      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="report.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
       <a href="strengths.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
       <a href="weaknesses.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> نقاط الضعف</a>
       <a href="journey.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h12v2H3v-2zm0 4h12v2H3v-2zm0 4h8v2H3v-2z"/></svg> رحلة العميل</a>
@@ -297,36 +297,7 @@
 
   </main>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // 3D Tilt Effect for Phases
-      const phases = document.querySelectorAll('.rm-phase, .roi-card');
-      phases.forEach(card => {
-        card.addEventListener('mousemove', (e) => {
-          const rect = card.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          const centerX = rect.width / 2;
-          const centerY = rect.height / 2;
-          const rotateX = ((y - centerY) / centerY) * -1;
-          const rotateY = ((x - centerX) / centerX) * 1;
-          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
-        });
-        card.addEventListener('mouseleave', () => {
-          card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)`;
-        });
-      });
-
-      // Parallax Orbs
-      const orbs = document.querySelectorAll('.bg-orb');
-      window.addEventListener('scroll', () => {
-        const scrolled = window.scrollY;
-        if(orbs[0]) orbs[0].style.transform = `translateY(${scrolled * 0.2}px)`;
-        if(orbs[1]) orbs[1].style.transform = `translateY(${scrolled * 0.15}px)`;
-        if(orbs[2]) orbs[2].style.transform = `translateY(${scrolled * -0.1}px) translateX(${scrolled * 0.05}px)`;
-      });
-    });
-  </script>
-  <script src="js/report-connect.js?v=2.6"></script>
+  <script src="js/animations.js?v=1.0"></script>
+  <script src="js/report-connect.js?v=5.4"></script>
 </body>
 </html>

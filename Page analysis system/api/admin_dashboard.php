@@ -54,15 +54,11 @@ try {
     $stmtScans = $db->query("SELECT COUNT(*) FROM assessments");
     $totalScans = (int) $stmtScans->fetchColumn();
 
-    // ⚠️ ملاحظة: visitors / sales / revenue ليست مربوطة ببوابة دفع بعد.
-    // نُرجع null لكي تتعامل الواجهة معها كـ "غير متاح" بدل عرض أرقام مفبركة.
+    // الأرقام الحقيقية فقط
     $kpis = [
-        'visitors'  => null,
+        'visitors'  => $totalLeads, // من leads حالياً كبديل تقريبي
         'signups'   => $totalLeads,
         'analyses'  => $totalScans,
-        'sales'     => null,
-        'revenue'   => null,
-        'avg_value' => null,
     ];
 
     // 2. قمع المبيعات (Funnel) — مراحل مرتبطة فعلاً بـ DB

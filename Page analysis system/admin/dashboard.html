@@ -212,20 +212,20 @@
         <div class="kpi-card">
           <div class="kpi-icon">🛒</div>
           <div class="kpi-title">إجمالي المبيعات</div>
-          <div class="kpi-value">342</div>
-          <div class="kpi-change up">↑ 22.4%</div>
+          <div class="kpi-value" style="display:none;">342</div>
+          <div class="kpi-change up" style="display:none;">↑ 22.4%</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-icon">💰</div>
           <div class="kpi-title">الإيرادات (الشهرية)</div>
-          <div class="kpi-value" style="color: var(--primary);">$14,850</div>
-          <div class="kpi-change up">↑ 18.5%</div>
+          <div class="kpi-value" style="color: var(--text-gray); font-size: 16px;">الإيرادات - قريباً بعد ربط بوابة الدفع</div>
+          <div class="kpi-change up" style="display:none;">↑ 18.5%</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-icon">💎</div>
           <div class="kpi-title">متوسط قيمة العميل</div>
-          <div class="kpi-value">$43.40</div>
-          <div class="kpi-change down">↓ 2.1%</div>
+          <div class="kpi-value" style="display:none;">$43.40</div>
+          <div class="kpi-change down" style="display:none;">↓ 2.1%</div>
         </div>
       </div>
 
@@ -375,9 +375,9 @@
           animateNumber(kv[0], data.kpis.visitors || 0);
           animateNumber(kv[1], data.kpis.signups || 0);
           animateNumber(kv[2], data.kpis.analyses || 0);
-          animateNumber(kv[3], data.kpis.sales || 0);
-          kv[4].textContent = '$' + (data.kpis.revenue || 0).toLocaleString('en-US');
-          kv[5].textContent = '$' + ((data.kpis.avg_value || 0).toFixed(2));
+          // animateNumber(kv[3], data.kpis.sales || 0);
+          // kv[4].textContent = '$' + (data.kpis.revenue || 0).toLocaleString('en-US');
+          // kv[5].textContent = '$' + ((data.kpis.avg_value || 0).toFixed(2));
         }
 
         const fv = document.querySelectorAll('.f-val');

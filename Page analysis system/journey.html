@@ -257,7 +257,7 @@
     </div>
     
     <nav class="nav-menu">
-      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="report.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
       <a href="strengths.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> نقاط القوة</a>
       <a href="weaknesses.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> نقاط الضعف</a>
       <a href="journey.html" class="nav-item active"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h12v2H3v-2zm0 4h12v2H3v-2zm0 4h8v2H3v-2z"/></svg> رحلة العميل</a>
@@ -295,8 +295,8 @@
       <div class="card profile-card animate-up delay-1">
         <div class="profile-img">🌿</div>
         <div class="profile-info">
-          <h2>متجر ناتشورال بيوتي</h2>
-          <p>@natural.beauty.sa</p>
+          <h2>جاري تحميل التقرير...</h2>
+          <p>@loading</p>
           <div class="profile-tags">
             <div class="ptag"><span style="color:var(--text-gray)">نوع الحساب:</span> <span id="profileAccountType">يتم التحليل...</span></div>
             <div class="ptag"><span style="color:var(--text-gray)">المجال:</span> <span id="profileNiche">يتم التحليل...</span></div>
@@ -341,7 +341,7 @@
           <div class="j-card">
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الوعي (Awareness)</h4>
-              <p class="j-card-desc" id="stage1Desc">
+              <p class="j-card-desc" id="stage1Desc" data-field="awareness">
                 حملاتك الإعلانية تعمل بشكل ممتاز وتنجح في لفت انتباه الجمهور المستهدف. هناك تدفق صحي للزوار الجدد إلى حسابك، مما يعني أن استهدافك ورسالتك الإعلانية الأولية (Hook) تؤدي الغرض بنجاح وبكفاءة عالية.
               </p>
             </div>
@@ -358,7 +358,7 @@
           <div class="j-card">
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الجذب (Interest)</h4>
-              <p class="j-card-desc" id="stage2Desc">
+              <p class="j-card-desc" id="stage2Desc" data-field="attraction">
                 عندما يدخل الزوار إلى حسابك، يعجبهم التصميم العام وتلفتهم المنتجات. يقومون بتصفح بعض المنشورات ومشاهدة القصص (Stories)، مما يعكس وجود رغبة مبدئية واهتمام حقيقي بما تقدمه.
               </p>
             </div>
@@ -375,7 +375,7 @@
           <div class="j-card">
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الثقة (Trust) <span id="stage3Warning" style="display:none; font-size:13px; background:var(--red); padding:4px 10px; border-radius:8px; font-weight:900; color:#fff;">⚠️ نقطة النزيف الحادة</span></h4>
-              <p class="j-card-desc" id="stage3Desc">
+              <p class="j-card-desc" id="stage3Desc" data-field="trust">
                 الزائر لديه الرغبة بالشراء، لكنه يبحث عن ما يطمئنه. مراجعات العملاء وتجاربهم السابقة (Social Proof) تلعب الدور الأكبر في إقناعه بإكمال عملية الشراء وتجاوز حاجز الخوف.
               </p>
               
@@ -402,7 +402,7 @@
           <div class="j-card">
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الشراء (Conversion) <span id="stage4Warning" style="display:none; font-size:13px; background:var(--red); padding:4px 10px; border-radius:8px; font-weight:900; color:#fff;">⚠️ نقطة النزيف الحادة</span></h4>
-              <p class="j-card-desc" id="stage4Desc">
+              <p class="j-card-desc" id="stage4Desc" data-field="purchase">
                 عدد الزوار الذين يصلون فعلياً إلى صفحة الدفع (Checkout) ويكملون عملية الشراء. معدل التحويل يعتمد على سهولة الدفع ووضوح العرض.
               </p>
               <div class="j-fix-box" id="stage4FixBox" style="display:none;">
@@ -427,7 +427,7 @@
           <div class="j-card">
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الولاء (Loyalty)</h4>
-              <p class="j-card-desc" id="stage5Desc">
+              <p class="j-card-desc" id="stage5Desc" data-field="loyalty">
                 العملاء الذين اتخذوا قرار الشراء، ومدى احتمالية عودتهم للشراء مرة أخرى، مما يؤشر على جودة منتجك ورضاهم عن التجربة.
               </p>
             </div>
@@ -443,75 +443,7 @@
 
   </main>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Number Counter
-      const animateValue = (obj, start, end, duration) => {
-        let startTimestamp = null;
-        const step = (timestamp) => {
-          if (!startTimestamp) startTimestamp = timestamp;
-          const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-          const easeOut = 1 - Math.pow(1 - progress, 3);
-          obj.innerHTML = Math.floor(easeOut * (end - start) + start) + '%';
-          if (progress < 1) window.requestAnimationFrame(step);
-          else obj.innerHTML = end + '%';
-        };
-        window.requestAnimationFrame(step);
-      };
-
-      setTimeout(() => {
-        const numberElements = document.querySelectorAll('.score-num[data-val]');
-        numberElements.forEach(el => {
-          const target = parseInt(el.getAttribute('data-val'));
-          if(!isNaN(target)) animateValue(el, 0, target, 2000);
-        });
-      }, 500);
-
-      // Ring Charts
-      setTimeout(() => {
-        const rings = document.querySelectorAll('.score-circle[data-percent]');
-        rings.forEach(ring => {
-          const percent = parseInt(ring.getAttribute('data-percent'));
-          const color = ring.getAttribute('data-color');
-          let currentPercent = 0;
-          const animateRing = () => {
-            currentPercent += (percent - currentPercent) * 0.08;
-            ring.style.background = `conic-gradient(${color} ${currentPercent}%, rgba(255,255,255,0.1) 0)`;
-            if (percent - currentPercent > 0.5) requestAnimationFrame(animateRing);
-            else ring.style.background = `conic-gradient(${color} ${percent}%, rgba(255,255,255,0.1) 0)`;
-          };
-          requestAnimationFrame(animateRing);
-        });
-      }, 800);
-
-      // 3D Tilt Effect
-      const cards = document.querySelectorAll('.card');
-      cards.forEach(card => {
-        card.addEventListener('mousemove', (e) => {
-          const rect = card.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          const centerX = rect.width / 2;
-          const centerY = rect.height / 2;
-          const rotateX = ((y - centerY) / centerY) * -3;
-          const rotateY = ((x - centerX) / centerX) * 3;
-          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.01)`;
-        });
-        card.addEventListener('mouseleave', () => {
-          card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)`;
-        });
-      });
-
-      // Parallax Orbs
-      const orbs = document.querySelectorAll('.bg-orb');
-      window.addEventListener('scroll', () => {
-        const scrolled = window.scrollY;
-        if(orbs[0]) orbs[0].style.transform = `translateY(${scrolled * 0.2}px)`;
-        if(orbs[1]) orbs[1].style.transform = `translateY(${scrolled * 0.15}px)`;
-        if(orbs[2]) orbs[2].style.transform = `translateY(${scrolled * -0.1}px) translateX(${scrolled * 0.05}px)`;
-      });
-    });
-  </script>
-  <script src="js/report-connect.js?v=2.5"></script>
+  <script src="js/animations.js?v=1.0"></script>
+ <script src="js/report-connect.js?v=5.4"></script>
 </body>
 </html>

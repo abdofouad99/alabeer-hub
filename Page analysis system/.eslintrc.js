@@ -22,7 +22,7 @@ module.exports = {
         // style rules; keep correctness rules (recommended set + parse errors).
         'indent': 'off',
         'quotes': 'off',
-        'linebreak-style': ['error', 'unix'],
+        'linebreak-style': 'off',
         'semi': ['error', 'always'],
         'no-unused-vars': 'warn',
         'no-useless-escape': 'warn',

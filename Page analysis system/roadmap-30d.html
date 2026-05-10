@@ -123,7 +123,7 @@
       <div>العبير<div style="font-size: 12px; color: var(--text-gray); font-weight: 700; text-shadow: none; letter-spacing: 0;">بصمة النمو الرقمي</div></div>
     </div>
     <nav class="nav-menu">
-      <a href="result.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
+      <a href="report.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg> النتائج العامة</a>
       <a href="detailed-analysis.html" class="nav-item"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg> تحليل القنوات</a>
       <a href="roadmap-30d.html" class="nav-item active">
         <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -260,22 +260,7 @@
 
     </main>
 
-  <script src="js/report-connect.js?v=3.1"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Intersection Observer for animation
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry, i) => {
-          if (entry.isIntersecting) {
-            setTimeout(() => {
-              entry.target.classList.add('visible');
-            }, i * 200);
-          }
-        });
-      }, { threshold: 0.1 });
-
-      document.querySelectorAll('.week-block').forEach(block => observer.observe(block));
-    });
-  </script>
+  <script src="js/report-connect.js?v=5.4"></script>
+  <script src="js/roadmap-page.js?v=1.0"></script>
 </body>
 </html>

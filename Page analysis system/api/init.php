@@ -41,22 +41,6 @@ function checkApiRateLimit(string $action = 'api_request'): bool {
     return checkRateLimit($db, $config, $logger, $action);
 }
 
-// دالة للتسجيل السريع
-function logInfo(string $message, array $context = []) {
-    global $logger;
-    $logger->info($message, $context);
-}
-
-function logError(string $message, array $context = []) {
-    global $logger;
-    $logger->error($message, $context);
-}
-
-function logWarning(string $message, array $context = []) {
-    global $logger;
-    $logger->warning($message, $context);
-}
-
 // دالة للـ caching السريع
 function cacheGet(string $key) {
     global $cache;

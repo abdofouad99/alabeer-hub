@@ -114,4 +114,65 @@ function getLogger(array $config): Logger {
     }
     return $logger;
 }
+
+// ── Helper functions للسهولة ───
+if (!function_exists('logInfo')) {
+    function logInfo(string $message, array $context = []): void {
+        static $cfg = null;
+        if ($cfg === null) {
+            $cfgFile = __DIR__ . '/config.php';
+            $cfg = file_exists($cfgFile) ? require $cfgFile : ['logging'=>['enabled'=>true,'level'=>'INFO','file_path'=>__DIR__.'/../logs/app.log']];
+        }
+        try {
+            getLogger($cfg)->info($message, $context);
+        } catch (\Throwable $e) {
+            error_log("[INFO] $message");
+        }
+    }
+}
+
+if (!function_exists('logError')) {
+    function logError(string $message, array $context = []): void {
+        static $cfg = null;
+        if ($cfg === null) {
+            $cfgFile = __DIR__ . '/config.php';
+            $cfg = file_exists($cfgFile) ? require $cfgFile : ['logging'=>['enabled'=>true,'level'=>'ERROR','file_path'=>__DIR__.'/../logs/app.log']];
+        }
+        try {
+            getLogger($cfg)->error($message, $context);
+        } catch (\Throwable $e) {
+            error_log("[ERROR] $message");
+        }
+    }
+}
+
+if (!function_exists('logWarning')) {
+    function logWarning(string $message, array $context = []): void {
+        static $cfg = null;
+        if ($cfg === null) {
+            $cfgFile = __DIR__ . '/config.php';
+            $cfg = file_exists($cfgFile) ? require $cfgFile : ['logging'=>['enabled'=>true,'level'=>'WARNING','file_path'=>__DIR__.'/../logs/app.log']];
+        }
+        try {
+            getLogger($cfg)->warning($message, $context);
+        } catch (\Throwable $e) {
+            error_log("[WARNING] $message");
+        }
+    }
+}
+
+if (!function_exists('logDebug')) {
+    function logDebug(string $message, array $context = []): void {
+        static $cfg = null;
+        if ($cfg === null) {
+            $cfgFile = __DIR__ . '/config.php';
+            $cfg = file_exists($cfgFile) ? require $cfgFile : ['logging'=>['enabled'=>true,'level'=>'DEBUG','file_path'=>__DIR__.'/../logs/app.log']];
+        }
+        try {
+            getLogger($cfg)->debug($message, $context);
+        } catch (\Throwable $e) {
+            error_log("[DEBUG] $message");
+        }
+    }
+}
 ?>

@@ -38,6 +38,49 @@ function animateTo(el, target, dur = 1400) {
 }
 
 // ── Score Ring ────────────────────────────────────────────────
+function extractText(item, fallback = '') {
+  if (item == null) return fallback;
+  if (typeof item === 'string') return item;
+  if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+  if (typeof item === 'object') {
+    const keys = ['title', 'name', 'point', 'text', 'heading', 'label', 'item', 'desc', 'description', 'task'];
+    for (const key of keys) {
+      const value = item[key];
+      if (typeof value === 'string' && value.trim()) return value;
+    }
+  }
+  return fallback;
+}
+
+function hasRenderableValue(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === 'object') return Object.keys(value).length > 0;
+  if (typeof value === 'string') return value.trim() !== '';
+  return value !== null && value !== undefined;
+}
+
+function preferFinalReportData(data) {
+  if (!data || !data.ai_report || typeof data.ai_report !== 'object') return data;
+  const ai = data.ai_report;
+  if (!hasRenderableValue(ai.summary) && hasRenderableValue(ai.final_report)) ai.summary = ai.final_report;
+  [
+    'summary',
+    'strengths',
+    'weaknesses',
+    'recommendations',
+    'action_week',
+    'action_month',
+    'competitor_analysis',
+    'ads_analysis',
+    'competitor_radar',
+    'content_strategy',
+    'customer_journey',
+  ].forEach((key) => {
+    if (hasRenderableValue(ai[key])) data[key] = ai[key];
+  });
+  return data;
+}
+
 function renderScoreRing(score, tier) {
   const ring = document.getElementById('scoreRing');
   if (!ring) return;
@@ -149,21 +192,62 @@ function renderFacebook(fbData) {
   if (social.deep_analysis) {
     renderDeepAnalysis(social.deep_analysis, 'fbDeepContent', 'var(--blue)');
   }
+
+  // ── عرض آخر المنشورات ──────────────────────────────────────
+  let postsContainer = document.getElementById('fbPostsList');
+  // أنشئ الحاوية إذا لم تكن موجودة
+  if (!postsContainer && container) {
+    postsContainer = document.createElement('div');
+    postsContainer.id = 'fbPostsList';
+    postsContainer.style.cssText = 'margin-top:12px; display:block';
+    container.parentNode.insertBefore(postsContainer, container.nextSibling);
+  }
+  if (postsContainer) {
+    const posts = social.latest_posts || [];
+    if (posts.length > 0) {
+      const header = document.createElement('div');
+      header.style.cssText = 'color:var(--blue);font-weight:700;margin:16px 0 10px;font-size:14px';
+      header.textContent = `📋 آخر ${Math.min(posts.length, 10)} منشورات:`;
+      postsContainer.innerHTML = '';
+      postsContainer.appendChild(header);
+      posts.slice(0, 10).forEach(post => {
+        const card = document.createElement('div');
+        card.style.cssText = 'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:8px;font-size:13px';
+        const likes = post.likes ?? post.likesCount ?? 0;
+        const comments = post.comments ?? post.commentsCount ?? 0;
+        const text = (post.text || post.caption || post.message || '').substring(0, 200);
+        const date = post.date || post.timestamp || post.created_time || '';
+        card.innerHTML = `
+          <div style="color:var(--text);margin-bottom:6px;line-height:1.5">${text || '📷 منشور بدون نص'}</div>
+          <div style="display:flex;gap:16px;color:var(--muted);font-size:11px">
+            <span>❤️ ${formatNum(likes)}</span>
+            <span>💬 ${formatNum(comments)}</span>
+            ${date ? `<span>📅 ${date}</span>` : ''}
+          </div>`;
+        postsContainer.appendChild(card);
+      });
+      postsContainer.style.display = 'block';
+    } else {
+      postsContainer.innerHTML = '<p style="color:var(--muted);text-align:center;padding:8px 0;font-size:13px">⚠️ لم يتم جلب المنشورات — قد تكون الصفحة خاصة أو Actor لا يدعم جلب المنشورات</p>';
+      postsContainer.style.display = 'block';
+    }
+  }
 }
 
 // ── Ads Library Section (إعلانات حقيقية) ─────────────────────
 function renderAdsLibrary(scan) {
   const ads = scan?.ads_library;
-  if (!ads) return;
-
+  // ✅ Show section even if no ads data (display "no ads found" state)
   const section = document.getElementById('adsSection');
   if (!section) return;
   section.style.display = 'block';
 
-  const totalAds  = ads.total_ads  || 0;
-  const activeAds = ads.active_ads || 0;
-  const adsItems  = ads.ads        || [];
-  const isRunning = ads.is_running_ads || ads.is_advertising || totalAds > 0;
+  // Handle null/undefined/empty ads gracefully
+  const hasAdsData = ads && (typeof ads === 'object') && (Object.keys(ads).length > 0 || Array.isArray(ads));
+  const totalAds  = hasAdsData ? (ads.total_ads  || 0) : 0;
+  const activeAds = hasAdsData ? (ads.active_ads || 0) : 0;
+  const adsItems  = hasAdsData ? (ads.ads        || []) : [];
+  const isRunning = hasAdsData ? (ads.is_running_ads || ads.is_advertising || totalAds > 0) : false;
 
   // ── ملخص الأرقام ──────────────────────────────────────────────
   const summary = document.getElementById('adsSummary');
@@ -537,7 +621,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const res  = await fetch(`api/result.php?id=${encodeURIComponent(id)}`);
-    const data = await res.json();
+    let data = await res.json();
+    data = preferFinalReportData(data);
     if (!res.ok) throw new Error(data.error || 'خطأ غير معروف');
 
     document.getElementById('skeleton').style.display      = 'none';
@@ -599,9 +684,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (igData) renderInstagramData(igData);
 
     // ── Ads Library ──────────────────────────────────────────────
-    if (scan.ads_library) {
-        renderAdsLibrary(scan);
-    }
+    renderAdsLibrary(scan);
 
     // Strengths & Weaknesses
     const strengths  = data.strengths  || [];
@@ -609,8 +692,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (strengths.length || weaknesses.length) {
       const sw = document.getElementById('swSection');
       if (sw) sw.style.display = 'block';
-      strengths.forEach(s  => { const li = document.createElement('li'); li.textContent = s; document.getElementById('strengthsList')?.appendChild(li); });
-      weaknesses.forEach(w => { const li = document.createElement('li'); li.textContent = w; document.getElementById('weaknessesList')?.appendChild(li); });
+      strengths.forEach(s  => { const li = document.createElement('li'); li.textContent = extractText(s); document.getElementById('strengthsList')?.appendChild(li); });
+      weaknesses.forEach(w => { const li = document.createElement('li'); li.textContent = extractText(w); document.getElementById('weaknessesList')?.appendChild(li); });
     }
 
     // Recommendations
