@@ -104,42 +104,43 @@ function scrapeAdsLibrary(
     // لم نعد نُرجع النتيجة المبدئية هنا، بل نستخدمها كمعلومة إضافية
     // لضمان تشغيل ساحب الإعلانات المخصص (Ads Actor) وجلب صور ونصوص الإعلانات فعلياً.
 
-    // ── المسار الاحتياطي: Apify actor منفصل ──────────────────────
-    $actorId = $cfg['apis']['apify_actor_ads_fb'] ?? '';
+    // ── Actor الجديد: JJghSZmShuco4j9gJ — يقبل URL الصفحة + Ads Library URL مباشرة
+    $actorId = $cfg['apis']['apify_actor_ads_fb'] ?? 'JJghSZmShuco4j9gJ';
     if (empty($actorId)) {
         return ['success' => false, 'error' => 'لا يوجد Ads Actor مُعرَّف', 'ads' => []];
     }
 
-    // استخراج اسم الصفحة من الرابط
-    $cleanQuery = $pageIdentifier;
-    if (str_starts_with($pageIdentifier, 'http')) {
-        preg_match('/(?:facebook|instagram)\.com\/([^\/\?#]+)/i', $pageIdentifier, $m);
-        if (!empty($m[1])) $cleanQuery = trim($m[1]);
-    }
-
-    $urlToSearch = str_starts_with($pageIdentifier, 'http')
+    $cleanUrl = str_starts_with($pageIdentifier, 'http')
         ? $pageIdentifier
-        : "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&q=" . urlencode($cleanQuery) . "&search_type=keyword_unordered";
+        : 'https://www.facebook.com/' . ltrim($pageIdentifier, '/');
+
+    preg_match('/facebook\.com\/([^\/\?#]+)/i', $cleanUrl, $m);
+    $pageSlug  = $m[1] ?? '';
+    $adsLibUrl = $pageSlug
+        ? "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&search_type=page&q=" . urlencode($pageSlug)
+        : '';
+
+    $startUrls = [['url' => $cleanUrl]];
+    if ($adsLibUrl) $startUrls[] = ['url' => $adsLibUrl];
 
     $input = [
-        'start_urls'          => [['url' => $urlToSearch]],
-        'max_results_per_url' => 50,
-        'total_max_results'   => 50,
-        'timeout_secs'        => 110,
-        'proxy_country'       => '',
+        'startUrls'        => $startUrls,
+        'resultsLimit'     => 50,
+        'onlyTotal'        => false,
+        'includeAboutPage' => false,
+        'isDetailsPerAd'   => false,
+        'activeStatus'     => '',
     ];
 
     $fallbackReturn = [
         'success'        => true,
         'source'         => 'facebook_actor',
         'is_running_ads' => $fbAdsActive ?? false,
-        'total_ads'      => $fbAdsCount ?? 0,
+        'total_ads'      => $fbAdsCount  ?? 0,
         'active_ads'     => ($fbAdsActive ?? false) ? ($fbAdsCount ?? 0) : 0,
-        'ads_status'     => $adStatus ?? '',
+        'ads_status'     => $adStatus    ?? '',
         'ads'            => [],
     ];
-
-    // Always run Apify actor to get real ad data — don't rely on Facebook's ads_running field
 
     $runId = _apifyStartRun($actorId, json_encode($input), $token);
     if (!$runId) return $fallbackReturn;
@@ -279,6 +280,100 @@ function enrichCompetitorsData(array $competitors, array $cfg): array {
 }
 
 
+
+// ============================================================
+// scrapePostComments — سحب تعليقات المنشورات (فيسبوك + إنستغرام)
+// FB: us5srxAYnsrkgUv2v | IG: SbK00X0JYCPblD2wp
+// الهدف: تغذية تحليل المشاعر والاعتراضات للذكاء الاصطناعي
+// ============================================================
+function scrapePostComments(string $postUrl, string $platform, string $token, int $limit = 50): array {
+    if ($platform === 'facebook') {
+        $actorId = 'us5srxAYnsrkgUv2v';
+        $input = json_encode([
+            'startUrls'             => [['url' => $postUrl]],
+            'resultsLimit'          => $limit,
+            'includeNestedComments' => false,
+            'viewOption'            => 'RANKED_UNFILTERED',
+        ]);
+    } elseif ($platform === 'instagram') {
+        $actorId = 'SbK00X0JYCPblD2wp';
+        $input = json_encode(['directUrls' => [$postUrl], 'resultsLimit' => $limit]);
+    } else {
+        return ['success' => false, 'error' => 'منصة غير مدعومة'];
+    }
+
+    $runId = _apifyStartRun($actorId, $input, $token);
+    if (!$runId) return ['success' => false, 'error' => 'فشل تشغيل Comments Actor'];
+    $items = _apifyWaitAndFetch($runId, $token, 90);
+    if (!$items) return ['success' => false, 'error' => 'انتهت مهلة Comments Actor'];
+
+    $positive = 0; $negative = 0; $questions = 0;
+    $objections = []; $phrases = [];
+    $negWords = ['غالي','لا','سيء','وحش','ضعيف','bad','worst','expensive'];
+    $posWords = ['رائع','ممتاز','جيد','حلو','عظيم','great','love','excellent'];
+    $qWords   = ['?','؟','كيف','متى','كم','هل','how','price','when'];
+
+    foreach ($items as $item) {
+        $text = $item['text'] ?? $item['comment'] ?? $item['message'] ?? '';
+        if (!trim($text)) continue;
+        $phrases[] = mb_substr($text, 0, 80);
+        $isNeg = false; $isPos = false;
+        foreach ($negWords as $w) { if (mb_stripos($text,$w) !== false) { $isNeg=true; $objections[]=mb_substr($text,0,60); break; } }
+        foreach ($posWords as $w) { if (mb_stripos($text,$w) !== false) { $isPos=true; break; } }
+        foreach ($qWords  as $w) { if (mb_stripos($text,$w) !== false) { $questions++; break; } }
+        if ($isNeg) $negative++; elseif ($isPos) $positive++;
+    }
+    $total = max(count($items), 1);
+    return [
+        'success'        => true,
+        'platform'       => $platform,
+        'total_comments' => count($items),
+        'positive_pct'   => round(($positive / $total) * 100),
+        'negative_pct'   => round(($negative / $total) * 100),
+        'questions_pct'  => round(($questions / $total) * 100),
+        'top_objections' => array_slice(array_unique($objections), 0, 5),
+        'sample_phrases' => array_slice($phrases, 0, 10),
+    ];
+}
+
+// ============================================================
+// scrapeGoogleMapsReviews — صوت العميل الحقيقي (Xb8osYTtOjlsgI6k9)
+// ============================================================
+function scrapeGoogleMapsReviews(string $mapsUrl, string $token, int $maxReviews = 50): array {
+    $actorId = 'Xb8osYTtOjlsgI6k9';
+    $input = json_encode([
+        'startUrls'     => [['url' => $mapsUrl]],
+        'maxReviews'    => $maxReviews,
+        'reviewsSort'   => 'newest',
+        'language'      => 'ar',
+        'reviewsOrigin' => 'all',
+        'personalData'  => false,
+    ]);
+    $runId = _apifyStartRun($actorId, $input, $token);
+    if (!$runId) return ['success' => false, 'error' => 'فشل Maps Actor'];
+    $items = _apifyWaitAndFetch($runId, $token, 90);
+    if (!$items) return ['success' => false, 'error' => 'انتهت مهلة Maps Actor'];
+
+    $ratings=[]; $neg=[]; $pos=[]; $texts=[];
+    foreach ($items as $r) {
+        $stars = (float)($r['stars'] ?? $r['rating'] ?? 0);
+        if ($stars) $ratings[] = $stars;
+        $text = $r['text'] ?? $r['reviewText'] ?? '';
+        if ($text) {
+            $texts[] = mb_substr($text, 0, 80);
+            if ($stars <= 2) $neg[] = mb_substr($text, 0, 80);
+            if ($stars >= 4) $pos[] = mb_substr($text, 0, 80);
+        }
+    }
+    return [
+        'success'       => true,
+        'total_reviews' => count($items),
+        'avg_rating'    => $ratings ? round(array_sum($ratings)/count($ratings),1) : null,
+        'positive'      => array_slice($pos, 0, 5),
+        'negative'      => array_slice($neg, 0, 5),
+        'samples'       => array_slice($texts, 0, 10),
+    ];
+}
 
 // ── Apify Internal Helpers ────────────────────────────────────
 function _apifyStartRun(string $actorId, string $inputJson, string $token): ?string {
@@ -529,54 +624,86 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
 // Instagram Scraper (apify~instagram-profile-scraper)
 // ============================================================
 function scrapeInstagram(string $url, string $token, array $cfg): array {
-    $actorId = $cfg['apis']['apify_actor_ig'] ?? 'apify~instagram-profile-scraper';
+    // ── Actor القوي الجديد: يسحب 100 منشور + تعليقات + Reels ──
+    $actorId = $cfg['apis']['apify_actor_ig'] ?? 'shu8hvrXbJbY3Eb9W';
 
-    // استخراج username
+    // بناء رابط البروفايل
     preg_match('/instagram\.com\/([^\/\?#]+)/i', $url, $m);
-    $username = $m[1] ?? '';
-    $username = trim($username, '/@');
+    $username = trim($m[1] ?? '', '/@');
     $username = preg_replace('/[^a-zA-Z0-9_\.]/', '', $username);
-
     if (!$username) return ['success' => false, 'error' => 'لم يتم استخراج username'];
 
-    $input = json_encode([
-        'usernames'      => [$username],
-        'resultsPerPage' => 30,
-    ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
-    $runId = _apifyStartRun($actorId, $input, $token);
+    $profileUrl = 'https://www.instagram.com/' . $username . '/';
 
+    $input = json_encode([
+        'resultsType'  => 'posts',
+        'directUrls'   => [$profileUrl],
+        'resultsLimit' => 100,
+        'searchType'   => 'hashtag',
+        'searchLimit'  => 10,
+        'addParentData'=> true,   // يُضيف بيانات الحساب لكل منشور
+    ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
+
+    $runId = _apifyStartRun($actorId, $input, $token);
     if (!$runId) return ['success' => false, 'error' => 'فشل تشغيل Instagram Scraper'];
 
-    $result = _apifyWaitAndFetch($runId, $token, 120);
-    // إذا كانت النتيجة null يعني فشل أو مهلة، أما مصفوفة فارغة فتعني لا بيانات ولكن لا تعتبر فشلاً صراحةً
+    $result = _apifyWaitAndFetch($runId, $token, 150);
     if ($result === null) return ['success' => false, 'error' => 'انتهت مهلة Instagram Scraper'];
+    if (empty($result)) return ['success' => false, 'error' => 'لا بيانات Instagram'];
 
-    $profile = $result[0] ?? [];
-    if (empty($profile)) return ['success' => false, 'error' => 'لا بيانات Instagram'];
+    // أول عنصر يحتوي على بيانات المنشور مع ownerFullName/ownerUsername
+    $firstPost = $result[0] ?? [];
+    $posts     = $result;   // كل عنصر = منشور
 
-    $posts = $profile['latestPosts'] ?? $profile['posts'] ?? [];
+    // استخراج بيانات الحساب من ownerFullName / ownerId / meta
+    $igUser    = $firstPost['ownerUsername']  ?? $firstPost['owner']['username']   ?? $username;
+    $fullName  = $firstPost['ownerFullName']  ?? $firstPost['owner']['full_name']  ?? '';
+    $followers = $firstPost['ownerFollowersCount'] ?? $firstPost['owner']['edge_followed_by']['count'] ?? null;
+    $following = $firstPost['ownerFollowingCount'] ?? null;
+    $postsTotal= $firstPost['ownerPostsCount']     ?? count($posts);
+    $bio       = $firstPost['ownerBiography']      ?? '';
+    $website   = $firstPost['ownerExternalUrl']    ?? '';
+    $verified  = $firstPost['ownerIsVerified']     ?? false;
+    $picUrl    = $firstPost['ownerProfilePicUrl']  ?? '';
+
+    // حساب متوسطات أدق بما يشمل Saves
+    $totalLikes   = 0; $totalComments = 0; $totalViews = 0;
+    $reelsCount   = 0; $savesTotal = 0;
+    foreach ($posts as $p) {
+        $totalLikes    += (int)($p['likesCount']    ?? $p['likes']    ?? 0);
+        $totalComments += (int)($p['commentsCount'] ?? $p['comments'] ?? 0);
+        $totalViews    += (int)($p['videoViewCount'] ?? 0);
+        $savesTotal    += (int)($p['savesCount']    ?? $p['saves']    ?? 0);
+        $t = strtolower($p['type'] ?? $p['mediaType'] ?? '');
+        if (str_contains($t, 'video') || str_contains($t, 'reel')) $reelsCount++;
+    }
+    $cnt = max(count($posts), 1);
+    $avgLikes    = round($totalLikes    / $cnt, 1);
+    $avgComments = round($totalComments / $cnt, 1);
+    $avgSaves    = round($savesTotal    / $cnt, 1);
+    $avgViews    = round($totalViews    / $cnt, 1);
+    $engRate     = $followers ? round((($avgLikes + $avgComments) / $followers) * 100, 2) : 0;
 
     return [
         'success'          => true,
-        'source'           => 'apify',
+        'source'           => 'apify_ig_v2',
         'platform'         => 'instagram',
-        'username'         => $profile['username']          ?? $username,
-        'full_name'        => $profile['fullName']          ?? '',
-        'followers'        => $profile['followersCount']    ?? null,
-        'following'        => $profile['followsCount']      ?? null,
-        'posts_count'      => $profile['postsCount']        ?? count($posts),
-        'bio'              => $profile['biography']         ?? '',
-        'bio_length'       => mb_strlen($profile['biography'] ?? ''),
-        'website'          => $profile['externalUrl']       ?? '',
-        'is_verified'      => $profile['verified']          ?? false,
-        'is_business'      => $profile['isBusinessAccount'] ?? false,
-        'business_category'=> $profile['businessCategoryName'] ?? '',
-        'profile_pic'      => $profile['profilePicUrl']    ?? '',
-        'highlights_count' => $profile['highlightReelCount'] ?? 0,
-        'has_reels'        => !empty($profile['reelsCount']) || !empty($profile['isEligibleToViewUsernameReels']),
-        'avg_likes'        => calcAvgLikes($posts),
-        'avg_comments'     => calcAvgComments($posts),
-        'engagement_rate'  => calcIGEngagement($posts, $profile['followersCount'] ?? 1),
+        'username'         => $igUser,
+        'full_name'        => $fullName,
+        'followers'        => $followers,
+        'following'        => $following,
+        'posts_count'      => $postsTotal,
+        'bio'              => $bio,
+        'bio_length'       => mb_strlen($bio),
+        'website'          => $website,
+        'is_verified'      => $verified,
+        'profile_pic'      => $picUrl,
+        'avg_likes'        => $avgLikes,
+        'avg_comments'     => $avgComments,
+        'avg_saves'        => $avgSaves,          // ✅ جديد
+        'avg_video_views'  => $avgViews,          // ✅ جديد
+        'reels_count'      => $reelsCount,        // ✅ جديد
+        'engagement_rate'  => $engRate,
         'top_post'         => getTopIGPost($posts),
         'deep_analysis'    => analyzeDeepContent($posts),
         'posts_per_week'   => calcPostsPerWeek($posts),
@@ -589,62 +716,86 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
 // TikTok Scraper
 // ============================================================
 function scrapeTikTok(string $url, string $token, array $cfg): array {
-    $actorId = $cfg['apis']['apify_actor_tiktok'] ?? 'GdWCkxBtKWOsKjdch';
+    // ── Actor القوي الجديد: Shares + Saves + Trending Sounds ──
+    $actorId = $cfg['apis']['apify_actor_tiktok'] ?? '0FXVyOXXEmdGcV88a';
 
-    // استخراج username (يدعم: @user, user, tiktok.com/@user, tiktok.com/user)
     if (!str_contains($url, 'tiktok.com')) {
         $username = ltrim($url, '@');
     } else {
         preg_match('/tiktok\.com\/@?([^\/\?#]+)/i', $url, $m);
         $username = $m[1] ?? '';
     }
-
     if (!$username) return ['success' => false, 'error' => 'لم يتم استخراج TikTok username'];
 
-    logInfo("Starting TikTok scrape via Apify", ["username" => $username, "actor" => $actorId]);
+    logInfo('Starting TikTok scrape via Apify v2', ['username' => $username, 'actor' => $actorId]);
+
     $input = json_encode([
-        'profiles'       => ['https://www.tiktok.com/@' . $username],
-        'resultsPerPage' => 30,
+        'profiles'             => ['https://www.tiktok.com/@' . $username],
+        'profileScrapeSections'=> ['videos'],
+        'profileSorting'       => 'latest',
+        'resultsPerPage'       => 100,
+        'shouldDownloadVideos' => false,
+        'shouldDownloadCovers' => false,
+        'shouldDownloadAvatars'=> false,
+        'downloadSubtitlesOptions' => 'NEVER_DOWNLOAD_SUBTITLES',
     ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
+
     $runId = _apifyStartRun($actorId, $input, $token);
-    if (!$runId) {
-        logError("Failed to start TikTok run", ["actor" => $actorId]);
-        return ['success' => false, 'error' => 'فشل تشغيل TikTok Scraper'];
-    }
+    if (!$runId) { logError('Failed to start TikTok run', ['actor' => $actorId]); return ['success' => false, 'error' => 'فشل تشغيل TikTok Scraper']; }
 
-    $result = _apifyWaitAndFetch($runId, $token, 90);
-    if (!$result) {
-        logError("TikTok scrape timeout or failed", ["run_id" => $runId]);
-        return ['success' => false, 'error' => 'انتهت مهلة TikTok Scraper'];
-    }
+    $result = _apifyWaitAndFetch($runId, $token, 120);
+    if (!$result) { logError('TikTok timeout', ['runId' => $runId]); return ['success' => false, 'error' => 'انتهت مهلة TikTok Scraper']; }
 
-    $profile = $result[0] ?? [];
-    if (empty($profile)) {
-        logError("TikTok scrape returned no data", ["run_id" => $runId, "result" => $result]);
-        return ['success' => false, 'error' => 'لا بيانات TikTok'];
-    }
+    // Actor الجديد يُرجع كل فيديو كعنصر منفصل + بيانات الحساب في authorMeta
+    $firstItem = $result[0] ?? [];
+    if (empty($firstItem)) return ['success' => false, 'error' => 'لا بيانات TikTok'];
 
-    logInfo("TikTok scrape successful", ["username" => $username]);
+    $author   = $firstItem['authorMeta'] ?? [];
+    $videos   = $result;
+
+    // حساب Shares + Saves + Trending Sounds
+    $totalShares = 0; $totalSaves = 0; $totalViews = 0;
+    $sounds = [];
+    foreach ($videos as $v) {
+        $totalShares += (int)($v['diggCount']   ?? $v['shareCount'] ?? 0);
+        $totalSaves  += (int)($v['collectCount'] ?? 0);
+        $totalViews  += (int)($v['playCount']   ?? 0);
+        $sound = $v['musicMeta']['musicName'] ?? $v['music']['title'] ?? '';
+        if ($sound) $sounds[$sound] = ($sounds[$sound] ?? 0) + 1;
+    }
+    $cnt       = max(count($videos), 1);
+    $followers  = (int)($author['fans'] ?? $author['followerCount'] ?? 0);
+    $avgViews   = round($totalViews  / $cnt);
+    $avgShares  = round($totalShares / $cnt, 1);
+    $avgSaves   = round($totalSaves  / $cnt, 1);
+    arsort($sounds);
+    $trendingSounds = array_slice(array_keys($sounds), 0, 5);
+
+    logInfo('TikTok scrape successful v2', ['username' => $username, 'videos' => $cnt]);
 
     return [
-        'success'         => true,
-        'platform'        => 'tiktok',
-        'username'        => $profile['uniqueId']          ?? $profile['authorMeta']['name']      ?? $username,
-        'full_name'       => $profile['nickname']          ?? $profile['authorMeta']['nickName']  ?? '',
-        'followers'       => $profile['followerCount']     ?? $profile['authorMeta']['fans']      ?? 0,
-        'likes'           => $profile['heartCount']        ?? $profile['authorMeta']['heart']     ?? 0,
-        'video_count'     => $profile['videoCount']        ?? $profile['authorMeta']['video']     ?? 0,
-        'bio'             => $profile['signature']         ?? $profile['authorMeta']['signature'] ?? '',
-        'is_verified'     => $profile['verified']          ?? $profile['authorMeta']['verified']  ?? false,
-        'website'         => $profile['externalWebUrl']    ?? $profile['authorMeta']['externalUrl'] ?? '',
-        'avatar'          => $profile['avatarLarger']      ?? $profile['authorMeta']['avatar']    ?? '',
-        // ✅ تحليل المنشورات
-        'avg_likes'       => calcAvgLikes($profile['videos'] ?? []),
-        'avg_comments'    => calcAvgComments($profile['videos'] ?? []),
-        'engagement_rate' => calcIGEngagement($profile['videos'] ?? [], $profile['followerCount'] ?? 1),
-        'posts_per_week'  => calcPostsPerWeek($profile['videos'] ?? []),
-        'deep_analysis'   => analyzeDeepContent($profile['videos'] ?? []),
-        'latest_posts'    => array_slice($profile['videos'] ?? [], 0, 30),
+        'success'          => true,
+        'source'           => 'apify_tt_v2',
+        'platform'         => 'tiktok',
+        'username'         => $author['name']      ?? $username,
+        'full_name'        => $author['nickName']   ?? '',
+        'followers'        => $followers,
+        'likes'            => (int)($author['heart'] ?? 0),
+        'video_count'      => (int)($author['video'] ?? count($videos)),
+        'bio'              => $author['signature']  ?? '',
+        'is_verified'      => (bool)($author['verified'] ?? false),
+        'website'          => $author['externalUrl'] ?? '',
+        'avatar'           => $author['avatar']     ?? '',
+        'avg_likes'        => calcAvgLikes($videos),
+        'avg_comments'     => calcAvgComments($videos),
+        'avg_shares'       => $avgShares,          // ✅ جديد
+        'avg_saves'        => $avgSaves,           // ✅ جديد
+        'avg_views'        => $avgViews,           // ✅ جديد
+        'trending_sounds'  => $trendingSounds,     // ✅ جديد
+        'engagement_rate'  => calcIGEngagement($videos, $followers ?: 1),
+        'posts_per_week'   => calcPostsPerWeek($videos),
+        'deep_analysis'    => analyzeDeepContent($videos),
+        'latest_posts'     => array_slice($videos, 0, 30),
     ];
 }
 

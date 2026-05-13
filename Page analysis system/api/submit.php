@@ -157,7 +157,7 @@ $safeLeadFields = [
     'objective', 'target_audience', 'ad_budget',
     'project_type', 'platform', 'country', 'city',
     'website_url', 'facebook_url', 'instagram_url',
-    'tiktok_url', 'twitter_url', 'youtube_url'
+    'tiktok_url', 'twitter_url', 'youtube_url', 'maps_url'
 ];
 
 $insertCols = [];

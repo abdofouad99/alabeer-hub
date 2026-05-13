@@ -8,7 +8,7 @@
 // منع التشغيل المتكرر عبر lock file
 // نُحدِّث الإصدار إلى v4_0 لأننا أضفنا CREATE TABLE IF NOT EXISTS
 // لـ leads/assessments/answers/rate_limits (كانت مفقودة، فيفشل النشر النظيف).
-$lockFile = __DIR__ . '/../cache/db_migrated_v4_0.lock';
+$lockFile = __DIR__ . '/../cache/db_migrated_v5_0.lock';
 
 if (file_exists($lockFile)) {
     // الـ Migration اكتمل مسبقاً — لا تفعل شيئاً
@@ -61,6 +61,7 @@ try {
             facebook_url    VARCHAR(500),
             twitter_url     VARCHAR(500),
             youtube_url     VARCHAR(500),
+            maps_url        VARCHAR(500),
             status          VARCHAR(30)  NOT NULL DEFAULT 'new',
             notes           TEXT,
             source          VARCHAR(100) NOT NULL DEFAULT 'growth_fingerprint',
@@ -142,6 +143,7 @@ try {
         'tiktok_url'     => 'VARCHAR(500)',
         'twitter_url'    => 'VARCHAR(500)',
         'youtube_url'    => 'VARCHAR(500)',
+        'maps_url'       => 'VARCHAR(500)',
         'source'         => "VARCHAR(60) DEFAULT 'growth_fingerprint'",
     ];
     foreach ($wantLeadCols as $col => $def) {
@@ -185,7 +187,7 @@ try {
     }
 
     // ─── كتابة Lock File ──────────────────────────────────────
-    file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Migration v4.0 completed');
+    file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Migration v5.0 completed — added maps_url');
 
     return true;
 

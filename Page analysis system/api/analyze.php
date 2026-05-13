@@ -764,6 +764,101 @@ function runAnalysis(int $assessmentId): array {
 
     skip_tiktok:
 
+    // ─── 5d) تعليقات أفضل منشور (Facebook + Instagram) ──────────
+    // تُغذّي الذكاء الاصطناعي بتحليل المشاعر والاعتراضات الحقيقية
+    if (($cfg['analysis']['enable_apify'] ?? false)) {
+        try {
+            $token = getValidApifyToken($cfg);
+            if ($token) {
+                // Facebook: أفضل منشور
+                $fbTopPost = $scanResult['facebook']['top_post'] ?? null;
+                $fbTopUrl  = $fbTopPost['url'] ?? $fbTopPost['postUrl'] ?? '';
+                if ($fbTopUrl) {
+                    $fbComments = scrapePostComments($fbTopUrl, 'facebook', $token, 50);
+                    if ($fbComments['success'] ?? false) {
+                        $scanResult['facebook']['top_post_comments'] = $fbComments;
+                        $saveScanProgress('facebook.top_post_comments', $fbComments);
+                        logInfo('FB top post comments scraped', ['total' => $fbComments['total_comments']]);
+                    }
+                }
+                // Instagram: أفضل منشور
+                $igTopPost = $scanResult['instagram']['top_post'] ?? null;
+                $igTopUrl  = $igTopPost['url'] ?? $igTopPost['postUrl'] ?? '';
+                if ($igTopUrl) {
+                    $igComments = scrapePostComments($igTopUrl, 'instagram', $token, 50);
+                    if ($igComments['success'] ?? false) {
+                        $scanResult['instagram']['top_post_comments'] = $igComments;
+                        $saveScanProgress('instagram.top_post_comments', $igComments);
+                        logInfo('IG top post comments scraped', ['total' => $igComments['total_comments']]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logError('Comments scrape failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    // ─── 5e) Google Maps Reviews — إذا وُجد رابط Maps ────────────
+    if (($cfg['analysis']['enable_apify'] ?? false)) {
+        $mapsUrl = $row['maps_url'] ?? '';
+        // محاولة اكتشاف رابط Maps من الموقع
+        if (!$mapsUrl) {
+            $wsLinks = $scanResult['website_scan']['links'] ?? [];
+            foreach ((array)$wsLinks as $link) {
+                if (is_string($link) && str_contains($link, 'google.com/maps')) {
+                    $mapsUrl = $link; break;
+                }
+            }
+        }
+        if ($mapsUrl) {
+            try {
+                $token = getValidApifyToken($cfg);
+                if ($token) {
+                    $mapsResult = scrapeGoogleMapsReviews($mapsUrl, $token, 50);
+                    if ($mapsResult['success'] ?? false) {
+                        $scanResult['google_maps'] = $mapsResult;
+                        $saveScanProgress('google_maps', $mapsResult);
+                        logInfo('Google Maps reviews scraped', ['total' => $mapsResult['total_reviews'], 'rating' => $mapsResult['avg_rating']]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                logError('Google Maps scrape failed', ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    // ─── 5f) Cloud Video Intelligence — تحليل أفضل فيديو/رييل ───
+    $gcpCredsFile = __DIR__ . '/gcp-credentials.json';
+    if (file_exists($gcpCredsFile)) {
+        require_once __DIR__ . '/gcp-video-analyzer.php';
+        $topVideoUrl = '';
+        foreach ((array)($scanResult['instagram']['latest_posts'] ?? $scanResult['instagram']['posts'] ?? []) as $p) {
+            $u = $p['videoUrl'] ?? $p['video_url'] ?? $p['videoPlayUrl'] ?? '';
+            if ($u && str_starts_with($u, 'http')) { $topVideoUrl = $u; break; }
+        }
+        if (!$topVideoUrl) {
+            foreach ((array)($scanResult['tiktok']['latest_posts'] ?? $scanResult['tiktok']['posts'] ?? []) as $p) {
+                $u = $p['videoUrl'] ?? $p['video_url'] ?? $p['playAddr'] ?? '';
+                if ($u && str_starts_with($u, 'http')) { $topVideoUrl = $u; break; }
+            }
+        }
+        if ($topVideoUrl) {
+            try {
+                logInfo('GCP Video analysis started', ['url' => substr($topVideoUrl, 0, 80)]);
+                $vidResult = analyzeVideoContent($topVideoUrl, $gcpCredsFile, 'alabeer-hub-video-analysis');
+                if ($vidResult['analyzed']) {
+                    $scanResult['video_intelligence'] = $vidResult;
+                    $saveScanProgress('video_intelligence', $vidResult);
+                    logInfo('GCP Video done', ['hook' => mb_substr($vidResult['hook_text'], 0, 60)]);
+                } else {
+                    logError('GCP Video failed', ['error' => $vidResult['error']]);
+                }
+            } catch (\Throwable $e) {
+                logError('GCP Video exception', ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
     // ─── 5c) Twitter — من رابط مُدخل يدوياً أو مُكتشف تلقائياً ──
     // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
     // if ((microtime(true) - $analysisStartTime) > $maxAnalysisTime) { goto skip_twitter; }

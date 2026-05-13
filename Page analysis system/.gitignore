@@ -13,6 +13,9 @@ config.local.php
 config/*.php
 api/config.local.php
 api/secrets.php
+bq-key.json.json
+api/gcp-credentials.json
+*.json.json
 
 # ملفات أُنشئت في وقت التشغيل وقد تحوي توكينات حساسة
 cache/setup_token.txt

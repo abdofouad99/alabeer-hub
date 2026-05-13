@@ -11,6 +11,45 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/page-scan.php';
 setCors();
 
+// ============================================================
+// دوال القراءة الآمنة (Null-Safe Helpers) — العملية 2
+// تضمن أن أي مسار JSON مفقود لا يكسر الـ Mapping
+// ============================================================
+
+/**
+ * قراءة آمنة من مصفوفة متداخلة عبر مسار نقطي
+ * مثال: safeGet($arr, 'page_6_content.hook_analysis', [])
+ */
+function safeGet(array $data, string $path, $default = null) {
+    $keys    = explode('.', $path);
+    $current = $data;
+    foreach ($keys as $key) {
+        if (!is_array($current) || !array_key_exists($key, $current)) {
+            return $default;
+        }
+        $current = $current[$key];
+    }
+    return ($current === null) ? $default : $current;
+}
+
+/** قراءة آمنة لمصفوفة — تُرجع [] إذا غير موجودة أو غير مصفوفة */
+function safeGetArray(array $data, string $path): array {
+    $v = safeGet($data, $path, []);
+    return is_array($v) ? $v : [];
+}
+
+/** قراءة آمنة لرقم — تُرجع $default إذا غير رقمي */
+function safeGetNumber(array $data, string $path, float $default = 0): float {
+    $v = safeGet($data, $path, $default);
+    return is_numeric($v) ? (float) $v : $default;
+}
+
+/** قراءة آمنة لنص — تُرجع placeholder إذا فارغ */
+function safeGetString(array $data, string $path, string $placeholder = '—'): string {
+    $v = safeGet($data, $path, $placeholder);
+    return (is_string($v) && $v !== '') ? $v : $placeholder;
+}
+
 // ── طبقة تطبيع دفاعية: مكافِئ للـ normalizeStrengthWeakness في ai-analyze.php ──
 // تضمن وجود مفتاح 'title' في كل عنصر strengths/weaknesses قبل إرساله للواجهة.
 // لا تضع 'score' في الـ object المُحوَّل من نص؛ الـ frontend يختار الـ default
@@ -63,7 +102,7 @@ $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$id) jsonError('معرّف التقييم غير صالح');
 
 $db   = getDB();
-$stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? LIMIT 1");
+$stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? LIMIT 1");
 $stmt->execute([$id]);
 $row  = $stmt->fetch();
 
@@ -112,28 +151,129 @@ $__copyAiFieldToRoot = static function(array &$row, array $aiReport, string $fie
 
 // أولوية: strengths/weaknesses من ai_report (الذكاء الاصطناعي الحقيقي)
 // وإلا من الحقول المستقلة (التي حفظها analyze.php)
-if (!empty($aiReport['strengths'])) {
-    $row['ai_report']['strengths']  = $aiReport['strengths'];
-}
-if (!empty($aiReport['weaknesses'])) {
-    $row['ai_report']['weaknesses'] = $aiReport['weaknesses'];
-}
+$_aiStrengths  = safeGetArray($aiReport, 'strengths');
+$_aiWeaknesses = safeGetArray($aiReport, 'weaknesses');
+if (!empty($_aiStrengths))  $row['ai_report']['strengths']  = $_aiStrengths;
+if (!empty($_aiWeaknesses)) $row['ai_report']['weaknesses'] = $_aiWeaknesses;
 
 // ── إذا كانت strengths/weaknesses فارغة في ai_report، ابحث في جذر الـ row ──
-if (empty($row['ai_report']['strengths']) && !empty($row['strengths'])) {
-    $row['ai_report']['strengths']  = is_array($row['strengths']) ? $row['strengths'] : json_decode($row['strengths'], true) ?? [];
-}
-if (empty($row['ai_report']['weaknesses']) && !empty($row['weaknesses'])) {
-    $row['ai_report']['weaknesses'] = is_array($row['weaknesses']) ? $row['weaknesses'] : json_decode($row['weaknesses'], true) ?? [];
-}
+$_rowStrengths  = is_array($row['strengths'] ?? null) ? $row['strengths'] : [];
+$_rowWeaknesses = is_array($row['weaknesses'] ?? null) ? $row['weaknesses'] : [];
+if (empty($row['ai_report']['strengths'])  && !empty($_rowStrengths))  $row['ai_report']['strengths']  = $_rowStrengths;
+if (empty($row['ai_report']['weaknesses']) && !empty($_rowWeaknesses)) $row['ai_report']['weaknesses'] = $_rowWeaknesses;
 
 // Prefer the final AI JSON for all render-facing fields.
-// Root columns may contain older local/fallback data, while ai_report carries
-// the final report shape consumed by the frontend.
 $aiReport = is_array($row['ai_report']) ? $row['ai_report'] : [];
-if (!($__hasRenderableValue($aiReport['summary'] ?? null)) && $__hasRenderableValue($aiReport['final_report'] ?? null)) {
-    $row['ai_report']['summary'] = $aiReport['final_report'];
-    $aiReport['summary'] = $aiReport['final_report'];
+
+// ── Schema Normalization: Map new Gemini page_* keys to legacy frontend keys ──
+$page_6 = safeGet($aiReport, 'page_6_content', null);
+if (is_array($page_6)) {
+    if (empty($aiReport['content_pillars_matrix'])) {
+        $pillars = safeGetArray($page_6, 'content_pillars');
+        if (!empty($pillars)) {
+            $aiReport['content_pillars_matrix'] = array_map(function($p) {
+                return [
+                    'pillar'     => safeGetString($p, 'pillar', '—'),
+                    'percentage' => safeGetNumber($p, 'percentage', 0),
+                    'desc'       => safeGetString($p, 'why', ''),
+                    'example'    => !empty($p['examples']) && is_array($p['examples']) ? $p['examples'][0] : '',
+                ];
+            }, $pillars);
+        }
+    }
+    if (empty($aiReport['hook_bank'])) {
+        $hookBank = safeGetArray($page_6, 'hook_bank');
+        if (!empty($hookBank)) {
+            $aiReport['hook_bank'] = array_map(function($h) {
+                return [
+                    'type'    => safeGetString($h, 'format', '') . ' - ' . safeGetString($h, 'platform', ''),
+                    'formula' => safeGetString($h, 'psychology', ''),
+                    'example' => safeGetString($h, 'hook', ''),
+                ];
+            }, $hookBank);
+        }
+    }
+    if (empty($aiReport['viral_deconstruction'])) {
+        $hookAnalysis = safeGet($page_6, 'hook_analysis', null);
+        if (is_array($hookAnalysis)) {
+            $aiReport['viral_deconstruction'] = [
+                'post_type'           => 'فيديو/ريلز',
+                'hook_analysis'       => safeGetString($hookAnalysis, 'current_hook', '—'),
+                'sentiment_diagnosis' => [
+                    'intent_to_buy' => safeGetString($hookAnalysis, 'verdict', '—'),
+                    'objections'    => safeGetString($hookAnalysis, 'improvement', '—'),
+                    'emotion'       => safeGetString($hookAnalysis, 'psychology_used', '—'),
+                ],
+                'gap_extracted' => 'بناءً على تحليل الذكاء الاصطناعي',
+            ];
+        }
+    }
+    if (empty($aiReport['omnichannel_strategy'])) {
+        $viralFormula = safeGet($page_6, 'viral_formula', null);
+        if (is_array($viralFormula)) {
+            $formats = safeGet($viralFormula, 'trending_formats', '');
+            $aiReport['omnichannel_strategy'] = [
+                'core_content' => safeGetString($viralFormula, 'structure', '—'),
+                'distribution' => is_array($formats) ? implode('، ', $formats) : (string) $formats,
+            ];
+        }
+    }
+}
+
+if (empty($aiReport['customer_journey'])) {
+    $aiReport['customer_journey'] = safeGet($aiReport, 'page_8_journey', [
+        'journey_score'      => 0,
+        'funnel_analysis'    => [
+            'awareness' => ['score'=>0,'current_channels'=>[],'gaps'=>[],'recommendations'=>[],'monthly_reach'=>0],
+            'interest'  => ['score'=>0,'what_hooks_them'=>[],'what_loses_them'=>[],'recommendations'=>[]],
+            'decision'  => ['score'=>0,'trust_signals_present'=>[],'trust_signals_missing'=>[],'objections'=>[],'objection_handles'=>[]],
+            'action'    => ['score'=>0,'conversion_rate_estimate'=>'—','friction_points'=>[],'cta_quality'=>0,'recommendations'=>[]],
+            'loyalty'   => ['score'=>0,'retention_tactics_used'=>[],'missing_tactics'=>[],'recommendations'=>[]],
+        ],
+        'biggest_funnel_leak' => ['stage'=>'—','problem'=>'—','monthly_lost_revenue'=>'—','fix'=>'—'],
+    ]);
+}
+
+if (empty($aiReport['competitor_analysis'])) {
+    $competitors = safeGetArray($aiReport, 'page_10_competitors.competitors');
+    if (!empty($competitors)) {
+        $aiReport['competitor_analysis'] = array_map(function($c) {
+            return [
+                'name'        => safeGetString($c, 'name', '—'),
+                'strategy'    => safeGetString($c, 'content_strategy', '—'),
+                'how_to_beat' => !empty($c['steal_this']) ? $c['steal_this'] : safeGetString($c, 'their_weakness', '—'),
+            ];
+        }, $competitors);
+    }
+}
+
+if (empty($aiReport['action_month'])) {
+    $r = safeGet($aiReport, 'page_18_roadmap', null);
+    if ($r) {
+        $buildWeek = function(string $wk) use ($r) {
+            return [
+                'title' => safeGetString($r, "{$wk}.theme", '—'),
+                'goals' => safeGetArray($r, "{$wk}.week_kpis"),
+                'tasks' => array_map(
+                    fn($d) => safeGetString($d, 'date_offset', '') . ': ' . safeGetString($d, 'morning_task.task', '') . ' | ' . safeGetString($d, 'afternoon_task.task', ''),
+                    safeGetArray($r, "{$wk}.daily_tasks")
+                ),
+            ];
+        };
+        $aiReport['action_month'] = [
+            'week1' => $buildWeek('week1'),
+            'week2' => $buildWeek('week2'),
+            'week3' => $buildWeek('week3'),
+            'week4' => $buildWeek('week4'),
+        ];
+    }
+}
+
+$row['ai_report'] = $aiReport;
+
+if (!$__hasRenderableValue(safeGet($aiReport, 'summary', null)) && $__hasRenderableValue(safeGet($aiReport, 'final_report', null))) {
+    $row['ai_report']['summary'] = safeGet($aiReport, 'final_report');
+    $aiReport['summary'] = safeGet($aiReport, 'final_report');
 }
 foreach ([
     'summary',
@@ -157,6 +297,14 @@ foreach ([
 ] as $__aiField) {
     $__copyAiFieldToRoot($row, $aiReport, $__aiField);
 }
+
+// ── نسخ حقول صفحات الوكلاء المتعددين للـ Root ──
+foreach ($aiReport as $k => $v) {
+    if (str_starts_with($k, 'page_')) {
+        $row[$k] = $v;
+    }
+}
+
 if ($__hasRenderableValue($row['action_week'] ?? null)) {
     $row['next_steps'] = $row['action_week'];
 }
@@ -252,15 +400,20 @@ $row['package_tier'] = !empty($row['is_unlocked']) ? 'paid' : 'free';
 // ── DEBUG: أضف مؤشر المصدر لتسهيل التشخيص ──────────────────
 $row['_debug'] = [
     'ai_report_source'        => !empty($row['ai_report']) ? 'DB:ai_report' : 'EMPTY',
-    'strengths_count'         => count($row['ai_report']['strengths']       ?? []),
-    'weaknesses_count'        => count($row['ai_report']['weaknesses']      ?? []),
-    'recommendations_count'   => count($row['recommendations']              ?? []),
-    'has_high_priority_rec'   => count(array_filter($row['recommendations'] ?? [], fn($r) => ($r['priority'] ?? '') === 'high')),
-    'has_content_analysis'    => !empty($row['ai_report']['content_analysis']),
-    'data_quality'            => $row['scan_result']['data_quality'] ?? null,
-    'ads_actor_used'          => $row['scan_result']['ads_library']['actor_used'] ?? null,
-    'ads_raw_count'           => $row['scan_result']['ads_library']['raw_count'] ?? 0,
-    'ads_mapped_count'        => count($row['scan_result']['ads_library']['ads'] ?? []),
+    'strengths_count'         => count(safeGetArray($row['ai_report'] ?? [], 'strengths')),
+    'weaknesses_count'        => count(safeGetArray($row['ai_report'] ?? [], 'weaknesses')),
+    'recommendations_count'   => count(is_array($row['recommendations'] ?? null) ? $row['recommendations'] : []),
+    'has_high_priority_rec'   => count(array_filter(
+        is_array($row['recommendations'] ?? null) ? $row['recommendations'] : [],
+        fn($r) => is_array($r) && ($r['priority'] ?? '') === 'high'
+    )),
+    'has_content_analysis'    => !empty(safeGet($row['ai_report'] ?? [], 'content_analysis')),
+    'data_quality'            => safeGet($row['scan_result'] ?? [], 'data_quality', null),
+    'ads_actor_used'          => safeGet($row['scan_result'] ?? [], 'ads_library.actor_used', null),
+    'ads_raw_count'           => safeGetNumber($row['scan_result'] ?? [], 'ads_library.raw_count', 0),
+    'ads_mapped_count'        => count(safeGetArray($row['scan_result'] ?? [], 'ads_library.ads')),
+    'has_failures'            => safeGet($row['ai_report'] ?? [], 'meta.has_failures', false),
+    'failed_agents'           => safeGetArray($row['ai_report'] ?? [], 'meta.failed_agents'),
 ];
 
 jsonOut($row);
