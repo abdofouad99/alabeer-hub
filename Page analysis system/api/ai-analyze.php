@@ -198,9 +198,9 @@ function buildAgentInputData(array $data): array
             'business_name'      => $data['company_name'] ?? $data['full_name'] ?? '',
             'industry'           => $industry,
             'location'           => $answers['location'] ?? $data['city'] ?? '',
-            'lead_objective'     => $answers['objective'] ?? $scan['lead_objective'] ?? '',
-            'lead_audience'      => $answers['target_audience'] ?? $scan['lead_audience'] ?? '',
-            'lead_budget'        => $answers['ad_budget'] ?? $scan['lead_budget'] ?? '',
+            'lead_objective'     => $answers['objective'] ?? $data['objective'] ?? $scan['lead_objective'] ?? '',
+            'lead_audience'      => $answers['target_audience'] ?? $data['target_audience'] ?? $scan['lead_audience'] ?? '',
+            'lead_budget'        => $answers['ad_budget'] ?? $data['ad_budget'] ?? $scan['lead_budget'] ?? '',
             // حقول جديدة: لحساب معادلات الإيراد والنمو بدقة
             'avg_order_value'    => (float)($answers['avg_order_value'] ?? $scan['avg_order_value'] ?? _agentEstimateAvgOrderValue($industry)),
             'followers_last_month' => _agentEstimateLastMonthFollowers($scan),

@@ -300,7 +300,7 @@ foreach ([
 
 // ── نسخ حقول صفحات الوكلاء المتعددين للـ Root ──
 foreach ($aiReport as $k => $v) {
-    if (str_starts_with($k, 'page_')) {
+    if (is_string($k) && strpos($k, 'page_') === 0) {
         $row[$k] = $v;
     }
 }
