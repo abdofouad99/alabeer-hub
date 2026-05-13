@@ -78,6 +78,20 @@ function sanitize(str) {
     return temp.innerHTML;
 }
 
+// ============================================================
+// escapeHtml — alias-style helper guaranteed to return a string
+// Use for ANY interpolation of API/user data inside a template
+// literal that builds HTML (e.g. innerHTML = `...${value}...`).
+// Coerces non-strings safely; never returns undefined.
+// ============================================================
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    const str = (typeof value === 'string') ? value : String(value);
+    const temp = document.createElement('div');
+    temp.textContent = str;
+    return temp.innerHTML;
+}
+
 // ── extractText: استخراج نص من قيمة قد تكون string أو object ──
 // يحل مشكلة [object Object] في بطاقات strengths/weaknesses عندما يُرجع
 // الـ AI كائنات بمفاتيح متباينة (title, name, point, text, label, ...).
@@ -569,6 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: result.html (MAIN DASHBOARD)
         // ==========================================
+        try {
         if (path.includes('result.html') || path.endsWith('/') || path.endsWith('report.html')) {
             const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
             // استخدام `ai` الموحد من الـ outer scope (يشمل strengths/weaknesses من الجذر)
@@ -1118,10 +1133,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${recs.length} إجراء)</a></div>`;
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: result.html / report.html (root)', __pageErr);
+        }
 
         // ==========================================
         // PAGE: report.html — Viral Growth Engine Teaser Card
         // ==========================================
+        try {
         if (path.includes('report.html')) {
             const viralCard = document.getElementById('viralTeaserCard');
             const teaserLink = document.getElementById('viralTeaserLink');
@@ -1166,12 +1185,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 viralCard.style.display = '';
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: report.html', __pageErr);
+        }
 
         // ==========================================
 
         // ==========================================
         // PAGE: detailed-analysis.html (ULTIMATE AUDIT)
         // ==========================================
+        try {
         if (path.includes('detailed-analysis.html')) {
             const daName = document.getElementById('auditClientName');
             if (daName) daName.textContent = clientName;
@@ -1953,10 +1976,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 diagContainer.innerHTML = diagHtml;
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: detailed-analysis.html', __pageErr);
+        }
 
         // ==========================================
         // PAGE: competitors.html (MARKET RADAR)
         // ==========================================
+        try {
         if (path.includes('competitors.html')) {
             const compName = document.getElementById('compClientName');
             const vsName = document.getElementById('vsClientName');
@@ -2049,10 +2076,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     'استراتيجية (المحيط الأزرق) تكمن في استغلال الثغرات في خدمة عملاء المنافسين. ركز على تجربة شراء لا تُنسى وسيبدأ ولاء العملاء بالتحول إليك تدريجياً.';
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: competitors.html', __pageErr);
+        }
 
         // ==========================================
         // PAGE: ads.html (ADS WAR ROOM)
         // ==========================================
+        try {
         if (path.includes('ads.html')) {
             const adName = document.getElementById('adClientName');
             const adHandle = document.getElementById('adHandle');
@@ -2124,6 +2155,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
             }
         } // ← closes `if (path.includes('ads.html'))` opened above (was missing — caused parse failure for the entire file)
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: ads.html', __pageErr);
+        }
 
         // (الكتلة المكررة لـ recommendations تم دمجها مع الأولى وإزالتها من هنا)
 
@@ -2138,6 +2172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: content.html
         // ==========================================
+        try {
         if (path.includes('content.html')) {
             const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
             // ✅ إصلاح: استخدام srObj المتاح فعلياً (sr قد لا يكون معرَّفاً في هذا السياق)
@@ -2726,10 +2761,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: content.html', __pageErr);
+        }
 
         // ==========================================
         // PAGE: strengths.html & weaknesses.html
         // ==========================================
+        try {
         if (path.includes('strengths.html') || path.includes('weaknesses.html')) {
             const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
             const typeStr = (ai.page_type || data.project_type || 'تجاري').toLowerCase();
@@ -3377,10 +3416,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: strengths.html / weaknesses.html', __pageErr);
+        }
 
         // ==========================================
         // PAGE: journey.html — رحلة العميل (AI-driven only, single source of truth)
         // ==========================================
+        try {
         if (path.includes('journey.html')) {
             const journeyData = (data.ai_report && data.ai_report.customer_journey) || null;
 
@@ -3532,10 +3575,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 100);
             } // end else (journeyData present)
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: journey.html', __pageErr);
+        }
 
         // ==========================================
         // PAGE: recommendations.html
         // ==========================================
+        try {
         if (path.includes('recommendations.html')) {
             const recClientName = document.getElementById('recClientName');
             const recHandle = document.getElementById('recHandle');
@@ -3726,6 +3773,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (recTotalCount) recTotalCount.textContent = '... إجراء';
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: recommendations.html', __pageErr);
+        }
 
         // ==========================================
         // GLOBAL: INNER PAGES PROFILE TAGS
@@ -3743,6 +3793,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: roadmap-30d.html
         // ==========================================
+        try {
         if (path.includes('roadmap-30d.html')) {
             const roadmap =
                 (data.ai_report &&
@@ -3828,10 +3879,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: roadmap-30d.html', __pageErr);
+        }
 
         // ==========================================
         // PAGE: plan.html
         // ==========================================
+        try {
         if (path.includes('plan.html')) {
             // Update client name
             const planName = document.getElementById('planClientName');
@@ -3929,7 +3984,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           .slice(0, 4)
                           .map(
                               task =>
-                                  `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${task}</div>`
+                                  `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${sanitize(task)}</div>`
                           )
                           .join('')
                     : `<div class="rm-task"><i>!</i> لا توجد بيانات توسع مؤكدة لهذا التقرير.</div>`;
@@ -3958,10 +4013,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: plan.html', __pageErr);
+        }
 
         // ==========================================
         // P2-3 PAGE: packages.html — شخصنة بالدرجة الحقيقية
         // ==========================================
+        try {
         if (path.includes('packages.html')) {
             const score = data.score || 0;
 
@@ -4026,6 +4085,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     btn.setAttribute('data-name', clientName);
                 }
             });
+        }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: packages.html', __pageErr);
         }
 
         // ── Re-trigger animations ──────────────────────────────
@@ -4498,8 +4560,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         m => `
           <div class="metric-box">
             <div class="m-title">${sanitize(m.title)}</div>
-            <div class="m-val ${m.val_class}">${sanitize(m.val)}</div>
-            <div class="m-status ${m.status_class}">${sanitize(m.status)}</div>
+            <div class="m-val ${escapeHtml(m.val_class)}">${sanitize(m.val)}</div>
+            <div class="m-status ${escapeHtml(m.status_class)}">${sanitize(m.status)}</div>
             <p style="font-size:12px;color:var(--text-gray);margin-top:8px;font-weight:600;">${sanitize(
                 m.desc
             )}</p>
@@ -4520,7 +4582,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ? 'pointer-green'
                                 : '';
                         return `<div class="pointer-item ${pClass}" style="margin-bottom:16px;">
-            <h5>${p.icon} ${sanitize(p.title)}</h5>
+            <h5>${escapeHtml(p.icon)} ${sanitize(p.title)}</h5>
             <p>${sanitize(p.desc)}</p>
           </div>`;
                     })
@@ -4538,7 +4600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             (step, i) =>
                                 `<li style="display:flex;gap:10px;font-size:14px;font-weight:700;color:#fff;"><span style="color:var(--primary)">${
                                     i + 1
-                                }.</span> ${step}</li>`
+                                }.</span> ${escapeHtml(step)}</li>`
                         )
                         .join('');
                 }
@@ -4623,8 +4685,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const isActive = ad.is_active !== false;
                         const statusClass = isActive ? 'ad-status-active' : 'ad-status-inactive';
                         const statusText = isActive ? '🟢 نشط' : '⚪ غير نشط';
-                        const imgBg = ad.image_url
-                            ? `style="background-image:url('${ad.image_url}');background-size:cover;background-position:center;"`
+                        // Image URL must be an https:// URL with no quotes/parens, otherwise
+                        // skip the background-image entirely. Inline-style URL injection
+                        // can break out of the attribute and inject markup.
+                        const rawImg = (typeof ad.image_url === 'string') ? ad.image_url.trim() : '';
+                        const safeImg = /^https:\/\/[^"'()<>\s]+$/i.test(rawImg) ? rawImg : '';
+                        const imgBg = safeImg
+                            ? `style="background-image:url('${safeImg}');background-size:cover;background-position:center;"`
                             : '';
                         const shortCopy =
                             (ad.title || ad.text || 'لا يوجد نص').substring(0, 80) +
@@ -4639,7 +4706,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
               <div class="ad-img-wrap" ${imgBg}>
                 ${
-                    !ad.image_url
+                    !safeImg
                         ? '<span style="color:#555;z-index:2;position:relative;">لا تتوفر صورة</span>'
                         : ''
                 }
@@ -4647,7 +4714,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="ad-footer">
                 <div class="ad-status ${statusClass}">${statusText}</div>
                 <div style="margin-bottom:6px;"><strong>تاريخ الإطلاق:</strong> ${
-                    ad.start_date ? String(ad.start_date).substring(0, 10) : 'غير معروف'
+                    ad.start_date ? escapeHtml(String(ad.start_date).substring(0, 10)) : 'غير معروف'
                 }</div>
                 <div style="color:#fff;font-weight:600;">${sanitize(shortCopy)}</div>
               </div>
@@ -4667,6 +4734,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Sections 7, 8, 9: Viral Deconstruction,
         // Content Pillars Matrix, Hook Bank + Omnichannel
         // ==========================================
+        try {
         if (path.includes('content.html')) {
 
             // ── Section 7: Viral Deconstruction ──────────────────
@@ -4738,7 +4806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (pillarsRatioBar) {
                     pillarsRatioBar.innerHTML = pillars.map((p, i) => {
                         const c = pillarColors[i % pillarColors.length];
-                        return `<div style="flex:${p.percentage || 1};background:${c.bar};transition:flex 0.8s ease;" title="${p.pillar}: ${p.percentage}%"></div>`;
+                        return `<div style="flex:${p.percentage || 1};background:${c.bar};transition:flex 0.8s ease;" title="${escapeHtml(p.pillar)}: ${p.percentage}%"></div>`;
                     }).join('');
                 }
 
@@ -4771,7 +4839,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (hookGrid) {
                     hookGrid.innerHTML = hooks.map((h, i) => {
                         const c = hookColors[i % hookColors.length];
-                        const copyText = (h.example || h.formula || '').replace(/"/g, '&quot;');
+                        // Fully escape so the data-copy attribute can never break out
+                        // of its quotes (was: only " → &quot; — vulnerable to <,>,&,').
+                        const copyText = escapeHtml(h.example || h.formula || '');
                         return `
                         <div style="background:${c.bg};border:1px solid ${c.border};border-radius:16px;padding:24px 28px;display:flex;gap:20px;align-items:flex-start;">
                           <div style="font-size:32px;flex-shrink:0;">${hookIcons[i % hookIcons.length]}</div>
@@ -4832,6 +4902,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } // end content.html
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: content.html (viral growth modules)', __pageErr);
+        }
 
         // تشغيل animations
         setTimeout(() => {
