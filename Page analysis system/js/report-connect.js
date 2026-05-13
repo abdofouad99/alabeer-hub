@@ -4889,6 +4889,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
             }
         }
+    } // end renderAdsSection
 
         // ==========================================
         // PAGE: content.html — Viral Growth Modules
