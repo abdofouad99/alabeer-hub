@@ -1135,6 +1135,12 @@ function runParallelAgents(array $data, string $apiKey, int $maxRetries, int $re
 
 /**
  * Retry wrapper for agent calls
+ *
+ * Error Boundary (المرحلة 4 — تدقيق صارم):
+ * - يلتقط \Throwable (يشمل RuntimeException + TypeError + Error + ParseError ...)
+ *   حتى لا يُسقط فشل وكيل واحد كامل خط الإنتاج (الـ 5 وكلاء).
+ * - بعد استنفاد المحاولات، يُرجع [] بدل Fatal — مما يسمح لـ mergeAgentOutputs
+ *   باستخدام getDefaultAgentNOutput() لذلك الوكيل والاستمرار في توليد التقرير.
  */
 function runWithRetry(callable $fn, int $maxRetries, int $retryDelay, callable $log, string $label): array {
     $lastError = null;
@@ -1142,10 +1148,11 @@ function runWithRetry(callable $fn, int $maxRetries, int $retryDelay, callable $
     for ($attempt = 1; $attempt <= $maxRetries + 1; $attempt++) {
         try {
             return $fn();
-        } catch (RuntimeException $e) {
+        } catch (\Throwable $e) {
             $lastError = $e;
             $errorMsg  = $e->getMessage();
-            $log("  ⚠️ {$label} — محاولة {$attempt} فشلت: {$errorMsg}");
+            $errorType = get_class($e);
+            $log("  ⚠️ {$label} — محاولة {$attempt} فشلت [{$errorType}]: {$errorMsg}");
 
             if ($attempt <= $maxRetries) {
                 // Exponential backoff: retryDelay → 2× → 4×
@@ -1153,6 +1160,11 @@ function runWithRetry(callable $fn, int $maxRetries, int $retryDelay, callable $
                 // Rate-limit يحتاج انتظاراً أطول
                 if (strpos($errorMsg, 'Rate Limited') !== false) {
                     $backoff = max($backoff, 30);
+                }
+                // أخطاء الـ Type/Parse لا تُحل بالإعادة — اخرج فوراً
+                if ($e instanceof \TypeError || $e instanceof \ParseError) {
+                    $log("  ⏭ خطأ نوع/تحليل — لا فائدة من إعادة المحاولة");
+                    break;
                 }
                 $log("  ⏳ إعادة المحاولة بعد {$backoff} ثانية...");
                 sleep($backoff);
@@ -1356,10 +1368,15 @@ function getDefaultAgent5Output(): array {
 
 /**
  * Calculate engagement rate
+ *
+ * Division-by-zero guard (المرحلة 4): يحمي من NaN/Inf حين يكون عدد المتابعين
+ * صفراً أو أقل (بيانات Apify ناقصة) — يُرجع 0.0 بدل كسر JSON النهائي.
  */
 function calcEngagementRate(int $followers, int $avgLikes, int $avgComments, int $avgShares = 0): float {
-    if ($followers === 0) return 0.0;
-    return round((($avgLikes + $avgComments + $avgShares) / $followers) * 100, 2);
+    if ($followers <= 0) return 0.0;
+    $rate = (($avgLikes + $avgComments + $avgShares) / $followers) * 100;
+    if (!is_finite($rate)) return 0.0;
+    return round($rate, 2);
 }
 
 /**

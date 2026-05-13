@@ -3311,16 +3311,16 @@ function fallbackAnalysis(array $data): array
     // البيانات الناقصة (إن وجدت)
     // ═════════════════════════════════════════════════════════════════════
     $missingData = [];
-    if ($avgEngagement == 0 && $totalFollowers > 0) {
+    if ($avgEngagement <= 0 && $totalFollowers > 0) {
         $missingData[] = 'بيانات التفاعل التفصيلية (لايك، تعليق، مشاركة، حفظ)';
     }
-    if ($postsPerWeek == 0 && $totalContent > 0) {
+    if ($postsPerWeek <= 0 && $totalContent > 0) {
         $missingData[] = 'بيانات انتظام النشر';
     }
     if (!$hasPixel && !$hasGA) {
         $missingData[] = 'بيانات تحليلات الموقع (مصادر الزيارات، سلوك الزوار)';
     }
-    if ($ctaPercent == 0) {
+    if ($ctaPercent <= 0) {
         $missingData[] = 'تحليل CTA في المحتوى';
     }
 
