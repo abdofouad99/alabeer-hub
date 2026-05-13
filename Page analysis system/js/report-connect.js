@@ -1,9 +1,11 @@
 // ============================================================
-// js/report-connect.js v2.0 — ربط كامل لجميع الصفحات الفرعية
+// js/report-connect.js v2.1 — ربط كامل لجميع الصفحات الفرعية
 // P2-1: إصلاح الاسم (brand_name → full_name)
 // P2-2: ربط ads, competitors, journey, content ببيانات حقيقية
 // P2-3: ربط packages بدرجة العميل الحقيقية
+// Phase 4 (Part 2): Strict mode + XSS hardening + Error Boundaries
 // ============================================================
+'use strict';
 
 // ============================================================
 // طبقة الـ JS Fallback — العملية 5
@@ -74,6 +76,36 @@ function sanitize(str) {
     const temp = document.createElement('div');
     temp.textContent = str;
     return temp.innerHTML;
+}
+
+// ── Phase 4.5: XSS hardening helpers ───────────────────────────
+// escapeHtml — يهرب < > & " ' لمنع HTML injection حتى داخل سمات
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+// safeUrl — يقبل http/https/mailto/tel فقط، يرفض javascript: و data: و vbscript:
+function safeUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    // Block dangerous schemes (javascript:, data:, vbscript:, file:)
+    if (/^\s*(javascript|data|vbscript|file)\s*:/i.test(trimmed)) return '';
+    // Allow relative URLs, http(s), mailto, tel
+    return escapeHtml(trimmed);
+}
+// safeRunBlock — يلف بلوك صفحة بـ try/catch لمنع cascading failure
+function safeRunBlock(name, fn) {
+    try {
+        fn();
+    } catch (e) {
+        console.error('[RC] فشل عرض قسم ' + name + ':', e);
+    }
 }
 
 // ── extractText: استخراج نص من قيمة قد تكون string أو object ──
@@ -670,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: result.html (MAIN DASHBOARD)
         // ==========================================
-        if (path.includes('result.html') || path.endsWith('/') || path.endsWith('report.html')) {
+        if (path.includes('result.html') || path.endsWith('/') || path.endsWith('report.html')) { try {
             const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
             // استخدام `ai` الموحد من الـ outer scope (يشمل strengths/weaknesses من الجذر)
             const cj = ai.customer_journey || null;
@@ -827,13 +859,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         purchase: 'الشراء',
                         loyalty: 'الولاء',
                     };
-                    fDesc.innerHTML = `يتوقف معظم العملاء في <strong>مرحلة ${
-                        stageNames[cj.bottleneck_stage] || cj.bottleneck_stage
-                    }</strong> — ${
+                    fDesc.innerHTML = `يتوقف معظم العملاء في <strong>مرحلة ${escapeHtml(
+                        stageNames[cj.bottleneck_stage] || cj.bottleneck_stage || ''
+                    )}</strong> — ${escapeHtml(
                         cj.bottleneck_fix || 'تحتاج لمعالجة هذه المرحلة بشكل عاجل.'
-                    }<div class="fix-box" id="resultFixBox"><div class="fix-box-title">كيف نحل هذه العقدة؟</div><ul id="resultFixList">${
+                    )}<div class="fix-box" id="resultFixBox"><div class="fix-box-title">كيف نحل هذه العقدة؟</div><ul id="resultFixList">${
                         (cj.fix_steps || [])
-                            .map(s => `<li><span style="color:var(--green);">✔</span> ${s}</li>`)
+                            .map(s => `<li><span style="color:var(--green);">✔</span> ${escapeHtml(s)}</li>`)
                             .join('') ||
                         '<li><span style="color:var(--green);">✔</span> راجع تقرير رحلة العميل للتفاصيل الكاملة</li>'
                     }</ul></div>`;
@@ -1218,12 +1250,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         .join('') +
                     `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${recs.length} إجراء)</a></div>`;
             }
+        } catch (__err_result_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم result.html:", __err_result_html);
+        }
         }
 
         // ==========================================
         // PAGE: report.html — Viral Growth Engine Teaser Card
         // ==========================================
-        if (path.includes('report.html')) {
+        if (path.includes('report.html')) { try {
             const viralCard = document.getElementById('viralTeaserCard');
             const teaserLink = document.getElementById('viralTeaserLink');
 
@@ -1266,6 +1301,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (viralCard && (hooks.length > 0 || vd || pillars.length > 0)) {
                 viralCard.style.display = '';
             }
+        } catch (__err_report_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم report.html:", __err_report_html);
+        }
         }
 
         // ==========================================
@@ -1273,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: detailed-analysis.html (ULTIMATE AUDIT)
         // ==========================================
-        if (path.includes('detailed-analysis.html')) {
+        if (path.includes('detailed-analysis.html')) { try {
             const daName = document.getElementById('auditClientName');
             if (daName) daName.textContent = clientName;
 
@@ -1293,7 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlW = document.getElementById('auditWebUrl');
             if (urlW)
                 urlW.innerHTML = websiteUrl
-                    ? `<a href="${websiteUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${websiteUrl}</a>`
+                    ? `<a href="${safeUrl(websiteUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:none;">${escapeHtml(websiteUrl)}</a>`
                     : 'لم يتم العثور على موقع إلكتروني';
             const _gw = document.getElementById('gridWebsite');
             if (!websiteUrl && _gw) _gw.classList.add('card-disabled');
@@ -1323,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlI = document.getElementById('auditIgUrl');
             if (urlI)
                 urlI.innerHTML = instagramUrl
-                    ? `<a href="${instagramUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${instagramUrl}</a>`
+                    ? `<a href="${safeUrl(instagramUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:none;">${escapeHtml(instagramUrl)}</a>`
                     : 'لم يتم العثور على حساب';
             const _gi = document.getElementById('gridInstagram');
             if (!instagramUrl && _gi) _gi.classList.add('card-disabled');
@@ -1434,7 +1472,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlF = document.getElementById('auditFbUrl');
             if (urlF)
                 urlF.innerHTML = facebookUrl
-                    ? `<a href="${facebookUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${facebookUrl}</a>`
+                    ? `<a href="${safeUrl(facebookUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:none;">${escapeHtml(facebookUrl)}</a>`
                     : 'لم يتم العثور على حساب';
             const _gf = document.getElementById('gridFacebook');
             if (!facebookUrl && _gf) _gf.classList.add('card-disabled');
@@ -1450,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlTT = document.getElementById('auditTikTokUrl');
             if (urlTT)
                 urlTT.innerHTML = tiktokUrl
-                    ? `<a href="${tiktokUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${tiktokUrl}</a>`
+                    ? `<a href="${safeUrl(tiktokUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:none;">${escapeHtml(tiktokUrl)}</a>`
                     : 'لم يتم العثور على حساب';
             const _gtt = document.getElementById('gridTikTok');
             if (!tiktokUrl && _gtt) _gtt.classList.add('card-disabled');
@@ -1587,7 +1625,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const urlTW = document.getElementById('auditTwitterUrl');
             if (urlTW)
                 urlTW.innerHTML = twitterUrl
-                    ? `<a href="${twitterUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${twitterUrl}</a>`
+                    ? `<a href="${safeUrl(twitterUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:none;">${escapeHtml(twitterUrl)}</a>`
                     : 'لم يتم العثور على حساب';
             const _gtw = document.getElementById('gridTwitter');
             if (!twitterUrl && _gtw) _gtw.classList.add('card-disabled');
@@ -2043,8 +2081,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 let diagHtml = '';
                 data.breakdown.forEach(item => {
                     const score = item.score || 0;
-                    // Highlight random keywords for effect (e.g., english words)
-                    let richText = (item.reason || '').replace(
+                    // Phase 4.5: escape first, THEN apply allowed highlight markup on already-safe HTML
+                    const escapedReason = escapeHtml(item.reason || '');
+                    const richText = escapedReason.replace(
                         /([A-Za-z]+)/g,
                         '<span class="highlight">$1</span>'
                     );
@@ -2054,13 +2093,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="diag-score">
                   <div class="num" style="color:${
                       score >= 80 ? 'var(--green)' : score >= 50 ? 'var(--yellow)' : 'var(--red)'
-                  }">${score}</div>
+                  }">${Number(score)}</div>
                   <div class="label">تقييم المحور</div>
                 </div>
                 <div class="diag-content">
-                  <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> تشخيص محور: ${
-                      item.axis
-                  }</h3>
+                  <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> تشخيص محور: ${escapeHtml(item.axis || '')}</h3>
                   <p>${richText}</p>
                 </div>
               </div>
@@ -2068,12 +2105,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 diagContainer.innerHTML = diagHtml;
             }
+        } catch (__err_detailed_analysis_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم detailed-analysis.html:", __err_detailed_analysis_html);
+        }
         }
 
         // ==========================================
         // PAGE: competitors.html (MARKET RADAR)
         // ==========================================
-        if (path.includes('competitors.html')) {
+        if (path.includes('competitors.html')) { try {
             const compName = document.getElementById('compClientName');
             const vsName = document.getElementById('vsClientName');
             if (compName) compName.textContent = clientName;
@@ -2106,32 +2146,28 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="comp-card">
                 <div class="cc-header">
                   <div class="cc-info">
-                    <h3>${comp.name || 'منافس'}</h3>
-                    <p><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> ${
-                        comp.url || 'غير متوفر'
-                    }</p>
+                    <h3>${escapeHtml(comp.name || 'منافس')}</h3>
+                    <p><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> ${escapeHtml(comp.url || 'غير متوفر')}</p>
                   </div>
-                  <div class="cc-rank">${ranks[i] || '#'}</div>
+                  <div class="cc-rank">${escapeHtml(ranks[i] || '#')}</div>
                 </div>
 
                 <div class="traits-list">
                   <div class="trait-group">
                     <span class="trait-title">نقاط تفوقه (Strengths)</span>
-                    <div class="trait-item trait-strength">${st1}</div>
-                    <div class="trait-item trait-strength">${st2}</div>
+                    <div class="trait-item trait-strength">${escapeHtml(extractText(st1))}</div>
+                    <div class="trait-item trait-strength">${escapeHtml(extractText(st2))}</div>
                   </div>
                   <div class="trait-group" style="margin-top:8px;">
                     <span class="trait-title">نقاط ضعفه (Vulnerabilities)</span>
-                    <div class="trait-item trait-weakness">${wk1}</div>
-                    <div class="trait-item trait-weakness">${wk2}</div>
+                    <div class="trait-item trait-weakness">${escapeHtml(extractText(wk1))}</div>
+                    <div class="trait-item trait-weakness">${escapeHtml(extractText(wk2))}</div>
                   </div>
                 </div>
 
                 <div class="attack-plan">
                   <div class="ap-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> خطة الهجوم</div>
-                  <div class="ap-desc">${
-                      comp.attack_plan || 'استغل نقاط ضعفه أعلاه للسيطرة على عملائه.'
-                  }</div>
+                  <div class="ap-desc">${escapeHtml(comp.attack_plan || 'استغل نقاط ضعفه أعلاه للسيطرة على عملائه.')}</div>
                 </div>
               </div>
             `;
@@ -2147,9 +2183,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.execution_arsenal.forEach(item => {
                     arsenalHtml += `
               <div class="arsenal-item">
-                <div class="arsenal-icon">${item.icon || '🔥'}</div>
-                <div class="arsenal-title">${item.title}</div>
-                <div class="arsenal-desc">${item.desc}</div>
+                <div class="arsenal-icon">${escapeHtml(item.icon || '🔥')}</div>
+                <div class="arsenal-title">${escapeHtml(item.title || '')}</div>
+                <div class="arsenal-desc">${escapeHtml(item.desc || '')}</div>
               </div>
             `;
                 });
@@ -2164,12 +2200,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 summaryText.innerHTML =
                     'استراتيجية (المحيط الأزرق) تكمن في استغلال الثغرات في خدمة عملاء المنافسين. ركز على تجربة شراء لا تُنسى وسيبدأ ولاء العملاء بالتحول إليك تدريجياً.';
             }
+        } catch (__err_competitors_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم competitors.html:", __err_competitors_html);
+        }
         }
 
         // ==========================================
         // PAGE: ads.html (ADS WAR ROOM)
         // ==========================================
-        if (path.includes('ads.html')) {
+        if (path.includes('ads.html')) { try {
             const adName = document.getElementById('adClientName');
             const adHandle = document.getElementById('adHandle');
             if (adName) adName.textContent = clientName;
@@ -2215,12 +2254,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const box = document.getElementById('deepReportSection');
                                 const cnt = document.getElementById('fullReportContent');
                                 if (box && cnt) {
-                                    // تحويل Markdown بسيط → HTML
-                                    const html = resp.data.full_report
+                                    // Phase 4.5: escape user content first, then apply allowed Markdown→HTML
+                                    const escaped = escapeHtml(resp.data.full_report);
+                                    const html = escaped
                                         .replace(/^## (.+)$/gm, '<h3>$1</h3>')
                                         .replace(/^### (.+)$/gm, '<h4>$1</h4>')
                                         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                                        .replace(/\*(.+?)\*/g, '<em>$1</em>');
+                                        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                                        .replace(/\n/g, '<br>');
                                     cnt.innerHTML = html;
                                     box.style.display = 'block';
                                 }
@@ -2239,6 +2280,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         : null
                 );
             }
+        } catch (__err_ads_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم ads.html:", __err_ads_html);
+        }
         } // ← closes `if (path.includes('ads.html'))` opened above (was missing — caused parse failure for the entire file)
 
         // (الكتلة المكررة لـ recommendations تم دمجها مع الأولى وإزالتها من هنا)
@@ -2254,7 +2298,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: content.html
         // ==========================================
-        if (path.includes('content.html')) {
+        if (path.includes('content.html')) { try {
             const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
             // ✅ إصلاح: استخدام srObj المتاح فعلياً (sr قد لا يكون معرَّفاً في هذا السياق)
             const fb =
@@ -2730,11 +2774,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (strategyData) {
                     aiStrategy.innerHTML = `
               <h4>التوجيه الذكي للمحتوى (Content Strategy)</h4>
-              <p>${strategyData.intro}</p>
+              <p>${escapeHtml(strategyData.intro || '')}</p>
               <ul class="ai-list">
-                <li><span style="color:var(--primary)">✔</span> <strong>التحول:</strong> ${strategyData.shift}</li>
-                <li><span style="color:var(--primary)">✔</span> <strong>الخطاف (Hook):</strong> ${strategyData.hook}</li>
-                <li><span style="color:var(--primary)">✔</span> <strong>الإجراء المباشر (CTA):</strong> ${strategyData.cta}</li>
+                <li><span style="color:var(--primary)">✔</span> <strong>التحول:</strong> ${escapeHtml(strategyData.shift || '')}</li>
+                <li><span style="color:var(--primary)">✔</span> <strong>الخطاف (Hook):</strong> ${escapeHtml(strategyData.hook || '')}</li>
+                <li><span style="color:var(--primary)">✔</span> <strong>الإجراء المباشر (CTA):</strong> ${escapeHtml(strategyData.cta || '')}</li>
               </ul>
             `;
                 } else {
@@ -2841,12 +2885,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                 }
             }
+        } catch (__err_content_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم content.html:", __err_content_html);
+        }
         }
 
         // ==========================================
         // PAGE: strengths.html & weaknesses.html
         // ==========================================
-        if (path.includes('strengths.html') || path.includes('weaknesses.html')) {
+        if (path.includes('strengths.html') || path.includes('weaknesses.html')) { try {
             const score = Number.isFinite(Number(data.score)) ? Number(data.score) : 0;
             const typeStr = (ai.page_type || data.project_type || 'تجاري').toLowerCase();
             const isService =
@@ -3492,12 +3539,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, 100);
                 }
             }
+        } catch (__err_strengths_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم strengths.html:", __err_strengths_html);
+        }
         }
 
         // ==========================================
         // PAGE: journey.html — رحلة العميل (AI-driven only, single source of truth)
         // ==========================================
-        if (path.includes('journey.html')) {
+        if (path.includes('journey.html')) { try {
             const journeyData = (data.ai_report && data.ai_report.customer_journey) || null;
 
             // ── Stage name → DOM index mapping (matches journey.html: stage1..5) ──
@@ -3617,12 +3667,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     animateRings();
                 }, 100);
             } // end else (journeyData present)
+        } catch (__err_journey_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم journey.html:", __err_journey_html);
+        }
         }
 
         // ==========================================
         // PAGE: recommendations.html
         // ==========================================
-        if (path.includes('recommendations.html')) {
+        if (path.includes('recommendations.html')) { try {
             const recClientName = document.getElementById('recClientName');
             const recHandle = document.getElementById('recHandle');
             const recTotalCount = document.getElementById('recTotalCount');
@@ -3811,6 +3864,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة نقاط القوة لمزيد من التفاصيل.</div>';
                 if (recTotalCount) recTotalCount.textContent = '... إجراء';
             }
+        } catch (__err_recommendations_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم recommendations.html:", __err_recommendations_html);
+        }
         }
 
         // ==========================================
@@ -3829,7 +3885,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         // PAGE: roadmap-30d.html
         // ==========================================
-        if (path.includes('roadmap-30d.html')) {
+        if (path.includes('roadmap-30d.html')) { try {
             const roadmap =
                 (data.ai_report &&
                     (data.ai_report.action_month ||
@@ -3913,12 +3969,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         'غير محدد من البيانات'
                 );
             }
+        } catch (__err_roadmap_30d_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم roadmap-30d.html:", __err_roadmap_30d_html);
+        }
         }
 
         // ==========================================
         // PAGE: plan.html
         // ==========================================
-        if (path.includes('plan.html')) {
+        if (path.includes('plan.html')) { try {
             // Update client name
             const planName = document.getElementById('planClientName');
             if (planName) planName.textContent = clientName;
@@ -3929,7 +3988,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 phase1.innerHTML = data.action_week
                     .map(
                         action =>
-                            `<div class="rm-task"><i style="color:var(--green);">✓</i> ${action}</div>`
+                            `<div class="rm-task"><i style="color:var(--green);">✓</i> ${escapeHtml(extractText(action))}</div>`
                     )
                     .join('');
             }
@@ -3950,7 +4009,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         .slice(0, 6)
                         .map(
                             title =>
-                                `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${title}</div>`
+                                `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${escapeHtml(title || '')}</div>`
                         )
                         .join('');
                 } else {
@@ -4015,7 +4074,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           .slice(0, 4)
                           .map(
                               task =>
-                                  `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${task}</div>`
+                                  `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${escapeHtml(task)}</div>`
                           )
                           .join('')
                     : `<div class="rm-task"><i>!</i> لا توجد بيانات توسع مؤكدة لهذا التقرير.</div>`;
@@ -4043,12 +4102,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     roiVals[2].textContent = 'غير متوفر';
                 }
             }
+        } catch (__err_plan_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم plan.html:", __err_plan_html);
+        }
         }
 
         // ==========================================
         // P2-3 PAGE: packages.html — شخصنة بالدرجة الحقيقية
         // ==========================================
-        if (path.includes('packages.html')) {
+        if (path.includes('packages.html')) { try {
             const score = data.score || 0;
 
             // تحديث العنوان الرئيسي بالاسم
@@ -4112,11 +4174,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     btn.setAttribute('data-name', clientName);
                 }
             });
+        } catch (__err_packages_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم packages.html:", __err_packages_html);
+        }
         }
 
         // ── Re-trigger animations ──────────────────────────────
         if (typeof animateCounters === 'function') animateCounters();
         if (typeof animateRings === 'function') animateRings();
+
+        } catch (err) {
+            // ── Error Boundary catch — Phase 4.4 ───────────────────
+            console.error('[RC] Al-Abeer: خطأ في عرض البيانات:', err);
+            try {
+                const main = document.querySelector('main') || document.querySelector('.main-content') || document.body;
+                if (main) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.cssText = 'background:rgba(254,242,242,0.1);border:1px solid rgba(252,165,165,0.4);color:#fca5a5;padding:20px;border-radius:12px;margin:20px;text-align:center;direction:rtl;font-family:Cairo,sans-serif;';
+                    const h3 = document.createElement('h3');
+                    h3.textContent = '⚠️ خطأ في عرض بيانات التقرير';
+                    const p1 = document.createElement('p');
+                    p1.style.marginTop = '8px';
+                    p1.textContent = 'حدث خطأ أثناء عرض التقرير. يرجى تحديث الصفحة أو إعادة تشغيل التحليل.';
+                    const small = document.createElement('small');
+                    small.style.cssText = 'display:block;margin-top:8px;opacity:0.6;direction:ltr;';
+                    small.textContent = (err && err.message) ? err.message : String(err);
+                    errorDiv.appendChild(h3);
+                    errorDiv.appendChild(p1);
+                    errorDiv.appendChild(small);
+                    main.prepend(errorDiv);
+                }
+            } catch (innerErr) {
+                console.error('[RC] فشل أيضاً عرض رسالة الخطأ:', innerErr);
+            }
+        }
+    }; // end renderData
 
     // (Animation Helpers have been moved to the top of the file)
 
@@ -4852,8 +4944,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const isActive = ad.is_active !== false;
                         const statusClass = isActive ? 'ad-status-active' : 'ad-status-inactive';
                         const statusText = isActive ? '🟢 نشط' : '⚪ غير نشط';
-                        const imgBg = ad.image_url
-                            ? `style="background-image:url('${ad.image_url}');background-size:cover;background-position:center;"`
+                        // Phase 4.5: validate image URL — only http(s), strip quotes/parens to prevent CSS escape
+                        const rawImg = String(ad.image_url || '').trim();
+                        const safeImg = /^https?:\/\//i.test(rawImg)
+                            ? rawImg.replace(/['"()<>\\]/g, '').replace(/javascript:/gi, '')
+                            : '';
+                        const imgBg = safeImg
+                            ? `style="background-image:url('${escapeHtml(safeImg)}');background-size:cover;background-position:center;"`
                             : '';
                         const shortCopy =
                             (ad.title || ad.text || 'لا يوجد نص').substring(0, 80) +
@@ -4868,16 +4965,16 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
               <div class="ad-img-wrap" ${imgBg}>
                 ${
-                    !ad.image_url
+                    !safeImg
                         ? '<span style="color:#555;z-index:2;position:relative;">لا تتوفر صورة</span>'
                         : ''
                 }
               </div>
               <div class="ad-footer">
                 <div class="ad-status ${statusClass}">${statusText}</div>
-                <div style="margin-bottom:6px;"><strong>تاريخ الإطلاق:</strong> ${
+                <div style="margin-bottom:6px;"><strong>تاريخ الإطلاق:</strong> ${escapeHtml(
                     ad.start_date ? String(ad.start_date).substring(0, 10) : 'غير معروف'
-                }</div>
+                )}</div>
                 <div style="color:#fff;font-weight:600;">${sanitize(shortCopy)}</div>
               </div>
             </div>`;
@@ -4895,7 +4992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Sections 7, 8, 9: Viral Deconstruction,
         // Content Pillars Matrix, Hook Bank + Omnichannel
         // ==========================================
-        if (path.includes('content.html')) {
+        if (path.includes('content.html')) { try {
 
             // ── Section 7: Viral Deconstruction ──────────────────
             const vd = ai.viral_deconstruction || null;
@@ -4999,7 +5096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (hookGrid) {
                     hookGrid.innerHTML = hooks.map((h, i) => {
                         const c = hookColors[i % hookColors.length];
-                        const copyText = (h.example || h.formula || '').replace(/"/g, '&quot;');
+                        const copyText = escapeHtml(h.example || h.formula || '');
                         return `
                         <div style="background:${c.bg};border:1px solid ${c.border};border-radius:16px;padding:24px 28px;display:flex;gap:20px;align-items:flex-start;">
                           <div style="font-size:32px;flex-shrink:0;">${hookIcons[i % hookIcons.length]}</div>
@@ -5059,6 +5156,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
+        } catch (__err_content_html) {
+            console.error("[RC] Phase 4.4: تعطل قسم content.html:", __err_content_html);
+        }
         } // end content.html
 
         // تشغيل animations
@@ -5066,27 +5166,5 @@ document.addEventListener('DOMContentLoaded', () => {
             animateCounters();
             animateRings();
         }, 200);
-
-        } catch (err) {
-            // ── Error Boundary catch — العملية 5 ──────────────────
-            console.error('[RC] Al-Abeer: خطأ في عرض البيانات:', err);
-            const main = document.querySelector('main') || document.querySelector('.main-content') || document.body;
-            if (main) {
-                const errorDiv = document.createElement('div');
-                errorDiv.style.cssText = 'background:rgba(254,242,242,0.1);border:1px solid rgba(252,165,165,0.4);color:#fca5a5;padding:20px;border-radius:12px;margin:20px;text-align:center;direction:rtl;font-family:Cairo,sans-serif;';
-                const h3 = document.createElement('h3');
-                h3.textContent = '⚠️ خطأ في عرض بيانات التقرير';
-                const p1 = document.createElement('p');
-                p1.style.marginTop = '8px';
-                p1.textContent = 'حدث خطأ أثناء عرض التقرير. يرجى تحديث الصفحة أو إعادة تشغيل التحليل.';
-                const small = document.createElement('small');
-                small.style.cssText = 'display:block;margin-top:8px;opacity:0.6;direction:ltr;';
-                small.textContent = err.message;
-                errorDiv.appendChild(h3);
-                errorDiv.appendChild(p1);
-                errorDiv.appendChild(small);
-                main.prepend(errorDiv);
-            }
-        }
-    } // end renderData
+    } // end renderAdsSection
 });
