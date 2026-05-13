@@ -155,6 +155,29 @@ function setTextIf(id, text) {
     if (el) el.textContent = text;
 }
 
+// ============================================================
+// renderSafeLink — حقن رابط بشكل آمن (CSP + XSS-safe)
+// يستبدل: el.innerHTML = `<a href="${url}">${url}</a>`
+// يتحقق أن الرابط يبدأ بـ https:// قبل الحقن، وإلا يعرض fallbackText
+// ============================================================
+function renderSafeLink(el, url, fallbackText) {
+    if (!el) return;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    const safeUrl = (typeof url === 'string') ? url.trim() : '';
+    if (safeUrl && /^https:\/\//i.test(safeUrl)) {
+        const a = document.createElement('a');
+        a.setAttribute('href', safeUrl);
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+        a.style.color = 'var(--primary)';
+        a.style.textDecoration = 'none';
+        a.textContent = safeUrl;
+        el.appendChild(a);
+    } else {
+        el.textContent = fallbackText || 'لم يتم العثور على رابط صالح';
+    }
+}
+
 function buildPublicAdsOverview(sr) {
     const adsLib = (sr && (sr.ads_library || sr.ads)) || {};
     const ads = Array.isArray(adsLib.ads) ? adsLib.ads : [];
@@ -1295,10 +1318,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- 1. Website Audit ---
             const urlW = document.getElementById('auditWebUrl');
-            if (urlW)
-                urlW.innerHTML = websiteUrl
-                    ? `<a href="${websiteUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${websiteUrl}</a>`
-                    : 'لم يتم العثور على موقع إلكتروني';
+            renderSafeLink(urlW, websiteUrl, 'لم يتم العثور على موقع إلكتروني');
             const _gw = document.getElementById('gridWebsite');
             if (!websiteUrl && _gw) _gw.classList.add('card-disabled');
 
@@ -1325,10 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- 2. Instagram Audit ---
             const urlI = document.getElementById('auditIgUrl');
-            if (urlI)
-                urlI.innerHTML = instagramUrl
-                    ? `<a href="${instagramUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${instagramUrl}</a>`
-                    : 'لم يتم العثور على حساب';
+            renderSafeLink(urlI, instagramUrl, 'لم يتم العثور على حساب');
             const _gi = document.getElementById('gridInstagram');
             if (!instagramUrl && _gi) _gi.classList.add('card-disabled');
 
@@ -1436,10 +1453,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- 3. Facebook Audit ---
             const urlF = document.getElementById('auditFbUrl');
-            if (urlF)
-                urlF.innerHTML = facebookUrl
-                    ? `<a href="${facebookUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${facebookUrl}</a>`
-                    : 'لم يتم العثور على حساب';
+            renderSafeLink(urlF, facebookUrl, 'لم يتم العثور على حساب');
             const _gf = document.getElementById('gridFacebook');
             if (!facebookUrl && _gf) _gf.classList.add('card-disabled');
 
@@ -1452,10 +1466,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // --- 3.5 TikTok Audit ---
             const tiktokUrl = data.tiktok_url || (srObj.tiktok ? srObj.tiktok.url : '') || '';
             const urlTT = document.getElementById('auditTikTokUrl');
-            if (urlTT)
-                urlTT.innerHTML = tiktokUrl
-                    ? `<a href="${tiktokUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${tiktokUrl}</a>`
-                    : 'لم يتم العثور على حساب';
+            renderSafeLink(urlTT, tiktokUrl, 'لم يتم العثور على حساب');
             const _gtt = document.getElementById('gridTikTok');
             if (!tiktokUrl && _gtt) _gtt.classList.add('card-disabled');
 
@@ -1589,10 +1600,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // --- 3.6 Twitter/X Audit ---
             const twitterUrl = data.twitter_url || (srObj.twitter ? srObj.twitter.url : '') || '';
             const urlTW = document.getElementById('auditTwitterUrl');
-            if (urlTW)
-                urlTW.innerHTML = twitterUrl
-                    ? `<a href="${twitterUrl}" target="_blank" style="color:var(--primary);text-decoration:none;">${twitterUrl}</a>`
-                    : 'لم يتم العثور على حساب';
+            renderSafeLink(urlTW, twitterUrl, 'لم يتم العثور على حساب');
             const _gtw = document.getElementById('gridTwitter');
             if (!twitterUrl && _gtw) _gtw.classList.add('card-disabled');
 
@@ -2110,10 +2118,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="comp-card">
                 <div class="cc-header">
                   <div class="cc-info">
-                    <h3>${comp.name || 'منافس'}</h3>
-                    <p><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> ${
+                    <h3>${sanitize(comp.name || 'منافس')}</h3>
+                    <p><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> ${sanitize(
                         comp.url || 'غير متوفر'
-                    }</p>
+                    )}</p>
                   </div>
                   <div class="cc-rank">${ranks[i] || '#'}</div>
                 </div>
@@ -2121,21 +2129,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="traits-list">
                   <div class="trait-group">
                     <span class="trait-title">نقاط تفوقه (Strengths)</span>
-                    <div class="trait-item trait-strength">${st1}</div>
-                    <div class="trait-item trait-strength">${st2}</div>
+                    <div class="trait-item trait-strength">${sanitize(st1)}</div>
+                    <div class="trait-item trait-strength">${sanitize(st2)}</div>
                   </div>
                   <div class="trait-group" style="margin-top:8px;">
                     <span class="trait-title">نقاط ضعفه (Vulnerabilities)</span>
-                    <div class="trait-item trait-weakness">${wk1}</div>
-                    <div class="trait-item trait-weakness">${wk2}</div>
+                    <div class="trait-item trait-weakness">${sanitize(wk1)}</div>
+                    <div class="trait-item trait-weakness">${sanitize(wk2)}</div>
                   </div>
                 </div>
 
                 <div class="attack-plan">
                   <div class="ap-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> خطة الهجوم</div>
-                  <div class="ap-desc">${
+                  <div class="ap-desc">${sanitize(
                       comp.attack_plan || 'استغل نقاط ضعفه أعلاه للسيطرة على عملائه.'
-                  }</div>
+                  )}</div>
                 </div>
               </div>
             `;
@@ -2151,9 +2159,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.execution_arsenal.forEach(item => {
                     arsenalHtml += `
               <div class="arsenal-item">
-                <div class="arsenal-icon">${item.icon || '🔥'}</div>
-                <div class="arsenal-title">${item.title}</div>
-                <div class="arsenal-desc">${item.desc}</div>
+                <div class="arsenal-icon">${sanitize(item.icon || '🔥')}</div>
+                <div class="arsenal-title">${sanitize(item.title || '')}</div>
+                <div class="arsenal-desc">${sanitize(item.desc || '')}</div>
               </div>
             `;
                 });
@@ -3933,7 +3941,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 phase1.innerHTML = data.action_week
                     .map(
                         action =>
-                            `<div class="rm-task"><i style="color:var(--green);">✓</i> ${action}</div>`
+                            `<div class="rm-task"><i style="color:var(--green);">✓</i> ${sanitize(action)}</div>`
                     )
                     .join('');
             }
@@ -3954,7 +3962,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         .slice(0, 6)
                         .map(
                             title =>
-                                `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${title}</div>`
+                                `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${sanitize(title)}</div>`
                         )
                         .join('');
                 } else {
