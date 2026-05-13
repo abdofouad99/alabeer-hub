@@ -307,17 +307,17 @@
       <!-- Mini Score Card -->
       <div class="card score-box-mini animate-up delay-2">
         <div class="score-circle-wrap" style="width:110px; height:110px;">
-          <div class="score-circle" id="journeyCircle" data-color="var(--primary)" data-percent="45">
+          <div class="score-circle" id="journeyCircle" data-color="var(--primary)" data-percent="0">
             <div class="score-inner" style="width:85px; height:85px;">
-              <div class="score-num" id="journeyScore" data-val="45" style="font-size:36px; letter-spacing:-1px;">0</div>
+              <div class="score-num" id="journeyScore" data-val="0" style="font-size:36px; letter-spacing:-1px;">0</div>
               <div class="score-text" style="font-size:11px;">كفاءة القمع</div>
             </div>
           </div>
         </div>
         <div style="transform: translateZ(10px);">
           <h3 style="font-size:16px; font-weight:800; margin-bottom:10px; color:var(--text-gray);">كفاءة رحلة العميل</h3>
-          <div id="journeyStatusTitle" style="font-size:22px; font-weight:900; color:var(--primary); display:flex; align-items:center; gap:8px;">⚠️ يوجد انسداد</div>
-          <p id="journeyStatusDesc" style="font-size:13px; color:var(--text-gray); margin-top:8px; line-height:1.5; font-weight:600;">الكثير من الزوار، لكن <strong>قليل من يشتري</strong> بسبب نقطة اختناق في المنتصف.</p>
+          <div id="journeyStatusTitle" style="font-size:22px; font-weight:900; color:var(--primary); display:flex; align-items:center; gap:8px;">—</div>
+          <p id="journeyStatusDesc" style="font-size:13px; color:var(--text-gray); margin-top:8px; line-height:1.5; font-weight:600;">بانتظار تحليل رحلة العميل من AI...</p>
         </div>
       </div>
 
@@ -342,11 +342,11 @@
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الوعي (Awareness)</h4>
               <p class="j-card-desc" id="stage1Desc" data-field="awareness">
-                حملاتك الإعلانية تعمل بشكل ممتاز وتنجح في لفت انتباه الجمهور المستهدف. هناك تدفق صحي للزوار الجدد إلى حسابك، مما يعني أن استهدافك ورسالتك الإعلانية الأولية (Hook) تؤدي الغرض بنجاح وبكفاءة عالية.
+                بانتظار تحليل مرحلة الوعي من AI...
               </p>
             </div>
             <div class="j-card-stats">
-              <div class="j-stat-val score-num" id="stage1Score" data-val="80">0%</div>
+              <div class="j-stat-val score-num" id="stage1Score" data-val="0">0%</div>
               <div class="j-stat-label">نسبة التدفق</div>
             </div>
           </div>
@@ -359,11 +359,11 @@
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الجذب (Interest)</h4>
               <p class="j-card-desc" id="stage2Desc" data-field="attraction">
-                عندما يدخل الزوار إلى حسابك، يعجبهم التصميم العام وتلفتهم المنتجات. يقومون بتصفح بعض المنشورات ومشاهدة القصص (Stories)، مما يعكس وجود رغبة مبدئية واهتمام حقيقي بما تقدمه.
+                بانتظار تحليل مرحلة الجذب من AI...
               </p>
             </div>
             <div class="j-card-stats">
-              <div class="j-stat-val score-num" id="stage2Score" data-val="65">0%</div>
+              <div class="j-stat-val score-num" id="stage2Score" data-val="0">0%</div>
               <div class="j-stat-label">نسبة الاهتمام</div>
             </div>
           </div>
@@ -376,7 +376,7 @@
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الثقة (Trust) <span id="stage3Warning" style="display:none; font-size:13px; background:var(--red); padding:4px 10px; border-radius:8px; font-weight:900; color:#fff;">⚠️ نقطة النزيف الحادة</span></h4>
               <p class="j-card-desc" id="stage3Desc" data-field="trust">
-                الزائر لديه الرغبة بالشراء، لكنه يبحث عن ما يطمئنه. مراجعات العملاء وتجاربهم السابقة (Social Proof) تلعب الدور الأكبر في إقناعه بإكمال عملية الشراء وتجاوز حاجز الخوف.
+                بانتظار تحليل مرحلة الثقة من AI...
               </p>
               
               <div class="j-fix-box" id="stage3FixBox" style="display:none;">
@@ -390,7 +390,7 @@
 
             </div>
             <div class="j-card-stats">
-              <div class="j-stat-val score-num" id="stage3Score" data-val="40">0%</div>
+              <div class="j-stat-val score-num" id="stage3Score" data-val="0">0%</div>
               <div class="j-stat-label">نسبة بناء الثقة</div>
             </div>
           </div>
@@ -403,7 +403,7 @@
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الشراء (Conversion) <span id="stage4Warning" style="display:none; font-size:13px; background:var(--red); padding:4px 10px; border-radius:8px; font-weight:900; color:#fff;">⚠️ نقطة النزيف الحادة</span></h4>
               <p class="j-card-desc" id="stage4Desc" data-field="purchase">
-                عدد الزوار الذين يصلون فعلياً إلى صفحة الدفع (Checkout) ويكملون عملية الشراء. معدل التحويل يعتمد على سهولة الدفع ووضوح العرض.
+                بانتظار تحليل مرحلة الشراء من AI...
               </p>
               <div class="j-fix-box" id="stage4FixBox" style="display:none;">
                 <h5>💡 الروشتة التسويقية الفورية:</h5>
@@ -415,7 +415,7 @@
               </div>
             </div>
             <div class="j-card-stats">
-              <div class="j-stat-val score-num" id="stage4Score" data-val="25">0%</div>
+              <div class="j-stat-val score-num" id="stage4Score" data-val="0">0%</div>
               <div class="j-stat-label">معدل التحويل (CR)</div>
             </div>
           </div>
@@ -428,11 +428,11 @@
             <div class="j-card-header">
               <h4 class="j-card-title">مرحلة الولاء (Loyalty)</h4>
               <p class="j-card-desc" id="stage5Desc" data-field="loyalty">
-                العملاء الذين اتخذوا قرار الشراء، ومدى احتمالية عودتهم للشراء مرة أخرى، مما يؤشر على جودة منتجك ورضاهم عن التجربة.
+                بانتظار تحليل مرحلة الولاء من AI...
               </p>
             </div>
             <div class="j-card-stats">
-              <div class="j-stat-val score-num" id="stage5Score" data-val="45">0%</div>
+              <div class="j-stat-val score-num" id="stage5Score" data-val="0">0%</div>
               <div class="j-stat-label">نسبة العودة والشراء مجدداً</div>
             </div>
           </div>
