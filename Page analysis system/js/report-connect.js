@@ -839,47 +839,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     }</ul></div>`;
                 }
             } else {
-                // Fallback funnel based on overall score
-                const s = score || 50;
-                const funnelStages = [
-                    { id: 'resultFVal1', stageId: 'resultFStage1', val: Math.min(100, s + 25) },
-                    { id: 'resultFVal2', stageId: 'resultFStage2', val: Math.min(100, s + 10) },
-                    { id: 'resultFVal3', stageId: 'resultFStage3', val: s },
-                    { id: 'resultFVal4', stageId: 'resultFStage4', val: Math.max(5, s - 20) },
-                    { id: 'resultFVal5', stageId: 'resultFStage5', val: Math.max(2, s - 35) },
-                ];
-
-                let minScore = 100;
-                let bottleneckId = 'resultFVal4';
-                funnelStages.forEach(f => {
-                    const el = document.getElementById(f.id);
-                    const stageEl = document.getElementById(f.stageId);
-                    if (el) el.textContent = f.val + '%';
-                    if (stageEl) stageEl.style.width = Math.max(15, f.val) + '%';
-                    if (f.val < minScore) {
-                        minScore = f.val;
-                        bottleneckId = f.id;
-                    }
+                // No AI funnel data → reset all stages to 0%/— and show honest message.
+                // Do NOT fabricate values from the overall score (would mislead the client).
+                ['resultFVal1', 'resultFVal2', 'resultFVal3', 'resultFVal4', 'resultFVal5'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '—';
+                });
+                ['resultFStage1', 'resultFStage2', 'resultFStage3', 'resultFStage4', 'resultFStage5'].forEach(id => {
+                    const stageEl = document.getElementById(id);
+                    if (stageEl) stageEl.style.width = '0%';
                 });
 
                 const badge = document.getElementById('resultBottleneckBadge');
-                if (badge) {
-                    badge.style.display = 'inline';
-                    // Adjust badge position roughly based on bottleneck
-                    const badgePositions = {
-                        resultFVal1: '10%',
-                        resultFVal2: '30%',
-                        resultFVal3: '50%',
-                        resultFVal4: '70%',
-                        resultFVal5: '90%',
-                    };
-                    badge.style.top = badgePositions[bottleneckId] || '70%';
-                }
+                if (badge) badge.style.display = 'none';
 
                 const fDesc = document.getElementById('resultFunnelDesc');
                 if (fDesc) {
-                    fDesc.innerHTML =
-                        'بناءً على التقييم العام والأداء الرقمي للحساب، قمنا بتقدير مسار التحويل، حيث يظهر تسرب واضح في مرحلة الشراء/الولاء.<div class="fix-box" id="resultFixBox"><div class="fix-box-title">كيف نحل هذه العقدة؟</div><ul id="resultFixList"><li><span style="color:var(--green);">✔</span> إطلاق حملات إعادة استهداف للزوار المتخلين عن الشراء.</li><li><span style="color:var(--green);">✔</span> تحسين صفحة الهبوط لتسهيل إجراءات الدفع.</li><li><span style="color:var(--green);">✔</span> مراجعة العروض الترويجية والأسعار التنافسية.</li></ul></div>';
+                    fDesc.textContent = 'لم يرجع AI تحليل قمع التحويل لهذا الحساب.';
                 }
             }
 
@@ -2288,32 +2264,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // محاولة جلب التحليل العميق (نفضل إنستجرام لأنه أدق في توزيع الأنواع عادةً)
             const da = ig.deep_analysis || fb.deep_analysis || {};
-            const types = da.types_percent || { video: 33, image: 33, sidecar: 34 };
-            const cta = da.cta_percent !== undefined ? da.cta_percent : score > 60 ? 60 : 30;
+            // لا نخترع types_percent — إذا لم يرجع API توزيعاً، تظل البطاقات فارغة.
+            const types = da.types_percent || null;
 
-            // 1. جودة التصميم (Visual): نربطها بوجود صورة بروفايل والدرجة العامة
-            let cVisual = ig.profile_pic || fb.profile_pic ? score + 15 : score;
-            if (cVisual > 95) cVisual = 95;
-
-            // 2. قوة الرسالة (Msg): نربطها مباشرة بنسبة الـ CTA المكتشفة
-            let cMsg = cta;
-            if (cMsg < 30 && score > 50) cMsg = 45;
-
-            // 3. التفاعل (Eng): نربطه بمعدل التفاعل الحقيقي
-            let realER = parseFloat(ig.engagement_rate || fb.avg_engagement || 0);
-            let cEng = realER > 3 ? 90 : realER > 1.5 ? 70 : realER > 0.5 ? 50 : 30;
-
-            // 4. التنوع (Var): نربطه بمدى توازن الأنواع (فيديو وصور وكاروسيل)
-            let typeCount = 0;
-            if (types.video > 5) typeCount++;
-            if (types.image > 5) typeCount++;
-            if (types.sidecar > 5) typeCount++;
-            let cVar = typeCount === 3 ? 95 : typeCount === 2 ? 75 : 45;
-
-            if (cVisual > 100) cVisual = 100;
-            if (cMsg > 100) cMsg = 100;
-            if (cEng > 100) cEng = 100;
-            if (cVar > 100) cVar = 100;
+            // ═══════════════════════════════════════════════════
+            // Bento metrics (Visual/Msg/Eng/Var):
+            // المصدر الموثوق الوحيد هو ai_report.content_analysis.bar_*
+            // (يبنيها buildContentAnalysis() في PHP من بيانات حقيقية).
+            // عند غيابها نعرض null → الواجهة ستعرض "—" بدلاً من رقم مخترع.
+            // ═══════════════════════════════════════════════════
+            let cVisual = null;
+            let cMsg = null;
+            let cEng = null;
+            let cVar = null;
 
             // ═══════════════════════════════════════════════════
             // ربط بيانات الذكاء الاصطناعي (content_analysis)
@@ -2396,176 +2359,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } // END IF AI
 
             // =====================================
-            // Global Sanitization & Overrides
-            // Executes for BOTH AI text and Fallback
+            // ملاحظة: تم حذف بلوك "Global Sanitization" نهائياً (Phase 2).
+            // كان البلوك يحوي ~140 سطر من txt.replace() لتنظيف نصوص قديمة عن
+            // عميل آخر (سيروم/تجميل/أمهات بعد الولادة/...) كانت مدمجة في HTML
+            // كـ fallback. بعد تنظيف HTML نفسه (Tasks #1-#3) لم تعد هذه النصوص
+            // موجودة، فأصبح بلوك "التنظيف" بدوره عرضة لتشويه النصوص الحقيقية.
+            //
+            // أيضاً تم حذف بلوك fallback bar formula (idx % 3 ? -15 : ...)
+            // الذي كان يولّد قيم 9 شرائط تخيلياً من score عند فشل AI.
+            // عند غياب ca.bar_*، تبقى الشرائط 0%/— كما هي في HTML.
             // =====================================
-            // Fallback: If AI fails to return content_analysis, sanitize legacy placeholder text.
-            const typeStr = ai.page_type || data.project_type || 'تجاري';
-            const isService =
-                typeStr.includes('Service') ||
-                typeStr.includes('Business') ||
-                typeStr.includes('تسويق') ||
-                typeStr.includes('شركة') ||
-                typeStr.includes('عقارات') ||
-                typeStr.includes('Influencer') ||
-                /marketing|agency|وكالة|b2b/i.test(typeStr);
-
-            document
-                .querySelectorAll(
-                    '.q-answer, .q-label, .insight-box p, .insight-box h4, .bar-label, .pill, .j-card-title, .j-stat-label, .problem-desc, .f-label, .dc-sub'
-                )
-                .forEach(el => {
-                    // ── تخطي العناصر التي ملأها الذكاء الاصطناعي ببيانات حقيقية ──
-                    if (el.getAttribute('data-ai') === 'true') return;
-
-                    let txt = el.innerHTML;
-
-                    // Global String Sanitization (Runs on Fallback text ONLY)
-                    txt = txt.replace(/اسم تجريبي قديم/g, clientName);
-                    txt = txt.replace(/منتجات تجميل طبيعية/g, 'منتجات/خدمات مميزة');
-                    txt = txt.replace(/تجميل/g, 'هذا المجال');
-                    txt = txt.replace(/منتجات عناية/g, 'ما تقدمه');
-                    txt = txt.replace(/طبيعية/g, 'احترافية');
-                    txt = txt.replace(/للسوق السعودي/g, 'للسوق المحلي');
-                    txt = txt.replace(
-                        /أمهات بعد الولادة، صاحبات البشرة الحساسة/g,
-                        'شرائح محددة تلائم نشاطك'
-                    );
-                    txt = txt.replace(/نساء سعوديات/g, 'الجمهور المستهدف');
-                    txt = txt.replace(/سيروم/g, 'أهم ما تقدمه');
-                    txt = txt.replace(
-                        /طبيعي 100%\؟ عضوي\؟ محلي\؟/g,
-                        'توضيح الميزة التنافسية الدقيقة'
-                    );
-
-                    // إزالة العبارات التي توحي بأن النص قالب أو تخمين واستبدالها بنص تحليلي واثق
-                    txt = txt.replace(
-                        /صورة البروفايل واضحة ومميزة\. الغلاف \(إن وُجد\) يتناسق مع الهوية البصرية العامة — مستوى جيد\./g,
-                        'الواجهة الرئيسية وحالة البروفايل تعكس احترافية وتتناسق بشكل ممتاز مع الهوية البصرية.'
-                    );
-                    txt = txt.replace(
-                        /نعم من الشكل العام\. لكن التخصص الدقيق .* غير واضح بما يكفي\./g,
-                        'النشاط واضح بشكل عام، لكن يُنصح بإبراز الميزة التنافسية الدقيقة بشكل أقوى في النبذة التعريفية.'
-                    );
-                    txt = txt.replace(/الغلاف \(إن وُجد\)/g, 'الواجهة الرئيسية');
-                    txt = txt.replace(/\(إن وُجد\)/g, '');
-                    txt = txt.replace(/\(Social Proof\)/g, '(تجارب العملاء)');
-                    txt = txt.replace(/يبيع دون أن تبدو "محل"/g, 'يسوق دون أن يبدو كإعلان تقليدي');
-                    txt = txt.replace(
-                        /لا يوجد بعد عنصر "توقيع" يميّز الحساب/g,
-                        'يُنصح بإيجاد عنصر بصري أو نمط محتوى فريد يميز الحساب'
-                    );
-                    txt = txt.replace(
-                        /يحتاج تحسيناً — البايو الحالي عام\./g,
-                        'تحتاج النبذة التعريفية إلى تحسين لتكون أكثر دقة وتحديداً.'
-                    );
-                    txt = txt.replace(
-                        /ماذا تبيع \+ لمن \+ ما الميزة الفريدة \+ كيف تطلب/g,
-                        isService
-                            ? 'نوع الخدمة + لمن + الميزة التنافسية + دعوة للحجز أو التواصل'
-                            : 'ما هو المنتج + لمن + الميزة التنافسية + دعوة للطلب'
-                    );
-                    txt = txt.replace(
-                        /نص تجريبي قديم عن اسم النشاط\./g,
-                        'غير متوفر من بيانات التقرير.'
-                    );
-
-                    txt = txt.replace(/المستهلك السعودي/g, 'المستهلك المحلي');
-                    txt = txt.replace(
-                        /الريلز الذي يعرض "طريقة استخدام" المنتج حصل على 3x وصول مقارنة بصور الكتالوج — إشارة واضحة لنوع المحتوى المطلوب\./g,
-                        'المحتوى المرئي القصير الذي يقدم فائدة عملية مباشرة يتفوق في الوصول والتفاعل مقارنة بالمحتوى الترويجي الجامد.'
-                    );
-                    txt = txt.replace(
-                        /الأفضل للنساء السعوديات: 8-10 مساءً والجمعة صباحاً\./g,
-                        'يُنصح باختبار أوقات النشر لتحديد ذروة تواجد جمهورك المستهدف بشكل دقيق.'
-                    );
-                    txt = txt.replace(/10 عميلات نشطات/g, 'عدد من العملاء المخلصين والراضين');
-                    txt = txt.replace(
-                        /تحديد شريحة \(مثل: أمهات بعد الولادة، صاحبات البشرة الحساسة\) سيرفع التحويل كثيراً\./g,
-                        'تحديد شريحة دقيقة بدلاً من مخاطبة الجميع سيرفع من معدلات التحويل بشكل ملحوظ.'
-                    );
-                    txt = txt.replace(
-                        /"منتجات عناية طبيعية 100% \| توصيل سريع \| اطلبي الآن 👇"/g,
-                        isService
-                            ? '"خدمات متخصصة باحترافية | احجز استشارتك الآن 👇"'
-                            : '"منتجات مميزة بجودة عالية | اطلب الآن 👇"'
-                    );
-                    txt = txt.replace(
-                        /تبيع دون أن تبدو "محل"\./g,
-                        isService
-                            ? 'تجلب عملاء دون أن تبدو "إعلاناً تقليدياً".'
-                            : 'تبيع دون أن تبدو كـ "كتالوج جامد".'
-                    );
-
-                    if (isService) {
-                        txt = txt.replace(/هناك منتجات معروضة/g, 'هناك خدمات معروضة');
-                        txt = txt.replace(/تجربة الشراء/g, 'تجربة طلب الخدمة');
-                        txt = txt.replace(/إلى الشراء/g, 'إلى طلب الخدمة أو الاستشارة');
-                        txt = txt.replace(/المنتج/g, 'الخدمة');
-                        txt = txt.replace(/الشراء/g, 'التعاقد أو الطلب');
-                        txt = txt.replace(/يشتري/g, 'يطلب');
-                        txt = txt.replace(/صور المنتجات/g, 'صور الخدمات والأعمال');
-                        txt = txt.replace(/تبيع/g, 'تقدم');
-                        txt = txt.replace(/أشتري/g, 'أطلب');
-                        txt = txt.replace(/المنتجات/g, 'الخدمات');
-                        txt = txt.replace(/للنساء السعوديات/g, 'لجمهورك المستهدف');
-                    }
-
-                    txt = txt.replace(/ \(80%\)/g, '');
-                    txt = txt.replace(
-                        /\(نصائح عناية، مكونات، أخطاء شائعة\)/g,
-                        '(نصائح، معلومات قيمة، إجابات للجمهور)'
-                    );
-                    txt = txt.replace(
-                        /\(عروض، منتجات، CTA واضح\)/g,
-                        '(عروض، خدمات، دعوة اتخاذ إجراء واضحة)'
-                    );
-                    txt = txt.replace(/40% تعليمي/g, 'محتوى تعليمي');
-                    txt = txt.replace(/30% بناء ثقة/g, 'محتوى بناء ثقة');
-                    txt = txt.replace(/30% بيعي/g, 'محتوى بيعي/ترويجي');
-
-                    if (isService) {
-                        txt = txt.replace(/للبيع أو الحجز/g, 'للطلب أو التعاقد');
-                        txt = txt.replace(/تجربة الشراء/g, 'تجربة الطلب/التواصل');
-                        txt = txt.replace(/للبيع/g, 'للطلب');
-                        txt = txt.replace(/يشتري/g, 'يطلب الخدمة');
-                        txt = txt.replace(/بالشراء/g, 'بالتعاقد أو الطلب');
-                        txt = txt.replace(/الشراء/g, 'الطلب');
-                        txt = txt.replace(/المنتجات/g, 'الخدمات');
-                        txt = txt.replace(/منتجات/g, 'الخدمات');
-                        txt = txt.replace(/منتج/g, 'خدمة');
-                        txt = txt.replace(/متجر/g, 'حساب/شركة');
-                        txt = txt.replace(/يبيع/g, 'يقدم');
-                        txt = txt.replace(/المشترين/g, 'العملاء');
-                    }
-
-                    el.innerHTML = txt;
-                });
-
-            // تم إزالة تغيير الـ Status العشوائي لتجنب التناقض بين الأيقونة والنص المكتوب
-
-            // Fallback: update progress bars dynamically ONLY if AI didn't supply them
-            const allBars = document.querySelectorAll('.bar-fill[data-width]');
-            const barsUpdatedByAI = ca && Array.isArray(ca.q) && ca.bar_cta !== undefined;
-            if (!barsUpdatedByAI) {
-                allBars.forEach((bar, idx) => {
-                    let val = score + (idx % 3 === 0 ? -15 : idx % 2 === 0 ? 10 : -5);
-                    val = Math.min(100, Math.max(15, val));
-                    bar.setAttribute('data-width', val);
-                    bar.style.width = val + '%';
-                    bar.className = bar.className.replace(/\b(green|yellow|red|blue)\b/g, '');
-                    bar.classList.add(val > 70 ? 'green' : val > 40 ? 'yellow' : 'red');
-                    const valEl = bar.closest('.bar-row')?.querySelector('.bar-val');
-                    if (valEl) {
-                        valEl.textContent = val + '%';
-                        valEl.className = valEl.className.replace(
-                            /\b(green|yellow|red|blue)\b/g,
-                            ''
-                        );
-                        valEl.classList.add(val > 70 ? 'green' : val > 40 ? 'yellow' : 'red');
-                    }
-                });
-            }
 
             // Update balance wheel and journey descriptions from customer_journey stages if available (real AI data)
             const cj = data.ai_report && data.ai_report.customer_journey;
@@ -2656,23 +2459,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             } else {
-                // Fallback balance wheel from score
+                // No AI customer_journey → reset balance wheel to 0%/—
+                // (do NOT fabricate from overall score).
                 const bcFills = document.querySelectorAll('.bc-fill');
-                if (bcFills.length === 5) {
-                    const bVals = [
-                        Math.min(95, score + 10),
-                        Math.min(90, score),
-                        Math.max(10, score - 20),
-                        Math.max(10, score - 30),
-                        Math.max(5, score - 40),
-                    ];
-                    bcFills.forEach((fill, idx) => {
-                        const val = bVals[idx];
-                        fill.style.width = val + '%';
-                        const pctEl = fill.closest('.balance-card')?.querySelector('.bc-pct');
-                        if (pctEl) pctEl.textContent = val + '%';
-                    });
-                }
+                bcFills.forEach(fill => {
+                    fill.style.width = '0%';
+                    const pctEl = fill.closest('.balance-card')?.querySelector('.bc-pct');
+                    if (pctEl) pctEl.textContent = '—';
+                });
             }
 
             // Populate Content Type Pills from real scan data
@@ -2853,23 +2647,37 @@ document.addEventListener('DOMContentLoaded', () => {
             const contentStatusTitle = document.getElementById('contentStatusTitle');
             const contentStatusDesc = document.getElementById('contentStatusDesc');
 
-            // Content Index is an average of the four metrics
-            const avgContent = Math.floor((cVisual + cMsg + cEng + cVar) / 4);
+            // Content Index = average of available metrics only (skip nulls).
+            const validMetrics = [cVisual, cMsg, cEng, cVar].filter(v => v !== null && !isNaN(v));
+            const avgContent = validMetrics.length > 0
+                ? Math.floor(validMetrics.reduce((a, b) => a + b, 0) / validMetrics.length)
+                : null;
 
             if (contentScore) {
-                contentScore.setAttribute('data-val', avgContent);
-                contentScore.textContent = avgContent;
+                if (avgContent !== null) {
+                    contentScore.setAttribute('data-val', avgContent);
+                    contentScore.textContent = avgContent;
+                } else {
+                    contentScore.setAttribute('data-val', 0);
+                    contentScore.textContent = '—';
+                }
             }
 
             if (contentCircle) {
-                contentCircle.setAttribute('data-percent', avgContent);
-                if (avgContent > 70) contentCircle.setAttribute('data-color', 'var(--green)');
+                contentCircle.setAttribute('data-percent', avgContent !== null ? avgContent : 0);
+                if (avgContent === null) contentCircle.setAttribute('data-color', 'var(--text-gray)');
+                else if (avgContent > 70) contentCircle.setAttribute('data-color', 'var(--green)');
                 else if (avgContent > 40) contentCircle.setAttribute('data-color', 'var(--yellow)');
                 else contentCircle.setAttribute('data-color', 'var(--red)');
             }
 
             if (contentStatusTitle) {
-                if (avgContent > 70) {
+                if (avgContent === null) {
+                    contentStatusTitle.textContent = '—';
+                    contentStatusTitle.style.color = 'var(--text-gray)';
+                    if (contentStatusDesc)
+                        contentStatusDesc.textContent = 'بانتظار تحليل المحتوى من AI...';
+                } else if (avgContent > 70) {
                     contentStatusTitle.innerHTML = '✅ محتوى ذهبي';
                     contentStatusTitle.style.color = 'var(--green)';
                     if (contentStatusDesc)
@@ -2894,11 +2702,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const scoreEl = document.getElementById(`bento${prefix}Score`);
                 const boxEl = document.getElementById(`bento${prefix}Box`);
                 if (scoreEl) {
-                    scoreEl.setAttribute('data-val', val);
-                    scoreEl.textContent = val;
+                    if (val === null || val === undefined || isNaN(val)) {
+                        scoreEl.setAttribute('data-val', 0);
+                        scoreEl.textContent = '—';
+                    } else {
+                        scoreEl.setAttribute('data-val', val);
+                        scoreEl.textContent = val;
+                    }
                 }
                 if (boxEl) {
                     boxEl.classList.remove('b-green', 'b-yellow', 'b-red');
+                    if (val === null || val === undefined || isNaN(val)) return;
                     if (val > 70) boxEl.classList.add('b-green');
                     else if (val > 40) boxEl.classList.add('b-yellow');
                     else boxEl.classList.add('b-red');
@@ -3152,70 +2966,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             );
                         });
                     } else {
-                        if (srObj.hasSSL)
-                            strengths.push({
-                                title: isService ? 'بيئة آمنة وموثوقة' : 'بيئة شراء آمنة',
-                                desc: isService
-                                    ? 'موقعك محمي بشهادة SSL فعالة، مما يمنع رسائل (غير آمن) ويزيد من ثقة العميل في التعامل معك.'
-                                    : 'متجرك محمي بشهادة SSL فعالة، مما يمنع رسائل (غير آمن) ويزيد من ثقة العميل بالشراء.',
-                                score: score + 12,
-                                icon: '🔒',
-                            });
-                        if (srObj.hasPixel)
-                            strengths.push({
-                                title: 'جاهزية الاستهداف (Pixel)',
-                                desc: 'البيكسل مركب بنجاح، مما يسمح لك بتتبع الزوار وإعادة استهدافهم بحملات متقدمة.',
-                                score: score + 10,
-                                icon: '🎯',
-                            });
-                        if (ig.is_business)
-                            strengths.push({
-                                title: 'حساب احترافي للأعمال',
-                                desc: 'استخدامك لحساب أعمال يفتح لك أدوات التحليل والإعلانات بشكل كامل لبناء علامتك.',
-                                score: score + 5,
-                                icon: '📊',
-                            });
-                        if (
-                            (srObj.website_scan ? srObj.website_scan.load_time_ms : null) &&
-                            (srObj.website_scan ? srObj.website_scan.load_time_ms : null) < 2000
-                        )
-                            strengths.push({
-                                title: 'سرعة استجابة عالية',
-                                desc: isService
-                                    ? 'الموقع يحمل في أقل من ثانيتين، مما يحافظ على تركيز العميل المهتم بخدماتك.'
-                                    : 'الموقع يحمل في أقل من ثانيتين، مما يحافظ على تركيز العميل ويقلل معدل الارتداد.',
-                                score: score + 15,
-                                icon: '⚡',
-                            });
-                        if (ws.has_checkout)
-                            strengths.push({
-                                title: isService ? 'نظام تواصل وتسجيل واضح' : 'نظام دفع متكامل',
-                                desc: isService
-                                    ? 'تتوفر لديك نقطة واضحة لاستقطاب الطلبات (Lead Generation)، مما يسهل التحويل.'
-                                    : 'تتوفر لديك صفحة إتمام شراء (Checkout)، مما يسهل عملية تحصيل الأموال.',
-                                score: score + 8,
-                                icon: isService ? '📞' : '💳',
-                            });
-                        if (ig.followers && ig.followers > 5000)
-                            strengths.push({
-                                title: 'قاعدة جماهيرية جيدة',
-                                desc: 'يوجد عدد جيد من المتابعين يمكن استغلاله كشريحة أولية للاختبار وبناء الثقة.',
-                                score: score + 6,
-                                icon: '👥',
-                            });
-                        if (fb.has_ads)
-                            strengths.push({
-                                title: 'تواجد إعلاني نشط',
-                                desc: 'أنت تستثمر بالفعل في جلب الزيارات عبر الإعلانات، نحتاج فقط لمضاعفة العائد (ROAS).',
-                                score: score + 9,
-                                icon: '🚀',
-                            });
-
-                        // No padding with generic strengths. Empty results are rendered as missing data.
+                        // No fallback fabrication: when AI returns no strengths,
+                        // we display "missing data" placeholder rather than synthesize
+                        // strengths locally with arithmetic scores (score+12, +10, etc).
+                        // Real strengths must come from Agent 5 (page_14_strengths).
                     }
 
-                    // Sort by highest score
-                    strengths.sort((a, b) => b.score - a.score);
+                    // Sort by highest score (when AI provides scores)
+                    strengths.sort((a, b) => (b.score || 0) - (a.score || 0));
 
                     if (strengths.length === 0) {
                         appendMissingData(
@@ -3232,9 +2990,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     // ═══════════════════════════════════════════════════════════
                     const buildDeepStrengthCard = item => {
                         const s = item;
-                        const val = Math.min(Math.round(s.score || 85), 99);
+                        const hasScore = typeof s.score === 'number' && !isNaN(s.score) && s.score > 0;
+                        const val = hasScore ? Math.min(Math.round(s.score), 99) : null;
                         const priority =
-                            s.priority || (val >= 85 ? 'high' : val >= 70 ? 'medium' : 'low');
+                            s.priority || (hasScore && val >= 85 ? 'high' : hasScore && val >= 70 ? 'medium' : 'low');
                         const priorityText =
                             priority === 'high'
                                 ? 'عالية'
@@ -3293,14 +3052,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const scoreBadge = document.createElement('div');
                         scoreBadge.className = 'deep-score-badge';
-                        const scoreNum = document.createElement('div');
-                        scoreNum.className = 'deep-score-num';
-                        scoreNum.textContent = val;
-                        const scoreLabel = document.createElement('div');
-                        scoreLabel.className = 'deep-score-label';
-                        scoreLabel.textContent = 'درجة';
-                        scoreBadge.appendChild(scoreNum);
-                        scoreBadge.appendChild(scoreLabel);
+                        if (val === null) {
+                            scoreBadge.style.display = 'none';
+                        } else {
+                            const scoreNum = document.createElement('div');
+                            scoreNum.className = 'deep-score-num';
+                            scoreNum.textContent = val;
+                            const scoreLabel = document.createElement('div');
+                            scoreLabel.className = 'deep-score-label';
+                            scoreLabel.textContent = 'درجة';
+                            scoreBadge.appendChild(scoreNum);
+                            scoreBadge.appendChild(scoreLabel);
+                        }
 
                         header.appendChild(iconDiv);
                         header.appendChild(titleGroup);
@@ -3512,72 +3275,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             );
                         });
                     } else {
-                        if (srObj.hasSSL === false)
-                            weaknesses.push({
-                                title: 'ثغرة أمنية (SSL مفقود)',
-                                desc: isService
-                                    ? 'الزوار يتلقون رسالة (الموقع غير آمن) ويغادرون فوراً قبل التعرف على خدماتك.'
-                                    : 'كارثة حقيقية: الزوار يتلقون رسالة (الموقع غير آمن) من المتصفح ويغادرون فوراً قبل رؤية منتجاتك.',
-                                score: score - 20,
-                                icon: '🔓',
-                            });
-                        if (srObj.hasPixel === false)
-                            weaknesses.push({
-                                title: 'تجاهل البيكسل الإعلاني',
-                                desc: 'أنت تطلق إعلانات عمياء! بدون بيكسل لا يمكنك تتبع من اهتم بخدماتك أو إعادة استهدافه، مما يهدر ميزانيتك.',
-                                score: score - 15,
-                                icon: '👁️‍🗨️',
-                            });
-                        if (
-                            (srObj.website_scan ? srObj.website_scan.load_time_ms : null) &&
-                            (srObj.website_scan ? srObj.website_scan.load_time_ms : null) > 4000
-                        )
-                            weaknesses.push({
-                                title: 'بطء قاتل في التحميل',
-                                desc: isService
-                                    ? 'موقعك يستغرق أكثر من 4 ثواني للتحميل! إحصائياً، 50% من الزوار يغادرون إذا زاد التحميل عن 3 ثوانٍ.'
-                                    : 'متجرك يستغرق أكثر من 4 ثواني للتحميل! إحصائياً، 50% من الزوار يغادرون إذا زاد التحميل عن 3 ثوانٍ.',
-                                score: score - 12,
-                                icon: '🐢',
-                            });
-                        if (ig.is_business === false)
-                            weaknesses.push({
-                                title: 'حساب غير احترافي',
-                                desc: 'حسابك على انستقرام شخصي وليس تجارياً. هذا يحرمك من قراءة إحصاءات زوارك واستهدافهم إعلانياً.',
-                                score: score - 8,
-                                icon: '📱',
-                            });
-                        if (ig.engagement_rate && ig.engagement_rate < 0.01 && ig.followers > 1000)
-                            weaknesses.push({
-                                title: 'متابعين بلا تفاعل (موت الحساب)',
-                                desc: 'عدد متابعيك لا يعكس تفاعلاتك. الخوارزمية تعتبر حسابك ميتاً ولا تقترحه للعملاء الجدد.',
-                                score: score - 10,
-                                icon: '👻',
-                            });
-                        if (fb.has_ads === false)
-                            weaknesses.push({
-                                title: 'غياب التواجد الإعلاني',
-                                desc: isService
-                                    ? 'لا يوجد لك أي حملات نشطة في مكتبة الإعلانات. أنت تعتمد فقط على الحظ في جلب العملاء.'
-                                    : 'لا يوجد لك أي حملات نشطة في مكتبة الإعلانات. أنت تعتمد فقط على الحظ في جلب المبيعات.',
-                                score: score - 14,
-                                icon: '📉',
-                            });
-                        if (ws.has_checkout === false)
-                            weaknesses.push({
-                                title: isService ? 'صعوبة التواصل والطلب' : 'انهيار مسار الدفع',
-                                desc: isService
-                                    ? 'عدم وجود وسيلة واضحة وسريعة لطلب الخدمة يجعل العميل يتراجع في اللحظة الأخيرة.'
-                                    : 'عدم وجود صفحة إتمام شراء واضحة يجعل العميل يتراجع في اللحظة الأخيرة مما يرفع السلات المتروكة.',
-                                score: score - 11,
-                                icon: isService ? '☎️' : '🛒',
-                            });
-
-                        // No padding with generic weaknesses. Empty results are rendered as missing data.
+                        // No fallback fabrication: when AI returns no weaknesses,
+                        // we display "missing data" placeholder rather than synthesize
+                        // weaknesses locally with arithmetic scores (score-20, -15, etc).
+                        // Real weaknesses must come from Agent 5 (page_15_weaknesses).
                     }
 
                     // Sort by lowest score (worst weaknesses first)
-                    weaknesses.sort((a, b) => a.score - b.score);
+                    weaknesses.sort((a, b) => (a.score || 100) - (b.score || 100));
 
                     if (weaknesses.length === 0) {
                         appendMissingData(
@@ -3594,12 +3299,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // ═══════════════════════════════════════════════════════════
                     const buildDeepWeaknessCard = item => {
                         const w = item;
-                        const val = Math.max(Math.round(w.score || 30), 5);
+                        const hasScore = typeof w.score === 'number' && !isNaN(w.score) && w.score > 0;
+                        const val = hasScore ? Math.max(Math.round(w.score), 5) : null;
                         const priority =
                             w.priority ||
-                            (val <= 25
+                            (hasScore && val <= 25
                                 ? 'critical'
-                                : val <= 40
+                                : hasScore && val <= 40
                                 ? 'high'
                                 : val <= 60
                                 ? 'medium'
@@ -3664,14 +3370,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const scoreBadge = document.createElement('div');
                         scoreBadge.className = 'deep-score-badge';
-                        const scoreNum = document.createElement('div');
-                        scoreNum.className = 'deep-score-num';
-                        scoreNum.textContent = val;
-                        const scoreLabel = document.createElement('div');
-                        scoreLabel.className = 'deep-score-label';
-                        scoreLabel.textContent = 'خطورة';
-                        scoreBadge.appendChild(scoreNum);
-                        scoreBadge.appendChild(scoreLabel);
+                        if (val === null) {
+                            scoreBadge.style.display = 'none';
+                        } else {
+                            const scoreNum = document.createElement('div');
+                            scoreNum.className = 'deep-score-num';
+                            scoreNum.textContent = val;
+                            const scoreLabel = document.createElement('div');
+                            scoreLabel.className = 'deep-score-label';
+                            scoreLabel.textContent = 'خطورة';
+                            scoreBadge.appendChild(scoreNum);
+                            scoreBadge.appendChild(scoreLabel);
+                        }
 
                         header.appendChild(iconDiv);
                         header.appendChild(titleGroup);
