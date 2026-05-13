@@ -363,6 +363,13 @@ if (!empty($row['recommendations']) && empty($row['ai_report']['recommendations'
     $row['ai_report']['recommendations'] = $row['recommendations'];
 }
 
+// ── نقل hook_bank للجذر (E2 Mapping) ──
+if (!empty($aiReport['hook_bank'])) {
+    $row['hook_bank'] = !empty($row['hook_bank']) 
+        ? array_merge($row['hook_bank'], $aiReport['hook_bank']) 
+        : $aiReport['hook_bank'];
+}
+
 // ── حقول موحدة للـ Frontend ──────────────────────────────────
 $row['url']       = $row['website_url'] ?: $row['facebook_url'] ?: $row['instagram_url'] ?: $row['tiktok_url'] ?: $row['twitter_url'] ?: '';
 $row['full_name'] = $row['full_name']   ?: $row['company_name'] ?: '';
