@@ -1,3 +1,5 @@
+"use strict";
+
 // ============================================================
 // js/report-connect.js v2.0 — ربط كامل لجميع الصفحات الفرعية
 // P2-1: إصلاح الاسم (brand_name → full_name)
@@ -323,6 +325,8 @@ function animateRings() {
             requestAnimationFrame(step);
         });
 }
+
+"use strict";
 
 document.addEventListener('DOMContentLoaded', () => {
     // ── Wire print button (CSP-safe replacement for onclick="window.print()") ──
