@@ -101,6 +101,8 @@ $__normalizeActionItemsForRender = static function(array $items): array {
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$id) jsonError('معرّف التقييم غير صالح');
 
+try {
+
 $db   = getDB();
 $stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? LIMIT 1");
 $stmt->execute([$id]);
@@ -424,3 +426,20 @@ $row['_debug'] = [
 ];
 
 jsonOut($row);
+
+} catch (\Throwable $e) {
+    // Server-side guard: never leak stack traces to clients. Log details and
+    // return a stable JSON envelope so the frontend can show a clean error.
+    if (function_exists('error_log')) {
+        error_log('[result.php] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    }
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode(
+        ['error' => 'server_error', 'msg' => 'حدث خطأ داخلي'],
+        JSON_UNESCAPED_UNICODE
+    );
+    exit;
+}

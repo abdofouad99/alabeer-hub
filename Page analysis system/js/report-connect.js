@@ -178,139 +178,13 @@ function renderSafeLink(el, url, fallbackText) {
     }
 }
 
-function buildPublicAdsOverview(sr) {
-    const adsLib = (sr && (sr.ads_library || sr.ads)) || {};
-    const ads = Array.isArray(adsLib.ads) ? adsLib.ads : [];
-    const rawItems = Array.isArray(adsLib.raw_items) ? adsLib.raw_items : [];
-    const totalAds =
-        Number(
-            adsLib.total_ads ??
-                adsLib.total_count ??
-                adsLib.raw_count ??
-                ads.length ??
-                rawItems.length ??
-                0
-        ) || 0;
-    const activeAds = Number(adsLib.active_ads ?? adsLib.active_count ?? 0) || 0;
-    const stoppedAds = Math.max(totalAds - activeAds, 0);
-    const hasPixel = !!(sr && (sr.hasPixel || sr.has_fb_pixel || sr.pixel_found || sr.meta_pixel));
-    const realMetrics =
-        adsLib.real_metrics && typeof adsLib.real_metrics === 'object' ? adsLib.real_metrics : null;
-    const hasRealMetrics = !!(realMetrics && Object.keys(realMetrics).length > 0);
-    const spendVal = realMetrics && (realMetrics.spend ?? realMetrics.amount_spent);
-    const roasVal = realMetrics && (realMetrics.roas ?? realMetrics.purchase_roas);
-    const ctrVal = realMetrics && realMetrics.ctr;
-
-    const exactMetrics = hasRealMetrics
-        ? [
-              {
-                  title: 'الإنفاق الحقيقي',
-                  val: spendVal != null ? String(spendVal) : 'غير متوفر',
-                  status: 'من Meta Ads Manager',
-                  status_class: 'status-green',
-                  val_class: spendVal != null ? 'val-green' : 'val-yellow',
-                  desc: 'هذه القيمة تأتي من ربط Meta Ads Manager وليست من مكتبة الإعلانات العامة.',
-              },
-              {
-                  title: 'ROAS الحقيقي',
-                  val: roasVal != null ? String(roasVal) : 'غير متوفر',
-                  status: 'من الحساب الإعلاني',
-                  status_class: 'status-green',
-                  val_class: roasVal != null ? 'val-green' : 'val-yellow',
-                  desc: 'لا يتم تقدير العائد هنا. يظهر فقط إذا أرجعه الحساب الإعلاني المربوط.',
-              },
-              {
-                  title: 'CTR الحقيقي',
-                  val: ctrVal != null ? String(ctrVal) : 'غير متوفر',
-                  status: 'من الحساب الإعلاني',
-                  status_class: 'status-green',
-                  val_class: ctrVal != null ? 'val-green' : 'val-yellow',
-                  desc: 'مؤشر النقر يظهر من بيانات Meta المربوطة عند توفره.',
-              },
-          ]
-        : [
-              {
-                  title: 'الميزانية والعائد',
-                  val: 'غير متوفر',
-                  status: 'يتطلب ربط Meta Ads Manager',
-                  status_class: 'status-yellow',
-                  val_class: 'val-yellow',
-                  desc: 'مكتبة الإعلانات العامة تعرض وجود الإعلان ومحتواه، لكنها لا تعطي الإنفاق أو ROAS أو تكلفة النتيجة.',
-              },
-          ];
-
-    return {
-        score: totalAds > 0 ? (hasPixel ? 55 : 35) : 10,
-        status:
-            totalAds > 0 ? 'بيانات إعلانات عامة متاحة' : 'لا توجد إعلانات مؤكدة من البيانات العامة',
-        desc:
-            totalAds > 0
-                ? `تم العثور على ${totalAds} إعلان في البيانات العامة. الأرقام المالية لا تظهر إلا عند ربط Meta Ads Manager.`
-                : 'لم ترجع مكتبة الإعلانات العامة أي إعلان مؤكد لهذا التقرير.',
-        metrics: [
-            {
-                title: 'إجمالي الإعلانات المرصودة',
-                val: String(totalAds),
-                status: totalAds > 0 ? 'من مكتبة Meta العامة' : 'لا يوجد رصد',
-                status_class: totalAds > 0 ? 'status-green' : 'status-red',
-                val_class: totalAds > 0 ? 'val-green' : 'val-red',
-                desc: 'هذا العدد مبني على نتيجة السحب الفعلية من مكتبة الإعلانات أو بيانات Apify المحفوظة.',
-            },
-            {
-                title: 'الإعلانات النشطة',
-                val: activeAds ? String(activeAds) : totalAds ? 'غير محدد' : '0',
-                status: activeAds ? 'نشطة وقت السحب' : 'غير مؤكد',
-                status_class: activeAds ? 'status-green' : 'status-yellow',
-                val_class: activeAds ? 'val-green' : 'val-yellow',
-                desc:
-                    stoppedAds > 0
-                        ? `يوجد ${stoppedAds} إعلان غير نشط أو غير مصنف ضمن البيانات المتاحة.`
-                        : 'حالة النشاط تعرض فقط عندما ترجعها أداة السحب.',
-            },
-            ...exactMetrics,
-        ],
-        creative_pointers: [
-            {
-                type: totalAds > 0 ? 'green' : 'yellow',
-                icon: totalAds > 0 ? '✓' : '!',
-                title: totalAds > 0 ? 'محتوى إعلاني مرصود' : 'لا توجد نسخة إعلان مؤكدة',
-                desc:
-                    totalAds > 0
-                        ? 'يمكن تحليل الرسائل والكرياتيف من نصوص الإعلانات والصور المتاحة.'
-                        : 'لا يمكن تحليل الرسائل الإعلانية بدون إعلانات مرصودة.',
-            },
-            {
-                type: hasPixel ? 'green' : 'yellow',
-                icon: hasPixel ? '✓' : '!',
-                title: hasPixel ? 'Meta Pixel مؤكد من الفحص' : 'حالة Meta Pixel غير مؤكدة',
-                desc: hasPixel
-                    ? 'وجود البيكسل يساعد على قراءة مسار التحويل عند توفر بيانات الحساب.'
-                    : 'غياب تأكيد البيكسل لا يعني بالضرورة أنه غير موجود، لكنه غير مثبت في بيانات الفحص الحالية.',
-            },
-            {
-                type: hasRealMetrics ? 'green' : 'yellow',
-                icon: hasRealMetrics ? '✓' : '!',
-                title: hasRealMetrics ? 'أرقام Ads Manager متاحة' : 'الأرقام المالية غير متاحة',
-                desc: hasRealMetrics
-                    ? 'الصفحة ستعرض أرقام الحساب الإعلاني المربوط فقط.'
-                    : 'اربط Meta Ads Manager لعرض الإنفاق، تكلفة النتيجة، ROAS، والتحويلات.',
-            },
-        ],
-        strategy: {
-            desc: 'هذا عرض مبني على البيانات المؤكدة فقط:',
-            steps: hasRealMetrics
-                ? [
-                      'راجع الإنفاق والعائد من الحساب المربوط قبل أي قرار ميزانية.',
-                      'حلل آخر 30 إعلان من الرسائل والكرياتيف لتحديد الأنماط الرابحة.',
-                      'اربط نتائج الإعلانات بصفحة الهبوط للتحقق من جاهزية التحويل.',
-                  ]
-                : [
-                      'استخدم مكتبة الإعلانات لتحليل الرسائل والكرياتيف فقط.',
-                      'اربط Meta Ads Manager للحصول على الإنفاق، ROAS، CPA، والتحويلات.',
-                      'لا تعتمد على أي تقدير مالي قبل توفر بيانات الحساب الإعلاني.',
-                  ],
-        },
-    };
+function buildPublicAdsOverview() {
+    // Removed in favor of an explicit missing-data state in renderAdsSection.
+    // Previously this function fabricated a score of 55 / 35 / 10 based only on
+    // hasPixel + totalAds, which is not a real ads-performance signal. Per the
+    // "no-hardcoded-fallbacks" rule, scores like ROAS / CPA / quality must come
+    // from ads_analysis (API) or Meta Ads Manager — never from heuristics.
+    return null;
 }
 
 // ── Animation Helpers (Moved to top) ──
@@ -348,8 +222,6 @@ function animateRings() {
             requestAnimationFrame(step);
         });
 }
-
-"use strict";
 
 document.addEventListener('DOMContentLoaded', () => {
     // ── Wire print button (CSP-safe replacement for onclick="window.print()") ──
@@ -3547,41 +3419,71 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // ── 1. Overall bottleneck score + status colors/text ──
                 const bottleneckKey = journeyData.bottleneck_stage || 'trust';
-                const bottleneckScore =
+                const bottleneckStage =
                     journeyData.stages && journeyData.stages[bottleneckKey]
-                        ? journeyData.stages[bottleneckKey].score
-                        : 45;
+                        ? journeyData.stages[bottleneckKey]
+                        : null;
+                const hasBottleneckScore = !!(
+                    bottleneckStage &&
+                    bottleneckStage.score !== undefined &&
+                    bottleneckStage.score !== null &&
+                    !isNaN(Number(bottleneckStage.score))
+                );
 
-                if (jScoreEl) {
-                    jScoreEl.setAttribute('data-val', bottleneckScore);
-                    jScoreEl.textContent = bottleneckScore;
-                }
-                if (jCircleEl) {
-                    const color =
-                        bottleneckScore > 70
-                            ? 'var(--green)'
-                            : bottleneckScore > 40
-                            ? 'var(--yellow)'
-                            : 'var(--red)';
-                    jCircleEl.setAttribute('data-percent', bottleneckScore);
-                    jCircleEl.setAttribute('data-color', color);
-                }
-                if (jTitleEl) {
-                    if (bottleneckScore > 70) {
-                        jTitleEl.innerHTML = '✅ مسار سليم';
-                        jTitleEl.style.color = 'var(--green)';
-                    } else if (bottleneckScore > 40) {
-                        jTitleEl.innerHTML = '⚠️ يوجد انسداد';
-                        jTitleEl.style.color = 'var(--yellow)';
-                    } else {
-                        jTitleEl.innerHTML = '❌ نقطة اختناق حرجة';
-                        jTitleEl.style.color = 'var(--red)';
+                if (!hasBottleneckScore) {
+                    // No fake fallback (was: 45). Surface a clear missing-data state
+                    // for the bottleneck score, but keep per-stage rendering below
+                    // running so any stages that DO have valid AI scores still appear.
+                    if (jScoreEl) {
+                        jScoreEl.removeAttribute('data-val');
+                        jScoreEl.textContent = '—';
                     }
-                }
-                if (jDescEl && journeyData.psychological_diagnosis) {
-                    jDescEl.innerHTML =
-                        '<strong>التشخيص النفسي:</strong> ' +
-                        sanitize(journeyData.psychological_diagnosis);
+                    if (jCircleEl) {
+                        jCircleEl.setAttribute('data-percent', 0);
+                        jCircleEl.setAttribute('data-color', 'var(--text-gray)');
+                    }
+                    if (jTitleEl) {
+                        jTitleEl.innerHTML = '⚠️ بيانات الرحلة غير مكتملة';
+                        jTitleEl.style.color = 'var(--yellow)';
+                    }
+                    if (jDescEl) {
+                        jDescEl.innerHTML =
+                            'لم يرجع تحليل الذكاء الاصطناعي درجة لمرحلة الاختناق في قمع التحويل، لذلك لا يتم عرض رقم تقديري. أعد تشغيل التحليل لعرض نتيجة مؤكدة.';
+                    }
+                } else {
+                    const bottleneckScore = Number(bottleneckStage.score);
+
+                    if (jScoreEl) {
+                        jScoreEl.setAttribute('data-val', bottleneckScore);
+                        jScoreEl.textContent = bottleneckScore;
+                    }
+                    if (jCircleEl) {
+                        const color =
+                            bottleneckScore > 70
+                                ? 'var(--green)'
+                                : bottleneckScore > 40
+                                ? 'var(--yellow)'
+                                : 'var(--red)';
+                        jCircleEl.setAttribute('data-percent', bottleneckScore);
+                        jCircleEl.setAttribute('data-color', color);
+                    }
+                    if (jTitleEl) {
+                        if (bottleneckScore > 70) {
+                            jTitleEl.innerHTML = '✅ مسار سليم';
+                            jTitleEl.style.color = 'var(--green)';
+                        } else if (bottleneckScore > 40) {
+                            jTitleEl.innerHTML = '⚠️ يوجد انسداد';
+                            jTitleEl.style.color = 'var(--yellow)';
+                        } else {
+                            jTitleEl.innerHTML = '❌ نقطة اختناق حرجة';
+                            jTitleEl.style.color = 'var(--red)';
+                        }
+                    }
+                    if (jDescEl && journeyData.psychological_diagnosis) {
+                        jDescEl.innerHTML =
+                            '<strong>التشخيص النفسي:</strong> ' +
+                            sanitize(journeyData.psychological_diagnosis);
+                    }
                 }
 
                 // ── 2. Per-stage rendering — value + analysis from AI; bottleneck in RED ──
@@ -4508,203 +4410,60 @@ document.addEventListener('DOMContentLoaded', () => {
         let adsAnalysis = data.ads_analysis || liveAiAnalysis;
 
         if (!adsAnalysis) {
-            const hasAds =
-                (sr.ads_library && sr.ads_library.total_ads > 0) ||
-                (sr.facebook && sr.facebook.ads_count > 0);
-            const hasPixel = sr.hasPixel || false;
-            const adCount = sr.ads_library
-                ? sr.ads_library.total_ads
-                : sr.facebook
-                ? sr.facebook.ads_count
-                : 0;
+            // No fake/hardcoded scoring (was: 55 / 35 / 10 based on hasAds + hasPixel).
+            // If ads_analysis is not provided by the API and there is no live AI
+            // analysis, surface an explicit missing-data state for the score card
+            // and metrics. Never fabricate numbers.
+            const adsScoreEl = document.getElementById('adScoreBlock');
+            const adsMetricsHost = document.getElementById('adMetricsGrid');
+            const adsPointersHost = document.getElementById('adPointersGrid');
+            const adsStrategyDescEl = document.getElementById('adStrategyDesc');
+            const adsStrategyListEl = document.getElementById('adStrategyList');
 
-            if (hasAds) {
-                if (!hasPixel) {
-                    adsAnalysis = {
-                        score: 30,
-                        status: '🚨 هدر مالي خطير (بدون تتبع)',
-                        desc: `تم اكتشاف ${adCount} إعلانات نشطة، لكنك لا تمتلك بيكسل تتبع! أنت تحرق أموالك في الهواء ولا تجمع أي بيانات.`,
-                        metrics: [
-                            {
-                                title: 'العائد على الإنفاق (ROAS)',
-                                val: 'مجهول',
-                                status: '▼ نزيف مستمر',
-                                status_class: 'status-red',
-                                val_class: 'val-red',
-                                desc: 'بسبب غياب التتبع (Pixel)، لا يمكن لفيسبوك تحسين العائد. أنت تدفع للظهور فقط.',
-                            },
-                            {
-                                title: 'تكلفة النقرة (CPC)',
-                                val: 'مرتفعة',
-                                status: '▶ غير محسنة',
-                                status_class: 'status-yellow',
-                                val_class: 'val-yellow',
-                                desc: 'الخوارزمية لا تعرف من يشتري، لذلك تجلب لك زيارات عشوائية بتكلفة عالية.',
-                            },
-                            {
-                                title: 'البيانات المجمعة',
-                                val: '0%',
-                                status: '▼ ضياع الأصول',
-                                status_class: 'status-red',
-                                val_class: 'val-red',
-                                desc: 'كل زائر لم يشتري ضاع للأبد، لا يمكنك إعادة استهدافه.',
-                            },
-                        ],
-                        creative_pointers: [
-                            {
-                                type: 'red',
-                                icon: '❌',
-                                title: 'كارثة التتبع (Pixel)',
-                                desc: 'تشغيل إعلانات بدون بيكسل مثل القيادة معصوب العينين. توقف فوراً.',
-                            },
-                            {
-                                type: 'yellow',
-                                icon: '⚠️',
-                                title: 'غياب الداتا (Data Loss)',
-                                desc: 'المنافسون يبنون قواعد بيانات لعملائهم، وأنت تدفع لفيسبوك دون أن تحتفظ بشيء.',
-                            },
-                            {
-                                type: 'red',
-                                icon: '❌',
-                                title: 'محتوى غير مخصص',
-                                desc: 'بسبب غياب التتبع، إعلاناتك تظهر للجميع (المهتم وغير المهتم).',
-                            },
-                        ],
-                        strategy: {
-                            desc: 'تدخل جراحي عاجل مطلوب:',
-                            steps: [
-                                '<strong>إيقاف الإعلانات:</strong> أوقف جميع حملاتك الممولة هذه اللحظة.',
-                                '<strong>زرع بيكسل التتبع:</strong> تركيب Meta Pixel وإعداد أحداث الشراء (Purchase Events).',
-                                '<strong>إطلاق حملات ذكية:</strong> إعادة إطلاق الإعلانات بهدف (التحويل Conversion) وليس (النقرات Traffic).',
-                            ],
-                        },
-                    };
-                } else {
-                    adsAnalysis = {
-                        score: 55,
-                        status: '⚠️ أداء متوسط (يحتاج تحسين)',
-                        desc: `تم رصد ${adCount} إعلانات نشطة. التتبع موجود، لكن المادة الإعلانية تحتاج لتحسين لرفع العائد.`,
-                        metrics: [
-                            {
-                                title: 'معدل التحويل',
-                                val: 'غير متوفر',
-                                status: 'يتطلب Ads Manager',
-                                status_class: 'status-yellow',
-                                val_class: 'val-yellow',
-                                desc: 'لا يتم عرض معدل تحويل تقديري بدون بيانات الحساب الإعلاني المربوط.',
-                            },
-                            {
-                                title: 'حالة الحملة',
-                                val: 'نشطة',
-                                status: '▲ مستقرة',
-                                status_class: 'status-green',
-                                val_class: 'val-green',
-                                desc: 'الحملات تعمل والبيانات تُجمع بشكل صحيح.',
-                            },
-                            {
-                                title: 'الاستحواذ (CPA)',
-                                val: 'مكلف',
-                                status: '▶ يحتاج تقليل',
-                                status_class: 'status-yellow',
-                                val_class: 'val-yellow',
-                                desc: 'تكلفة شراء العميل أعلى من الطبيعي بسبب ضعف الـ CTA.',
-                            },
-                        ],
-                        creative_pointers: [
-                            {
-                                type: 'yellow',
-                                icon: '⚠️',
-                                title: 'تكرار المحتوى (Ad Fatigue)',
-                                desc: 'نفس الإعلانات تظهر للجمهور، مما يسبب ملل وارتفاع في التكلفة.',
-                            },
-                            {
-                                type: 'red',
-                                icon: '❌',
-                                title: 'العرض (Offer) غير كافي',
-                                desc: 'العميل يحتاج سبباً مقنعاً للشراء (الآن). أضف عنصر الاستعجال (Scarcity).',
-                            },
-                            {
-                                type: 'green',
-                                icon: '✅',
-                                title: 'التتبع مفعل',
-                                desc: 'ميزة ممتازة تتيح لنا إعادة استهداف من زار الموقع ولم يشتري.',
-                            },
-                        ],
-                        strategy: {
-                            desc: 'لا توجد أرقام مالية مؤكدة في هذا المسار:',
-                            steps: [
-                                '<strong>تحليل الرسائل:</strong> استخدم نصوص الإعلانات المرصودة لتحديد الزوايا المتكررة.',
-                                '<strong>ربط الحساب:</strong> اربط Meta Ads Manager قبل اعتماد أي قرار ميزانية أو خصومات.',
-                                '<strong>صفحة الهبوط:</strong> تحقق من جاهزية الصفحة من بيانات الفحص قبل توسيع الحملة.',
-                            ],
-                        },
-                    };
-                }
-            } else {
-                adsAnalysis = {
-                    score: 10,
-                    status: '💤 سبات عميق (لا يوجد إعلانات)',
-                    desc: 'لم نتمكن من رصد أي نشاط إعلاني حالي لعلامتك التجارية. أنت تترك الساحة فارغة للمنافسين.',
-                    metrics: [
-                        {
-                            title: 'التواجد الإعلاني',
-                            val: 'معدوم',
-                            status: '▼ خطورة',
-                            status_class: 'status-red',
-                            val_class: 'val-red',
-                            desc: 'الاعتماد الكلي على الزيارات العضوية (Organic) يحد من نموك بشكل كارثي.',
-                        },
-                        {
-                            title: 'النمو الشهري',
-                            val: 'بطيء',
-                            status: '▼ تحت المعدل',
-                            status_class: 'status-red',
-                            val_class: 'val-red',
-                            desc: 'بدون وقود (الإعلانات)، لن تتمكن من مضاعفة مبيعاتك في وقت قصير.',
-                        },
-                        {
-                            title: 'تكلفة الفرصة الضائعة',
-                            val: 'عالية جداً',
-                            status: '▼ خسارة غير مرئية',
-                            status_class: 'status-red',
-                            val_class: 'val-red',
-                            desc: 'منافسوك يستحوذون على عملائك المحتملين يومياً عبر حملاتهم.',
-                        },
-                    ],
-                    creative_pointers: [
-                        {
-                            type: 'red',
-                            icon: '❌',
-                            title: 'غياب الظهور',
-                            desc: 'عميلك يبحث عن منتجك، ويرى إعلانات منافسك ويشتري منه.',
-                        },
-                        {
-                            type: 'yellow',
-                            icon: '⚠️',
-                            title: 'بطء مقلق',
-                            desc: 'النمو العضوي ممتاز ولكنه لا يبني إمبراطورية تجارية بسرعة.',
-                        },
-                        {
-                            type: 'red',
-                            icon: '❌',
-                            title: 'لا يوجد جمع بيانات',
-                            desc: 'لأنك لا تشغل إعلانات، بيكسلات التتبع الخاصة بك لا تتعلم من هو عميلك المثالي.',
-                        },
-                    ],
-                    strategy: {
-                        desc: 'لا توجد بيانات إعلانات مؤكدة لهذا التقرير:',
-                        steps: [
-                            '<strong>التحقق أولاً:</strong> اسحب مكتبة الإعلانات أو اربط الحساب الإعلاني قبل اقتراح ميزانية.',
-                            '<strong>بناء الجمهور:</strong> لا يتم اقتراح حملة محددة بدون هدف تجاري وبيانات صفحة هبوط.',
-                            '<strong>العرض:</strong> لا يتم اقتراح خصم أو عرض ثابت بدون بيانات المنتج والهامش.',
-                        ],
-                    },
-                };
+            const scoreRing = document.getElementById('adScoreRing');
+            const scoreNum = document.getElementById('adScoreNum');
+            const scoreTitle = document.getElementById('adScoreTitle');
+            const scoreDesc = document.getElementById('adScoreDesc');
+            if (scoreRing) {
+                scoreRing.setAttribute('data-percent', 0);
+                scoreRing.setAttribute('data-color', 'var(--text-gray)');
             }
-        }
+            if (scoreNum) {
+                scoreNum.removeAttribute('data-val');
+                scoreNum.textContent = '—';
+            }
+            if (scoreTitle) {
+                scoreTitle.textContent = 'بيانات الإعلانات غير متوفرة';
+                scoreTitle.style.color = 'var(--yellow)';
+            }
+            if (scoreDesc) {
+                scoreDesc.textContent =
+                    'لم يرجع هذا المحور تحليل إعلانات مؤكد من الـ API لهذا التقرير، لذلك لا يتم عرض درجة أو مؤشرات تقديرية.';
+            }
+            if (adsMetricsHost) {
+                adsMetricsHost.innerHTML = missingDataHtml(
+                    'مؤشرات الإعلانات غير متوفرة',
+                    'لم يرجع تحليل ads_analysis من الـ API، لذلك لا يتم عرض ROAS أو CPA أو معدل تحويل تقديري. أعد تشغيل التحليل أو اربط Meta Ads Manager لعرض أرقام مؤكدة.'
+                );
+            }
+            if (adsPointersHost) {
+                adsPointersHost.innerHTML = missingDataHtml(
+                    'تحليل الكرياتيف غير متوفر',
+                    'لم تتوفر مؤشرات إبداعية مؤكدة من الـ API. لن يتم عرض ملاحظات عامة أو افتراضية.'
+                );
+            }
+            if (adsStrategyDescEl) {
+                adsStrategyDescEl.textContent =
+                    'لا توجد استراتيجية إعلانية موصى بها بدون بيانات ads_analysis مؤكدة.';
+            }
+            if (adsStrategyListEl) {
+                adsStrategyListEl.innerHTML = '';
+            }
+            // Keep adsScoreEl reference for code that may toggle visibility — no-op if absent.
+            void adsScoreEl;
 
-        if (!data.ads_analysis && !liveAiAnalysis) {
-            adsAnalysis = buildPublicAdsOverview(sr);
+            // Continue to the Ad Gallery / detailed-ads / actual-ads rendering below
+            // so that any real ads_library data we DO have is still shown.
         }
 
         if (adsAnalysis) {

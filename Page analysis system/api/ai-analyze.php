@@ -1780,7 +1780,12 @@ function detectPageType(array $data): array
     $topType  = array_key_first($scores);
     $topScore = $scores[$topType];
     $total    = array_sum($scores) ?: 1;
-    $confidence = min(100, (int)(($topScore / $total) * 200));
+    $ratio    = ($topScore / $total) * 200;
+    if (!is_finite($ratio)) {
+        // حماية ضد القسمة الشاذة (NaN/INF) إذا تسربت قيم غير رقمية
+        $ratio = 0.0;
+    }
+    $confidence = min(100, (int)$ratio);
 
     $typeMap = [
         'agency'     => 'Digital Marketing Agency',
