@@ -627,42 +627,53 @@ function scanInstagramPublic(string $url, array $cfg = []): array {
 
     if (!$username) return $data;
 
-    // محاولة جلب بيانات JSON من IG
-    $apiUrl = "https://www.instagram.com/api/v1/users/web_profile_info/?username={$username}";
-    $headers = [
-        'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-        'Accept: application/json',
-        'X-IG-App-ID: 936619743392459',
-        'Referer: https://www.instagram.com/',
-    ];
-    $json = fetchJson($apiUrl, 12, $headers);
+    // ── ملاحظة: web_profile_info endpoint محجوب من Instagram منذ 2023 ──
+    // ── (يتطلب CSRF token + cookies). نعتمد فقط على HTML public scraping. ──
+    // ── HTML fallback يعمل في ~30-50% من الحالات (لو IP ليس datacenter). ──
+    $data['accessible'] = false;
+    $data['error']      = 'Instagram يتطلب Apify token — Public scraping محجوب جزئياً من Instagram.';
 
-    if ($json && isset($json['data']['user'])) {
-        $u = $json['data']['user'];
-        $data['accessible'] = true;
-        $data['followers']  = $u['edge_followed_by']['count'] ?? null;
-        $data['following']  = $u['edge_follow']['count'] ?? null;
-        $data['posts_count']= $u['edge_owner_to_timeline_media']['count'] ?? null;
-        $data['bio']        = $u['biography'] ?? '';
-        $data['bio_length'] = mb_strlen($data['bio']);
-        $data['has_link']   = !empty($u['external_url']);
-        $data['website']    = $u['external_url'] ?? '';
-        $data['is_verified']= $u['is_verified'] ?? false;
-        $data['is_business']= $u['is_business_account'] ?? false;
-        $data['has_reels']  = !empty($u['is_eligible_for_reels_remixing']);
-    } else {
-        // fallback: scraping HTML
-        $html = fetchHtml("https://www.instagram.com/{$username}/", 12);
-        if ($html) {
+    $html = fetchHtml("https://www.instagram.com/{$username}/", 12);
+    if ($html) {
+        // followers (HTML JSON embedded)
+        if (preg_match('/"edge_followed_by":\s*\{\s*"count":\s*(\d+)/u', $html, $mF)) {
+            $data['followers']  = (int)$mF[1];
             $data['accessible'] = true;
-            preg_match('/"edge_followed_by":\{"count":(\d+)\}/', $html, $mF);
-            if ($mF) $data['followers'] = (int)$mF[1];
-            preg_match('/"biography":"([^"]+)"/i', $html, $mBio);
-            if ($mBio) {
-                $data['bio'] = $mBio[1];
-                $data['bio_length'] = mb_strlen($data['bio']);
+            unset($data['error']);
+        }
+        // following
+        if (preg_match('/"edge_follow":\s*\{\s*"count":\s*(\d+)/u', $html, $mFol)) {
+            $data['following'] = (int)$mFol[1];
+        }
+        // posts count
+        if (preg_match('/"edge_owner_to_timeline_media":\s*\{\s*"count":\s*(\d+)/u', $html, $mP)) {
+            $data['posts_count'] = (int)$mP[1];
+        }
+        // biography
+        if (preg_match('/"biography":\s*"((?:[^"\\\\]|\\\\.)*)"/u', $html, $mBio)) {
+            // فك escape الـ JSON (e.g. \u0623)
+            $bioRaw = '"' . $mBio[1] . '"';
+            $bioDecoded = json_decode($bioRaw);
+            if (is_string($bioDecoded)) {
+                $data['bio']        = $bioDecoded;
+                $data['bio_length'] = mb_strlen($bioDecoded);
             }
-            $data['is_verified'] = (bool)preg_match('/"is_verified":true/i', $html);
+        }
+        // verified
+        if (preg_match('/"is_verified":\s*true/u', $html)) {
+            $data['is_verified'] = true;
+        }
+        // business
+        if (preg_match('/"is_business_account":\s*true/u', $html)) {
+            $data['is_business'] = true;
+        }
+        // external URL (website)
+        if (preg_match('/"external_url":\s*"((?:[^"\\\\]|\\\\.)+)"/u', $html, $mU)) {
+            $urlDecoded = json_decode('"' . $mU[1] . '"');
+            if (is_string($urlDecoded) && $urlDecoded !== '') {
+                $data['website']  = $urlDecoded;
+                $data['has_link'] = true;
+            }
         }
     }
 
