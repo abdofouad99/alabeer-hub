@@ -124,5 +124,18 @@ return [
     'app' => [
         'env'   => $get('APP_ENV', 'production'),
         'debug' => filter_var($get('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN),
+
+        // ── CORS allowlist ──────────────────────────────────
+        // قائمة الأصول (origins) المسموح لها بالوصول للـ APIs.
+        // setCors() في api/db.php تعكس Origin فقط إذا كان موجوداً
+        // في هذه القائمة، وإلا لا تُرسل أي Access-Control-Allow-Origin
+        // وبذلك يفشل أي طلب cross-origin من مواقع غير مُصرَّح بها.
+        // أضِف الـ origins الإنتاجية + أصول التطوير المحلي.
+        'cors' => [
+            'allowed_origins' => [
+                'https://yourdomain.com',
+                'https://alabeer.local:10004',  // local dev
+            ],
+        ],
     ],
 ];

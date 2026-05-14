@@ -4,6 +4,7 @@
 // GET /api/status.php?id=123
 // يرجع: status, scan_step, score, tier, scan_error
 // ============================================================
+$cfg = require __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 setCors();
 header('Content-Type: application/json; charset=utf-8');

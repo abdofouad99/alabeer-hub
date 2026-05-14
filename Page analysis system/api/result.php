@@ -7,6 +7,7 @@
 // تُكمل التطبيع الذي يحدث في api/ai-analyze.php (PR #8) لكن تنطبق على
 // السجلات القديمة المخزّنة قبل #8 (strengths/weaknesses كـ kalimat).
 // ============================================================
+$cfg = require __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/page-scan.php';
 setCors();

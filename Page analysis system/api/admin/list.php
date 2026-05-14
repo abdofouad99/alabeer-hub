@@ -4,6 +4,7 @@
 // GET /api/admin/list.php?limit=200&q=keyword
 // ============================================================
 require_once __DIR__ . '/middleware.php';
+$cfg = require __DIR__ . '/../config.php';
 setCors();
 requireAdmin();
 

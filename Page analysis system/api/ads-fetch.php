@@ -4,14 +4,13 @@
 // التحليل: OpenAI — مع تحليل محلي احتياطي فقط عند تعذر الوصول
 // البيانات: Apify (إعلانات) + Meta Ads Library API + Public Scraping
 // ============================================================
-header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST');
-
 $cfg    = require __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/logger.php';     // ✅ تحميل دوال التسجيل
 require_once __DIR__ . '/apify-scraper.php';   // for getValidApifyToken()
+
+header('Content-Type: application/json; charset=utf-8');
+setCors();
 
 $envPath = __DIR__ . '/../.env';
 $env     = file_exists($envPath) ? parse_ini_file($envPath) : [];

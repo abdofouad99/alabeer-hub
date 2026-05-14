@@ -4,6 +4,7 @@
 // يقوم بتشغيل التحليل الطويل بشكل منفصل لتجنب مشاكل Timeout
 // يتم استدعاؤه من المتصفح (analyzing.html) مباشرة بعد submit
 // ============================================================
+$cfg = require __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/analyze.php';
 
