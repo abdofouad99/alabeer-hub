@@ -606,7 +606,7 @@ function scanInstagramPublic(string $url, array $cfg = []): array {
     }
 
     // استخراج username
-    preg_match('/instagram\.com\/([^\/\?]+)/i', $url, $mUser);
+    preg_match('/instagram\.com\/(?!p\/|reel\/|tv\/|stories\/|explore|accounts)([a-zA-Z0-9._]+)/i', $url, $mUser);
     $username = $mUser[1] ?? '';
 
     $data = [

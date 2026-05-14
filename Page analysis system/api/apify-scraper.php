@@ -661,33 +661,84 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
     if ($result === null) return ['success' => false, 'error' => 'انتهت مهلة Instagram Scraper'];
     if (empty($result)) return ['success' => false, 'error' => 'لا بيانات Instagram'];
 
-    // أول عنصر يحتوي على بيانات المنشور مع ownerFullName/ownerUsername
-    $firstPost = $result[0] ?? [];
-    $posts     = $result;   // كل عنصر = منشور
+    // ── الكشف الذكي: هل الـ result يحوي profile مستقل + posts منفصلة؟ ──
+    // apify/instagram-scraper الجديد: profile object + post items
+    // shu8hvrXbJbY3Eb9W القديم: post items فقط مع owner* fields
+    $profile = null;
+    $posts   = [];
 
-    // استخراج بيانات الحساب من ownerFullName / ownerId / meta
-    $igUser    = $firstPost['ownerUsername']  ?? $firstPost['owner']['username']   ?? $username;
-    $fullName  = $firstPost['ownerFullName']  ?? $firstPost['owner']['full_name']  ?? '';
-    $followers = $firstPost['ownerFollowersCount'] ?? $firstPost['owner']['edge_followed_by']['count'] ?? null;
-    $following = $firstPost['ownerFollowingCount'] ?? null;
-    $postsTotal= $firstPost['ownerPostsCount']     ?? count($posts);
-    $bio       = $firstPost['ownerBiography']      ?? '';
-    $website   = $firstPost['ownerExternalUrl']    ?? '';
-    $verified  = $firstPost['ownerIsVerified']     ?? false;
-    $picUrl    = $firstPost['ownerProfilePicUrl']  ?? '';
+    foreach ($result as $item) {
+        if (!is_array($item)) continue;
+        $hasFollowers = isset($item['followersCount']) || isset($item['followers']);
+        $hasUsername  = !empty($item['username']);
+        $isPostItem   = isset($item['caption']) || isset($item['likesCount'])
+                      || isset($item['shortCode']) || isset($item['takenAtTimestamp']);
 
-    // حساب متوسطات أدق بما يشمل Saves
-    $totalLikes   = 0; $totalComments = 0; $totalViews = 0;
-    $reelsCount   = 0; $savesTotal = 0;
-    foreach ($posts as $p) {
-        $totalLikes    += (int)($p['likesCount']    ?? $p['likes']    ?? 0);
-        $totalComments += (int)($p['commentsCount'] ?? $p['comments'] ?? 0);
-        $totalViews    += (int)($p['videoViewCount'] ?? 0);
-        $savesTotal    += (int)($p['savesCount']    ?? $p['saves']    ?? 0);
-        $t = strtolower($p['type'] ?? $p['mediaType'] ?? '');
-        if (str_contains($t, 'video') || str_contains($t, 'reel')) $reelsCount++;
+        if ($profile === null && $hasFollowers && $hasUsername && !$isPostItem) {
+            $profile = $item;
+            // إذا الـ profile يحوي latestPosts، استخرجها
+            if (!empty($item['latestPosts']) && is_array($item['latestPosts'])) {
+                $posts = $item['latestPosts'];
+            }
+        } elseif ($isPostItem) {
+            $posts[] = $item;
+        }
     }
-    $cnt = max(count($posts), 1);
+
+    // ── Fallback: إذا لم نجد profile منفصل، schema قديم (post-level ownerXxx) ──
+    if ($profile === null) {
+        $firstPost = $result[0] ?? [];
+        $profile = [
+            'username'        => $firstPost['ownerUsername']       ?? $firstPost['owner']['username']  ?? $username,
+            'fullName'        => $firstPost['ownerFullName']       ?? $firstPost['owner']['full_name'] ?? '',
+            'followersCount'  => $firstPost['ownerFollowersCount'] ?? $firstPost['owner']['edge_followed_by']['count'] ?? null,
+            'followsCount'    => $firstPost['ownerFollowingCount'] ?? null,
+            'postsCount'      => $firstPost['ownerPostsCount']     ?? null,
+            'biography'       => $firstPost['ownerBiography']      ?? '',
+            'externalUrl'     => $firstPost['ownerExternalUrl']    ?? '',
+            'verified'        => $firstPost['ownerIsVerified']     ?? false,
+            'profilePicUrl'   => $firstPost['ownerProfilePicUrl']  ?? '',
+        ];
+        $posts = $result;
+    }
+
+    // ── استخراج بيانات الحساب (متعدد المسميات) ──
+    $igUser    = $profile['username']        ?? $username;
+    $fullName  = $profile['fullName']        ?? $profile['full_name']       ?? '';
+    $followers = $profile['followersCount']  ?? $profile['followers']       ?? null;
+    $following = $profile['followsCount']    ?? $profile['followingCount']  ?? null;
+    $postsTotal= $profile['postsCount']      ?? $profile['posts_count']     ?? count($posts);
+    $bio       = $profile['biography']       ?? $profile['bio']             ?? '';
+    $website   = $profile['externalUrl']     ?? $profile['external_url']    ?? '';
+    $verified  = (bool)($profile['verified'] ?? $profile['isVerified']      ?? false);
+    $picUrl    = $profile['profilePicUrl']   ?? $profile['profile_pic_url'] ?? '';
+
+    // ── فلتر المنشورات الحقيقية (يستبعد profile لو دخل بالخطأ — يصلح C6) ──
+    $realPosts = array_values(array_filter($posts, function($p) {
+        return is_array($p) && (
+            isset($p['likesCount']) || isset($p['commentsCount']) ||
+            isset($p['caption'])    || isset($p['shortCode']) ||
+            isset($p['type'])
+        );
+    }));
+
+    // ── حساب المتوسطات على المنشورات الحقيقية فقط ──
+    $totalLikes = $totalComments = $totalViews = $savesTotal = 0;
+    $reelsCount = 0;
+    $hasReels   = false;
+
+    foreach ($realPosts as $p) {
+        $totalLikes    += (int)($p['likesCount']     ?? $p['likes']        ?? 0);
+        $totalComments += (int)($p['commentsCount']  ?? $p['comments']     ?? 0);
+        $totalViews    += (int)($p['videoViewCount'] ?? $p['videoPlayCount'] ?? $p['playCount'] ?? 0);
+        $savesTotal    += (int)($p['savesCount']     ?? $p['saves']        ?? 0);
+        $t = strtolower($p['type'] ?? $p['productType'] ?? $p['mediaType'] ?? '');
+        if (str_contains($t, 'video') || str_contains($t, 'reel') || str_contains($t, 'clips')) {
+            $reelsCount++;
+            $hasReels = true;
+        }
+    }
+    $cnt = max(count($realPosts), 1);
     $avgLikes    = round($totalLikes    / $cnt, 1);
     $avgComments = round($totalComments / $cnt, 1);
     $avgSaves    = round($savesTotal    / $cnt, 1);
@@ -713,12 +764,13 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
         'avg_saves'        => $avgSaves,          // ✅ جديد
         'avg_video_views'  => $avgViews,          // ✅ جديد
         'reels_count'      => $reelsCount,        // ✅ جديد
+        'has_reels'        => $hasReels,
         'engagement_rate'  => $engRate,
-        'top_post'         => getTopIGPost($posts),
-        'deep_analysis'    => analyzeDeepContent($posts),
-        'posts_per_week'   => calcPostsPerWeek($posts),
-        'last_post_days'   => calcLastPostDays($posts),
-        'latest_posts'     => array_slice($posts, 0, 30),
+        'top_post'         => getTopIGPost($realPosts),
+        'deep_analysis'    => analyzeDeepContent($realPosts),
+        'posts_per_week'   => calcPostsPerWeek($realPosts),
+        'last_post_days'   => calcLastPostDays($realPosts),
+        'latest_posts'     => array_slice($realPosts, 0, 30),
     ];
 }
 
