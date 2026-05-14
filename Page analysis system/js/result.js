@@ -615,12 +615,13 @@ function copyLink(btn) {
 // ── MAIN ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   const id = new URLSearchParams(location.search).get('id');
+  const rToken = new URLSearchParams(location.search).get('token') || sessionStorage.getItem('last_assessment_token') || '';
   if (!id) { showError('معرّف التقييم غير موجود في الرابط'); return; }
 
   document.getElementById('waBtn').href = 'https://wa.me/967739537053?text=' + encodeURIComponent('السلام عليكم، حصلت على تقريري من بصمة النمو وأريد خطة تسويقية كاملة.');
 
   try {
-    const res  = await fetch(`api/result.php?id=${encodeURIComponent(id)}`);
+    const res  = await fetch('api/result.php?id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(rToken));
     let data = await res.json();
     data = preferFinalReportData(data);
     if (!res.ok) throw new Error(data.error || 'خطأ غير معروف');

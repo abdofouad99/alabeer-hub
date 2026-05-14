@@ -635,14 +635,24 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
 
     $profileUrl = 'https://www.instagram.com/' . $username . '/';
 
-    $input = json_encode([
-        'resultsType'  => 'posts',
-        'directUrls'   => [$profileUrl],
-        'resultsLimit' => 100,
-        'searchType'   => 'hashtag',
-        'searchLimit'  => 10,
-        'addParentData'=> true,   // يُضيف بيانات الحساب لكل منشور
-    ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
+    if (strpos($actorId, 'apify~instagram-profile-scraper') !== false) {
+        // Schema for apify~instagram-profile-scraper
+        $inputData = [
+            'usernames'    => [$username],
+            'resultsLimit' => 100
+        ];
+    } else {
+        // Original schema for shu8hvrXbJbY3Eb9W
+        $inputData = [
+            'resultsType'  => 'posts',
+            'directUrls'   => [$profileUrl],
+            'resultsLimit' => 100,
+            'searchType'   => 'hashtag',
+            'searchLimit'  => 10,
+            'addParentData'=> true,
+        ];
+    }
+    $input = json_encode($inputData, JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
 
     $runId = _apifyStartRun($actorId, $input, $token);
     if (!$runId) return ['success' => false, 'error' => 'فشل تشغيل Instagram Scraper'];

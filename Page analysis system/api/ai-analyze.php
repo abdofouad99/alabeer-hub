@@ -142,9 +142,9 @@ function runOpenAIAnalysis(array $data, array $cfg, bool $forceRefresh = false):
 
 function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false): array
 {
-    // ── محاولة Multi-Agent System أولاً ──────────────────────
-    $geminiKey = getGeminiKey($cfg);
-    if (!empty($geminiKey) && function_exists('runMultiAgentAnalysis')) {
+    // ── محاولة Multi-Agent System (الآن عبر OpenAI) ──────────
+    $openAIKey = $cfg['apis']['openai_key'] ?? '';
+    if (!empty($openAIKey) && function_exists('runMultiAgentAnalysis')) {
         // ── Cache check ──
         $cacheKey = 'agents_' . md5(($data['id'] ?? 'none') . '_' . ($data['score'] ?? 0));
         if (!$forceRefresh) {
@@ -157,7 +157,7 @@ function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false):
         try {
             $agentData = buildAgentInputData($data);
             $result = runMultiAgentAnalysis($agentData, [
-                'apiKey'      => $geminiKey,
+                'apiKey'      => $openAIKey,
                 'maxRetries'  => 1,
                 'retryDelay'  => 3,
                 'logCallback' => fn($msg) => logError('Agent: ' . $msg),
@@ -168,15 +168,15 @@ function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false):
                 $result['strengths']       = $result['page_14_strengths'] ?? [];
                 $result['weaknesses']      = $result['page_15_weaknesses'] ?? [];
                 $result['recommendations'] = $result['page_16_recommendations'] ?? [];
-                $result['source']          = 'gemini_agents';
+                $result['source']          = 'openai_agents';
                 cacheSet($cacheKey, $result, 3600);
                 return $result;
             }
         } catch (\Throwable $e) {
-            logError('Multi-agent failed — falling back to OpenAI', ['error' => $e->getMessage()]);
+            logError('Multi-agent failed — falling back to single OpenAI request', ['error' => $e->getMessage()]);
         }
     }
-    // ── Fallback إلى OpenAI ───────────────────────────────────
+    // ── Fallback إلى OpenAI كطلب واحد ────────────────────────
     return runOpenAIAnalysis($data, $cfg, $forceRefresh);
 }
 

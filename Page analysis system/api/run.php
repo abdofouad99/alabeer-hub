@@ -33,14 +33,25 @@ register_shutdown_function(function() {
 });
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+$token = trim((string)($_GET['token'] ?? ''));
 if (!$id) {
     jsonError('معرّف غير صالح');
+}
+if ($token === '') {
+    jsonError('لم يُعثر على التقييم', 404);
 }
 
 // يمكن إضافة آلية لمنع التشغيل المزدوج إذا لزم الأمر،
 // لكن الدالة runAnalysis تتحقق إن كان status = 'running'
 
 $db = getDB();
+
+// ── فحص token قبل تشغيل التحليل (منع استهلاك موارد بـ IDOR) ──
+$stmt = $db->prepare("SELECT id FROM assessments WHERE id = ? AND report_token = ? LIMIT 1");
+$stmt->execute([$id, $token]);
+if (!$stmt->fetch()) {
+    jsonError('لم يُعثر على التقييم', 404);
+}
 
 // Set global for shutdown handler
 $GLOBALS['analysis_id'] = $id;

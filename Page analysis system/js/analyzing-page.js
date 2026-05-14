@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setProgress(100);
     if (msg) msg.textContent = 'التقرير جاهز! جاري توجيهك...';
     setTimeout(function() {
-      window.location.href = 'report.html?id=' + assessmentId;
+      window.location.href = 'report.html?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || '');
     }, 1000);
   }
 
@@ -159,6 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Save id to sessionStorage for recovery
       sessionStorage.setItem('last_assessment_id', assessmentId);
+      sessionStorage.setItem('last_assessment_token', data.token || '');
 
       // If analysis already done (fast path)
       if (data.score != null && data.tier) {
@@ -166,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       // تشغيل التحليل في الخلفية
-      fetch('api/run.php?id=' + assessmentId).catch(function(e) { console.log('Run triggered', e); });
+      fetch('api/run.php?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || '')).catch(function(e) { console.log('Run triggered', e); });
 
       // Phase 2: Start polling
       phase2_poll();
@@ -192,11 +193,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // Timeout guard
       if (Date.now() - startTime > MAX_WAIT_MS) {
         clearInterval(pollTimer);
-        showError('انتهت مهلة التحليل (10 دقائق). التقرير الأولي قد يكون جاهزاً — <a href="report.html?id=' + assessmentId + '" style="color:#f58e1a">اضغط هنا للاطلاع عليه</a>');
+        showError('انتهت مهلة التحليل (10 دقائق). التقرير الأولي قد يكون جاهزاً — <a href="report.html?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || '') + '" style="color:#f58e1a">اضغط هنا للاطلاع عليه</a>');
         return;
       }
 
-      fetch('api/status.php?id=' + assessmentId)
+      fetch('api/status.php?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || ''))
         .then(function(resp) { return resp.json(); })
         .then(function(data) {
           if (!data || data.error) return; // تجاهل الأخطاء المؤقتة

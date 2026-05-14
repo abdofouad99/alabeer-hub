@@ -9,6 +9,7 @@
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/page-scan.php';
+$cfg = require __DIR__ . '/config.php';
 setCors();
 
 // ============================================================
@@ -99,13 +100,15 @@ $__normalizeActionItemsForRender = static function(array $items): array {
 };
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+$token = trim((string)($_GET['token'] ?? ''));
 if (!$id) jsonError('معرّف التقييم غير صالح');
+if ($token === '') jsonError('لم يُعثر على التقييم', 404);
 
 try {
 
 $db   = getDB();
-$stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? LIMIT 1");
-$stmt->execute([$id]);
+$stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? AND a.report_token = ? LIMIT 1");
+$stmt->execute([$id, $token]);
 $row  = $stmt->fetch();
 
 if (!$row) jsonError('لم يُعثر على التقييم', 404);
@@ -406,24 +409,26 @@ if (!empty($row['ai_report']['action_week']) && is_array($row['ai_report']['acti
 // لتطبيق slice(0, 3) على قسم التوصيات في الباقة المجانية.
 $row['package_tier'] = !empty($row['is_unlocked']) ? 'paid' : 'free';
 
-// ── DEBUG: أضف مؤشر المصدر لتسهيل التشخيص ──────────────────
-$row['_debug'] = [
-    'ai_report_source'        => !empty($row['ai_report']) ? 'DB:ai_report' : 'EMPTY',
-    'strengths_count'         => count(safeGetArray($row['ai_report'] ?? [], 'strengths')),
-    'weaknesses_count'        => count(safeGetArray($row['ai_report'] ?? [], 'weaknesses')),
-    'recommendations_count'   => count(is_array($row['recommendations'] ?? null) ? $row['recommendations'] : []),
-    'has_high_priority_rec'   => count(array_filter(
-        is_array($row['recommendations'] ?? null) ? $row['recommendations'] : [],
-        fn($r) => is_array($r) && ($r['priority'] ?? '') === 'high'
-    )),
-    'has_content_analysis'    => !empty(safeGet($row['ai_report'] ?? [], 'content_analysis')),
-    'data_quality'            => safeGet($row['scan_result'] ?? [], 'data_quality', null),
-    'ads_actor_used'          => safeGet($row['scan_result'] ?? [], 'ads_library.actor_used', null),
-    'ads_raw_count'           => safeGetNumber($row['scan_result'] ?? [], 'ads_library.raw_count', 0),
-    'ads_mapped_count'        => count(safeGetArray($row['scan_result'] ?? [], 'ads_library.ads')),
-    'has_failures'            => safeGet($row['ai_report'] ?? [], 'meta.has_failures', false),
-    'failed_agents'           => safeGetArray($row['ai_report'] ?? [], 'meta.failed_agents'),
-];
+// ── DEBUG: مؤشرات التشخيص — فقط في وضع التطوير ───────────
+if (($cfg['app']['debug'] ?? false) === true) {
+    $row['_debug'] = [
+        'ai_report_source'        => !empty($row['ai_report']) ? 'DB:ai_report' : 'EMPTY',
+        'strengths_count'         => count(safeGetArray($row['ai_report'] ?? [], 'strengths')),
+        'weaknesses_count'        => count(safeGetArray($row['ai_report'] ?? [], 'weaknesses')),
+        'recommendations_count'   => count(is_array($row['recommendations'] ?? null) ? $row['recommendations'] : []),
+        'has_high_priority_rec'   => count(array_filter(
+            is_array($row['recommendations'] ?? null) ? $row['recommendations'] : [],
+            fn($r) => is_array($r) && ($r['priority'] ?? '') === 'high'
+        )),
+        'has_content_analysis'    => !empty(safeGet($row['ai_report'] ?? [], 'content_analysis')),
+        'data_quality'            => safeGet($row['scan_result'] ?? [], 'data_quality', null),
+        'ads_actor_used'          => safeGet($row['scan_result'] ?? [], 'ads_library.actor_used', null),
+        'ads_raw_count'           => safeGetNumber($row['scan_result'] ?? [], 'ads_library.raw_count', 0),
+        'ads_mapped_count'        => count(safeGetArray($row['scan_result'] ?? [], 'ads_library.ads')),
+        'has_failures'            => safeGet($row['ai_report'] ?? [], 'meta.has_failures', false),
+        'failed_agents'           => safeGetArray($row['ai_report'] ?? [], 'meta.failed_agents'),
+    ];
+}
 
 jsonOut($row);
 
