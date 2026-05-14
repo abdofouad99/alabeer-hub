@@ -96,3 +96,34 @@ _backups/
 backup_*.zip
 *_Backup_*.zip
 System_Backup_*.zip
+
+# ============================================================
+# ملفات تشخيصية لا يجب رفعها أبداً
+# ============================================================
+brace.php
+brace_finder*.php
+check_xss.php
+convert_log.php
+find_innerhtml.php
+git_*.php
+verify_syntax.php
+csp-diag.php
+csp-override.php
+db-fix.php
+test_*.php
+test-scan.php
+check_admin.py
+extract.py
+update_links.py
+
+# بيانات/نصوص مكشوفة
+admin_output.txt
+extracted_text.txt
+raw_html.txt
+scan_report.txt
+git_log.txt
+
+# ملفات متنوعة
+*.patch
+scratch/
+backup-*.ps1

@@ -43,7 +43,7 @@
 </FilesMatch>
 
 # ── 4) DEBUG endpoints: localhost only ──────────────────────
-<FilesMatch "^(clear-cache|debug-data|debug-pipeline|maintenance|rerun-ai|migrate|db-migrate|db-test|init|fix_corrupted|check_braces|dump|dump-latest)\.php$">
+<FilesMatch "^(migrate|init)\.php$">
     <IfModule mod_authz_core.c>
         Require local
     </IfModule>
