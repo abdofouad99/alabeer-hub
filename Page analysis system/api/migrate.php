@@ -8,7 +8,7 @@
 // منع التشغيل المتكرر عبر lock file
 // نُحدِّث الإصدار إلى v4_0 لأننا أضفنا CREATE TABLE IF NOT EXISTS
 // لـ leads/assessments/answers/rate_limits (كانت مفقودة، فيفشل النشر النظيف).
-$lockFile = __DIR__ . '/../cache/db_migrated_v5_0.lock';
+$lockFile = __DIR__ . '/../cache/db_migrated_v6_0.lock';
 
 if (file_exists($lockFile)) {
     // الـ Migration اكتمل مسبقاً — لا تفعل شيئاً
@@ -186,8 +186,18 @@ try {
         try { $db->exec("ALTER TABLE assessments ADD COLUMN `tier` VARCHAR(20) NULL"); } catch (\Throwable $e) {}
     }
 
+    // ─── v6.0: Backfill empty report_tokens ──────────────
+    $emptyTokenRows = $db->query("SELECT id FROM assessments WHERE report_token = '' OR report_token IS NULL")->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($emptyTokenRows)) {
+        $updStmt = $db->prepare("UPDATE assessments SET report_token = ? WHERE id = ?");
+        foreach ($emptyTokenRows as $rowId) {
+            $updStmt->execute([bin2hex(random_bytes(16)), $rowId]);
+        }
+        error_log('[migrate] Backfilled report_token for ' . count($emptyTokenRows) . ' assessments');
+    }
+
     // ─── كتابة Lock File ──────────────────────────────────────
-    file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Migration v5.0 completed — added maps_url');
+    file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Migration v6.0 completed — backfilled report_tokens');
 
     return true;
 

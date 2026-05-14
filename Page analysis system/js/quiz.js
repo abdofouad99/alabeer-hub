@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // js/quiz.js — منطق الاستبيان الكامل v3.0
 // ============================================================
 
@@ -476,7 +476,7 @@ async function submitQuiz() {
     localStorage.removeItem(LS_KEY);
     stopScanAnimation();
     // result.html تمت إعادة تسميتها إلى report.html في PR #11
-    window.location.href = `report.html?id=${data.assessment_id}`;
+    window.location.href = 'report.html?id=' + data.assessment_id + '&token=' + encodeURIComponent(data.token || '');
   } catch (e) {
     stopScanAnimation();
     const navBtns  = document.getElementById('navButtons');

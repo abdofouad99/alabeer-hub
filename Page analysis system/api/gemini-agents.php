@@ -768,22 +768,20 @@ function callGeminiAgent(
     string $userMessage,
     int $maxTokens = 65536
 ): array {
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+    // Override model for OpenAI (we ignore the Gemini model name passed in)
+    $model = getenv('OPENAI_MODEL') ?: 'gpt-3.5-turbo';
+    
+    $url = "https://api.openai.com/v1/chat/completions";
 
     $payload = [
-        'system_instruction' => [
-            'parts' => [['text' => $systemPrompt]]
+        'model' => $model,
+        'messages' => [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $userMessage]
         ],
-        'contents' => [
-            ['parts' => [['text' => $userMessage]]]
-        ],
-        'generationConfig' => [
-            'temperature'     => 0.7,
-            'topP'            => 0.9,
-            'topK'            => 40,
-            'maxOutputTokens' => $maxTokens,
-            'responseMimeType' => 'application/json'
-        ]
+        'temperature' => 0.7,
+        'max_tokens' => 4096, // Safe limit for OpenAI outputs
+        'response_format' => ['type' => 'json_object']
     ];
 
     $ch = curl_init($url);
@@ -791,9 +789,12 @@ function callGeminiAgent(
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_HTTPHEADER     => [
+            'Content-Type: application/json',
+            "Authorization: Bearer {$apiKey}"
+        ],
         CURLOPT_TIMEOUT        => 180,   // 3 minutes per agent
-        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYPEER => false,
     ]);
 
     $response = curl_exec($ch);
@@ -802,7 +803,7 @@ function callGeminiAgent(
     curl_close($ch);
 
     if ($curlError) {
-        throw new RuntimeException("Gemini API cURL error: {$curlError}");
+        throw new RuntimeException("OpenAI API cURL error: {$curlError}");
     }
 
     if ($httpCode !== 200) {
@@ -810,23 +811,23 @@ function callGeminiAgent(
         $errorMessage = $errorBody['error']['message'] ?? substr($response, 0, 300);
         switch ($httpCode) {
             case 400:
-                throw new RuntimeException("Gemini Bad Request: {$errorMessage}");
+                throw new RuntimeException("OpenAI Bad Request: {$errorMessage}");
             case 429:
-                throw new RuntimeException("Gemini Rate Limited: {$errorMessage}");
+                throw new RuntimeException("OpenAI Rate Limited: {$errorMessage}");
             case 500:
             case 503:
-                throw new RuntimeException("Gemini Server Error ({$httpCode}): {$errorMessage}");
+                throw new RuntimeException("OpenAI Server Error ({$httpCode}): {$errorMessage}");
             default:
-                throw new RuntimeException("Gemini HTTP {$httpCode}: {$errorMessage}");
+                throw new RuntimeException("OpenAI HTTP {$httpCode}: {$errorMessage}");
         }
     }
 
     $result = json_decode($response, true);
-    if (!$result || !isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-        throw new RuntimeException("Unexpected Gemini API response structure: " . substr($response, 0, 500));
+    if (!$result || !isset($result['choices'][0]['message']['content'])) {
+        throw new RuntimeException("Unexpected OpenAI API response structure: " . substr($response, 0, 500));
     }
 
-    $text = $result['candidates'][0]['content']['parts'][0]['text'];
+    $text = $result['choices'][0]['message']['content'];
 
     // Clean potential markdown code fences
     $text = trim($text);

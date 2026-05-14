@@ -99,8 +99,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         setTimeout(function() {
           var checkId = urlParams.get('id');
+          var checkToken = urlParams.get('token') || sessionStorage.getItem('last_assessment_token') || '';
           if (checkId) {
-            window.location.href = 'report.html?id=' + checkId;
+            window.location.href = 'report.html?id=' + checkId + '&token=' + encodeURIComponent(checkToken);
           } else {
             window.location.href = 'report.html';
           }

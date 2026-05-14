@@ -9,9 +9,15 @@ setCors();
 header('Content-Type: application/json; charset=utf-8');
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+$token = trim((string)($_GET['token'] ?? ''));
 if (!$id) {
     http_response_code(400);
     echo json_encode(['error' => 'معرّف غير صالح']);
+    exit;
+}
+if ($token === '') {
+    http_response_code(404);
+    echo json_encode(['error' => 'لم يُعثر على التقييم']);
     exit;
 }
 
@@ -22,10 +28,10 @@ $stmt = $db->prepare("
            l.full_name, l.company_name
     FROM assessments a
     LEFT JOIN leads l ON a.lead_id = l.id
-    WHERE a.id = ?
+    WHERE a.id = ? AND a.report_token = ?
     LIMIT 1
 ");
-$stmt->execute([$id]);
+$stmt->execute([$id, $token]);
 $row = $stmt->fetch();
 
 if (!$row) {
