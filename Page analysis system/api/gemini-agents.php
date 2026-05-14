@@ -761,7 +761,7 @@ PROMPT;
  * @return array  Parsed JSON response
  * @throws RuntimeException on API error
  */
-function callGemini(
+function callGeminiAgent(
     string $apiKey,
     string $model,
     string $systemPrompt,
@@ -920,7 +920,7 @@ function runDiagnosticAgent(array $data, string $apiKey): array {
 
     $userMessage = "حلّل البيانات التالية وأخرج JSON المطلوب:\n\n" . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-    return callGemini($apiKey, 'gemini-2.5-flash', $systemPrompt, $userMessage, 65536);
+    return callGeminiAgent($apiKey, 'gemini-2.5-flash', $systemPrompt, $userMessage, 65536);
 }
 
 /**
@@ -934,7 +934,7 @@ function runContentAgent(array $data, string $apiKey): array {
 
     $userMessage = "حلّل البيانات التالية وأخرج JSON المطلوب:\n\n" . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-    return callGemini($apiKey, 'gemini-2.5-flash', $systemPrompt, $userMessage, 65536);
+    return callGeminiAgent($apiKey, 'gemini-2.5-flash', $systemPrompt, $userMessage, 65536);
 }
 
 /**
@@ -948,7 +948,7 @@ function runMarketAgent(array $data, string $apiKey): array {
 
     $userMessage = "حلّل البيانات التالية وأخرج JSON المطلوب:\n\n" . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-    return callGemini($apiKey, 'gemini-2.5-flash', $systemPrompt, $userMessage, 65536);
+    return callGeminiAgent($apiKey, 'gemini-2.5-flash', $systemPrompt, $userMessage, 65536);
 }
 
 /**
@@ -982,7 +982,7 @@ function runStrategistAgent(
         . "\n\n═══ نتائج الوكلاء السابقين ═══\n"
         . json_encode($previousOutput, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-    return callGemini($apiKey, 'gemini-2.5-pro', $systemPrompt, $userMessage, 65536);
+    return callGeminiAgent($apiKey, 'gemini-2.5-pro', $systemPrompt, $userMessage, 65536);
 }
 
 /**
@@ -1018,7 +1018,7 @@ function runActionPlannerAgent(
         . "\n\n═══ نتائج الوكلاء السابقين ═══\n"
         . json_encode($previousOutput, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-    return callGemini($apiKey, 'gemini-2.5-pro', $systemPrompt, $userMessage, 65536);
+    return callGeminiAgent($apiKey, 'gemini-2.5-pro', $systemPrompt, $userMessage, 65536);
 }
 
 
@@ -1123,7 +1123,7 @@ function runParallelAgents(array $data, string $apiKey, int $maxRetries, int $re
     ];
 
     // Fallback: run sequentially if no curl_multi support needed
-    // (curl_multi requires refactoring callGemini — left as TODO)
+    // (curl_multi requires refactoring callGeminiAgent — left as TODO)
     // For now, sequential with retry:
     foreach ($agentCalls as $key => $callable) {
         $results[$key] = runWithRetry($callable, $maxRetries, $retryDelay, $log, $key);
