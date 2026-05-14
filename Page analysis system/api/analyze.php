@@ -606,24 +606,49 @@ function runAnalysis(int $assessmentId): array {
     $updateStep(1); // step 1: بدء الفحص الأساسي
 
     // ─── 2) الفحص الأساسي الذكي ─────────────────────────────
-    $cacheKey = 'scan_' . md5($primaryUrl);
-    $scanResult = cacheRemember($cacheKey, function() use ($primaryUrl, $cfg, $assessmentId, $db, $updateStep) {
+    // ⚠️ FIX (2026-05): لا نستخدم cacheRemember هنا لأنه يحفظ النتائج الفاشلة
+    // أيضاً، فأي فشل عابر (rate limit / شبكة) كان "يَلتصق" 6 ساعات ويُعيد
+    // إرجاع نتيجة فاشلة كأنها سليمة. الحل: نقرأ من الـcache يدوياً، ونخزّن
+    // فقط إذا نجح الـscan فعلياً. الفشل لا يُحفَظ → يُعاد المحاولة في الطلب
+    // التالي.
+    $cacheKey   = 'scan_' . md5($primaryUrl);
+    $scanResult = cacheGet($cacheKey);
+
+    if ($scanResult === null) {
         logInfo('Starting page scan', ['url' => $primaryUrl, 'assessment_id' => $assessmentId]);
 
         try {
             // تحديث حالة assessment الى running
             $db->prepare("UPDATE assessments SET status='running' WHERE id=?")->execute([$assessmentId]);
 
-            $result = runPageScan($primaryUrl, $cfg);
+            $scanResult = runPageScan($primaryUrl, $cfg);
             $updateStep(2); // step 2: اكتمل فحص الموقع واكتُشفت المنصات
 
-            logInfo('Page scan completed', ['url' => $primaryUrl, 'success' => $result['success'] ?? false]);
-            return $result;
+            logInfo('Page scan completed', ['url' => $primaryUrl, 'success' => $scanResult['success'] ?? false]);
         } catch (\Throwable $e) {
             logError('Page scan failed', ['url' => $primaryUrl, 'error' => $e->getMessage()]);
-            return ['success' => false, 'error' => $e->getMessage()];
+            $scanResult = ['success' => false, 'error' => $e->getMessage()];
         }
-    }, 6 * 3600); // cache for 6 hours
+
+        // نخزّن فقط النتائج الناجحة (success === true ولا يوجد error صريح)
+        $isSuccess = is_array($scanResult)
+            && ($scanResult['success'] ?? false) === true
+            && empty($scanResult['error']);
+
+        if ($isSuccess) {
+            cacheSet($cacheKey, $scanResult, 6 * 3600); // 6 ساعات
+        } else {
+            logWarning('Skipping cache for failed scan; will retry on next request', [
+                'url'           => $primaryUrl,
+                'assessment_id' => $assessmentId,
+                'error'         => $scanResult['error'] ?? 'unknown',
+            ]);
+        }
+    } else {
+        logInfo('Using cached page scan', ['url' => $primaryUrl, 'assessment_id' => $assessmentId]);
+        // الـcache تجاوز فحص الموقع، تابع للخطوة التالية
+        $updateStep(2);
+    }
 
     // ─── 3) استخدم نتائج محرك الاكتشاف مباشرة ──────────────
     // runPageScan v5 يكتشف FB/IG ويشغّل Apify داخلياً
