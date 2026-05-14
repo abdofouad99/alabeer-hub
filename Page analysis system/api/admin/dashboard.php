@@ -9,6 +9,7 @@
 // ============================================================
 
 require_once __DIR__ . '/middleware.php';
+$cfg = require __DIR__ . '/../config.php';
 setCors();
 requireAdmin();
 

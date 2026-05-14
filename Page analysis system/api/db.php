@@ -77,8 +77,18 @@ function jsonError(string $msg, int $code = 400) {
 
 // ── CORS ────────────────────────────────────────────────────
 function setCors(): void {
-    header('Access-Control-Allow-Origin: *');
+    global $cfg;
+    $allowed = $cfg['app']['cors']['allowed_origins'] ?? [];
+    $origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin && in_array($origin, $allowed, true)) {
+        header("Access-Control-Allow-Origin: $origin");
+        header('Vary: Origin');
+        header('Access-Control-Allow-Credentials: true');
+    }
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, X-Requested-With');
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
 }

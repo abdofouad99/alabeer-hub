@@ -14,13 +14,12 @@ if (file_exists(__DIR__ . '/gemini-agents.php')) {
 
 // ── تشغيل مباشر فقط (ليس عند require من ملف آخر) ───────────
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
+    $cfg = require __DIR__ . '/config.php';
     setCors();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonError('Method not allowed', 405);
 
     $body = json_decode(file_get_contents('php://input'), true);
     if (!$body) jsonError('Invalid JSON');
-
-    $cfg = require __DIR__ . '/config.php';
 
     if (isset($body['assessment_id'])) {
         $data = loadAssessmentData((int)$body['assessment_id']);

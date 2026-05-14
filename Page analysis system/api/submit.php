@@ -10,6 +10,11 @@ require_once __DIR__ . '/init.php';
 /** @var PDO $db */
 /** @var object $logger */
 
+// ── alias $cfg مطلوب من setCors() (في api/db.php) ──────────
+// init.php يضع التكوين في $config، بينما setCors() تقرأ من
+// global $cfg. نضع alias هنا حتى لا تُكسر CORS allowlist.
+$cfg = $config;
+
 // ─── منع أي إخراج HTML من PHP يُفسد الـ JSON ──────────────
 ob_start();                         // التقط كل إخراج عشوائي
 ini_set('display_errors', 0);      // لا تطبع أخطاء PHP في الاستجابة

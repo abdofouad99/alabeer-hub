@@ -5,6 +5,7 @@
 // POST /api/admin/lead.php  { "id":123, "status":"contacted", "notes":"..." }
 // ============================================================
 require_once __DIR__ . '/middleware.php';
+$cfg = require __DIR__ . '/../config.php';
 setCors();
 requireAdmin();
 

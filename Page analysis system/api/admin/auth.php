@@ -7,11 +7,11 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../init.php';
 
 $cfg = require __DIR__ . '/../config.php';
+setCors();
 session_name($cfg['admin']['session_name']);
 ini_set('session.gc_maxlifetime', $cfg['admin']['session_lifetime']);
 session_start();
 
-setCors();
 $action = $_GET['action'] ?? 'login';
 
 // ── GET check ──────────────────────────────────────────────
