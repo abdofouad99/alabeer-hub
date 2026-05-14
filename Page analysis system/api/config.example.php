@@ -104,6 +104,9 @@ return [
         'openai_max_tokens'       => (int)$get('OPENAI_MAX_TOKENS', '3500'),
         'nvidia_keys'    => $csv('NVIDIA_KEYS'),
 
+        // Google PageSpeed Insights (يُستخدم في api/page-scan.php عند enable_pagespeed=true)
+        'google_pagespeed_key' => $get('GOOGLE_PAGESPEED_KEY', ''),
+
         // Apify — Tokens + Actor IDs
         // يدعم APIFY_TOKENS (CSV) و APIFY_TOKEN / APIFY_TOKEN_1..9 (مفرد).
         'apify_tokens'        => $apifyTokensList(),
@@ -124,5 +127,40 @@ return [
     'app' => [
         'env'   => $get('APP_ENV', 'production'),
         'debug' => filter_var($get('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    // ── 6) Caching (يُقرأ في api/cache.php) ──────────────────
+    'cache' => [
+        'enabled' => filter_var($get('CACHE_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'driver'  => $get('CACHE_DRIVER', 'file'),
+        'ttl'     => (int) $get('CACHE_TTL', '3600'),
+        'file'    => [
+            'path' => $get('CACHE_PATH', __DIR__ . '/../cache'),
+        ],
+        'redis'   => [
+            'url'   => $get('REDIS_URL', ''),
+            'token' => $get('REDIS_TOKEN', ''),
+        ],
+    ],
+
+    // ── 7) Logging (يُقرأ في api/logger.php) ─────────────────
+    'logging' => [
+        'enabled'       => filter_var($get('LOG_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'level'         => $get('LOG_LEVEL', 'INFO'),
+        'file_path'     => $get('LOG_PATH', __DIR__ . '/../logs/app.log'),
+        'max_file_size' => (int) $get('LOG_MAX_SIZE', '10485760'),
+        'max_files'     => (int) $get('LOG_MAX_FILES', '5'),
+    ],
+
+    // ── 8) Rate Limiting (يُقرأ في api/rate_limit.php) ───────
+    // ملاحظة: rate_limit.php يقرأ max_per_minute/hour/day فعلياً،
+    // و requests/window مُحتفظ بهما للتوافق مع المخطّط الأصلي.
+    'rate_limit' => [
+        'enabled'        => filter_var($get('RATE_LIMIT_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'requests'       => (int) $get('RATE_LIMIT_REQUESTS', '60'),
+        'window'         => (int) $get('RATE_LIMIT_WINDOW', '60'),
+        'max_per_minute' => (int) $get('RATE_LIMIT_PER_MINUTE', '60'),
+        'max_per_hour'   => (int) $get('RATE_LIMIT_PER_HOUR',   '1000'),
+        'max_per_day'    => (int) $get('RATE_LIMIT_PER_DAY',    '10000'),
     ],
 ];
