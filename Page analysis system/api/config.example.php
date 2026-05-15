@@ -70,10 +70,12 @@ return [
         // المُحدّدة الميزانية.
         'enable_apify'       => filter_var($get('ENABLE_APIFY',       'true'),  FILTER_VALIDATE_BOOLEAN),
         'enable_ads_library' => filter_var($get('ENABLE_ADS_LIBRARY', 'true'),  FILTER_VALIDATE_BOOLEAN),
-        'enable_pagespeed'   => filter_var($get('ENABLE_PAGESPEED',   'false'), FILTER_VALIDATE_BOOLEAN),
+        'enable_pagespeed'   => filter_var($get('ENABLE_PAGESPEED',   'true'), FILTER_VALIDATE_BOOLEAN), // WEB-4 FIX: مفعّل افتراضياً (حد 25 طلب/يوم بدون key)
         // enable_competitor_enrich مُعطَّل افتراضياً لأنه يضاعف استهلاك Apify ×6
         // لكل منافس (يُستدعى runPageScan الكامل لكل صفحة منافس).
         'enable_competitor_enrich' => filter_var($get('ENABLE_COMPETITOR_ENRICH', 'false'), FILTER_VALIDATE_BOOLEAN),
+        // TT-2 FIX: تفعيل Comments Sentiment لتيك توك
+        'enable_tt_comments' => filter_var($get('ENABLE_TT_COMMENTS', 'true'), FILTER_VALIDATE_BOOLEAN),
 
         // ── Instagram Deep Scan switches (مهمة لتقرير IG شامل) ─────
         // enable_ig_comments: استدعاء Comments Actor لأفضل 5 منشورات → Sentiment + Objections

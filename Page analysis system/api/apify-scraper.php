@@ -35,6 +35,16 @@ function getValidApifyToken(array $cfg): string {
     static $cachedToken = null;
     if ($cachedToken !== null) return $cachedToken;
 
+    // ── GLB-2 FIX: File-based cache لتجنب validation في كل HTTP request (5s ضائعة) ──
+    $cacheFile = sys_get_temp_dir() . '/apify_valid_token_' . md5(implode(',', $tokens));
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 900) { // 15 دقيقة
+        $saved = trim(file_get_contents($cacheFile));
+        if ($saved !== '' && in_array($saved, $tokens, true)) {
+            $cachedToken = $saved;
+            return $cachedToken;
+        }
+    }
+
     // ── الخطوة 1: اختيار عشوائي (load balancing حقيقي بدلاً من time() % count) ──
     // نسخة مُرخَّلة للقائمة لمنع نمط ثابت
     $shuffled = $tokens;
@@ -62,6 +72,8 @@ function getValidApifyToken(array $cfg): string {
 
         // وجدنا token صالح — نُخزّنه ونُعيده
         $cachedToken = $token;
+        // ✅ حفظ في file cache لتجنب validation في الطلبات القادمة
+        file_put_contents($cacheFile, $cachedToken);
         return $token;
     }
 
@@ -187,7 +199,8 @@ function _parseAd(array $ad): array {
         'id'                  => $ad['adArchiveID']              ?? $ad['ad_archive_id'] ?? $ad['id']          ?? null,
         'title'               => $ad['adCreativeBody']           ?? $ad['ad_creative_body'] ?? $ad['body'] ?? $ad['title'] ?? '',
         'page_name'           => $ad['pageName']                 ?? $ad['page_name'] ?? '',
-        'is_active'           => ($ad['isActive'] ?? $ad['is_active'] ?? false) || $status === 'active',
+        'is_active'           => ($ad['isActive'] ?? $ad['is_active'] ?? false) || $status === 'active'
+                              || ($status === '' && !empty($ad['startDate'] ?? $ad['start_date'] ?? $ad['ad_creation_time'])), // ADS-1 FIX: إعلان بدون status لكن له تاريخ بدء = نشط
         'start_date'          => $ad['startDate']                ?? $ad['start_date'] ?? $ad['ad_creation_time'] ?? null,
         'platforms'           => $ad['publisherPlatform']        ?? $ad['publisher_platforms'] ?? $ad['platforms'] ?? [],
         'spend'               => $ad['spend']                    ?? null,
@@ -204,7 +217,7 @@ function _parseAd(array $ad): array {
 // ============================================================
 // Google Search Scraper (nWGjfqxH9vqmJN76s) for Competitors
 // ============================================================
-function scrapeCompetitorsViaGoogle(string $companyName, string $targetAudience, string $token): array {
+function scrapeCompetitorsViaGoogle(string $companyName, string $targetAudience, string $token, string $originalUrl = ''): array {
     $actorId = 'nWGjfqxH9vqmJN76s'; // Google Search Scraper
 
     // إذا لم يكن هناك اسم نشاط، لا داعي للبحث
@@ -230,11 +243,24 @@ function scrapeCompetitorsViaGoogle(string $companyName, string $targetAudience,
 
     // استخراج النتائج
     $competitors = [];
+    // COMP-1 FIX: استبعاد الموقع الأصلي + مواقع عامة
+    $excludeDomains = ['youtube.com','wikipedia.org','linkedin.com','twitter.com','x.com','instagram.com','facebook.com','tiktok.com'];
+    $originalDomain = !empty($originalUrl) ? (parse_url($originalUrl, PHP_URL_HOST) ?? '') : '';
+
     foreach ($result as $item) {
         $title = $item['title'] ?? $item['metadataTitle'] ?? '';
         $url = $item['url'] ?? '';
         $desc = $item['metadataDescription'] ?? $item['description'] ?? '';
         if (!empty($title) && !empty($url)) {
+            $domain = parse_url($url, PHP_URL_HOST) ?? '';
+
+            // استبعاد الموقع الأصلي
+            if ($originalDomain && str_contains($domain, str_replace('www.', '', $originalDomain))) continue;
+            // استبعاد مواقع عامة
+            $skip = false;
+            foreach ($excludeDomains as $ed) { if (str_contains($domain, $ed)) { $skip = true; break; } }
+            if ($skip) continue;
+
             $competitors[] = [
                 'name' => $title,
                 'url' => $url,
@@ -277,6 +303,21 @@ function enrichCompetitorsData(array $competitors, array $cfg): array {
         $enriched[] = $comp;
     }
     return $enriched;
+}
+
+// COMP-2 FIX: فحص خفيف للمنافسين (OG + HTML فقط — بدون Apify) — سريع ومجاني
+function lightScanCompetitor(string $url, array $cfg): array {
+    require_once __DIR__ . '/page-scan.php';
+    $og = function_exists('scanOGTags') ? scanOGTags($url) : [];
+    $ws = function_exists('scanWebsiteHTML') ? scanWebsiteHTML($url, $cfg) : [];
+    return [
+        'title'     => $og['title'] ?? '',
+        'has_ssl'   => $ws['has_ssl'] ?? false,
+        'has_pixel' => $ws['has_fb_pixel'] ?? false,
+        'has_ga'    => $ws['has_ga'] ?? false,
+        'has_cta'   => $ws['has_cta'] ?? false,
+        'tech_stack'=> $ws['tech_stack'] ?? [],
+    ];
 }
 
 
@@ -538,7 +579,9 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         $is_verified = !empty($page['isVerified']) || !empty($page['verified']);
 
         // ── جلب النواقص (معلومات الصفحة + التقييمات + الخدمات) عبر Actor الصفحات السريع ──
-        if (empty($followers) && empty($email) && empty($phone) && empty($website)) {
+        // FB-1 FIX: استدعاء Actor الثاني أيضاً عند غياب reviews/services/hours (كان يشترط أن كل الأربعة فارغة فقط)
+        if ((empty($followers) && empty($email) && empty($phone) && empty($website))
+            || (empty($reviews) && empty($services) && empty($hours))) {
             $aboutInput = json_encode([
                 'startUrls'      => [['url' => $url]],
                 'maxPosts'       => 0,
@@ -874,10 +917,13 @@ function _extractReviews(array $page): array {
                 $author = $r['author'] ?? $r['userName'] ?? $r['user']['name'] ?? '';
                 $date   = $r['date'] ?? $r['createdTime'] ?? $r['timestamp'] ?? '';
                 if (!$text && $rating === null) continue;
-                // Normalize rating: numeric → float, semantic strings → 5.0/1.0 (consistent type)
+                // Normalize rating: numeric → float, boolean → 5.0/1.0, semantic strings → 5.0/1.0 (consistent type)
                 $normalizedRating = null;
                 if (is_numeric($rating)) {
                     $normalizedRating = (float)$rating;
+                } elseif (is_bool($rating)) {
+                    // FB-2 FIX: معالجة recommendation من نوع boolean (true = إيجابي, false = سلبي)
+                    $normalizedRating = $rating ? 5.0 : 1.0;
                 } elseif (is_string($rating)) {
                     $low = strtolower($rating);
                     if (in_array($low, ['positive','recommends','recommend'], true))           $normalizedRating = 5.0;
@@ -1066,9 +1112,9 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
     } elseif ($isOfficial) {
         $inputData = [
             'directUrls'    => [$profileUrl],
-            'resultsType'   => 'details',
+            'resultsType'   => 'posts',      // IG-1 FIX: كان 'details' يُرجع 12-24 منشور فقط
             'resultsLimit'  => 100,
-            'addParentData' => true,
+            'addParentData' => true,          // يُضمّن بيانات البروفايل مع كل منشور
             'searchLimit'   => 1,
         ];
     } else {
@@ -1386,6 +1432,23 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
 // ============================================================
 // TikTok Scraper — Comprehensive (profile + 200 videos + full analytics)
 // ============================================================
+// ── TT-1 FIX: Blacklist مؤقت (file-based) للـ actors الفاشلة ──
+if (!function_exists('_isActorBlacklisted')) {
+function _isActorBlacklisted(string $actorId): bool {
+    $file = sys_get_temp_dir() . '/apify_blacklist_' . md5($actorId);
+    if (!file_exists($file)) return false;
+    // blacklist لمدة ساعة واحدة
+    return (time() - filemtime($file)) < 3600;
+}
+}
+
+if (!function_exists('_blacklistActor')) {
+function _blacklistActor(string $actorId): void {
+    $file = sys_get_temp_dir() . '/apify_blacklist_' . md5($actorId);
+    file_put_contents($file, (string)time());
+}
+}
+
 function scrapeTikTok(string $url, string $token, array $cfg): array {
     // Actor الافتراضي: clockworks/tiktok-scraper (المدفوع — schema الحديث)
     // البديل المجاني: clockworks/free-tiktok-scraper بنفس الـ schema
@@ -1415,6 +1478,12 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
     if ($resultsPerPage > 500) $resultsPerPage = 500;
 
     foreach ($candidates as $actorId) {
+        // TT-1 FIX: تخطي actors مُدرجة في blacklist
+        if (_isActorBlacklisted($actorId)) {
+            logInfo('Skipping blacklisted TikTok actor', ['actor' => $actorId]);
+            continue;
+        }
+
         logInfo('Starting TikTok scrape attempt', ['username' => $username, 'actor' => $actorId, 'limit' => $resultsPerPage]);
 
         $input = json_encode([
@@ -1435,12 +1504,14 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
         $runId = _apifyStartRun($actorId, $input, $token);
         if (!$runId) {
             logError('Failed to start TikTok run; trying next actor', ['actor' => $actorId]);
+            _blacklistActor($actorId); // TT-1 FIX: سجّل الفشل
             continue;
         }
 
         $result = _apifyWaitAndFetch($runId, $token, 180, $resultsPerPage);
         if (!$result) {
             logError('TikTok timeout; trying next actor', ['runId' => $runId, 'actor' => $actorId]);
+            _blacklistActor($actorId); // TT-1 FIX: سجّل الفشل
             continue;
         }
 
@@ -1581,6 +1652,35 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
             else $typesCount['video']++;
         }
 
+        // TT-2 FIX: Comments Sentiment (مكافئ لـ FB/IG)
+        $ttSentiment = null;
+        if (!empty($cfg['analysis']['enable_tt_comments'] ?? true)) {
+            try {
+                // سحب تعليقات أفضل 3 فيديوهات
+                $topForComments = array_slice($topVideos, 0, 3);
+                $allComments = [];
+                foreach ($topForComments as $tv) {
+                    $tvUrl = $tv['url'] ?? '';
+                    if (!$tvUrl) continue;
+                    if (function_exists('scrapePostComments')) {
+                        $cResult = scrapePostComments($tvUrl, 'tiktok', $token, 30);
+                        if ($cResult['success'] ?? false) {
+                            $allComments = array_merge($allComments, $cResult['sample_phrases'] ?? []);
+                        }
+                    }
+                }
+                if (count($allComments) >= 5) {
+                    $ttSentiment = [
+                        'success' => true,
+                        'total_comments' => count($allComments),
+                        'samples' => array_slice($allComments, 0, 15),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                if (function_exists('logError')) logError('TikTok comments failed', ['err' => $e->getMessage()]);
+            }
+        }
+
         return [
             'success'              => true,
             'source'               => 'apify_tt_v3',
@@ -1640,6 +1740,7 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
             'top_post'             => $topVideos[0] ?? null,
             'deep_analysis'        => analyzeDeepContent($videos),
             'latest_posts'         => $latestPosts,         // كل الفيديوهات (200) — لا قطع
+            'comments_sentiment'   => $ttSentiment,         // TT-2 FIX: تحليل مشاعر التعليقات
         ];
     }
 
@@ -1716,6 +1817,39 @@ function _parseTikTokVideo(array $v): array {
 // ============================================================
 // Twitter / X Scraper — Comprehensive (profile + 100 tweets + analytics)
 // ============================================================
+// ── TW-4 FIX: Twitter Health Score مخصص ──
+function _calcTwitterHealthScore(array $data): array {
+    $score = 0; $issues = []; $strengths = [];
+    $followers = (int)($data['followers'] ?? 0);
+    $eng = (float)($data['engagement_rate'] ?? 0);
+    $postsPerWeek = (float)($data['posts_per_week'] ?? 0);
+    $verified = (bool)($data['is_verified'] ?? false);
+
+    if ($postsPerWeek >= 5) { $score += 25; $strengths[] = 'نشاط ممتاز'; }
+    elseif ($postsPerWeek >= 2) { $score += 15; }
+    elseif ($postsPerWeek > 0) { $score += 5; $issues[] = 'نشر متباعد'; }
+    else $issues[] = 'لا نشاط';
+
+    if ($eng >= 3) { $score += 25; $strengths[] = 'تفاعل ممتاز'; }
+    elseif ($eng >= 1) { $score += 15; }
+    elseif ($eng > 0) { $score += 5; }
+    else $issues[] = 'تفاعل ضعيف';
+
+    if ($followers >= 100000) $score += 20;
+    elseif ($followers >= 10000) $score += 15;
+    elseif ($followers >= 1000) $score += 10;
+    else $issues[] = 'جمهور صغير';
+
+    if ($verified) { $score += 15; $strengths[] = 'حساب موثّق'; }
+    if (!empty($data['website'])) { $score += 5; }
+    if (!empty($data['bio']) && mb_strlen($data['bio']) >= 50) { $score += 10; $strengths[] = 'Bio محسّن'; }
+    else $issues[] = 'Bio قصير أو فارغ';
+
+    $score = min(100, $score);
+    $grade = $score >= 80 ? 'A' : ($score >= 65 ? 'B' : ($score >= 50 ? 'C' : ($score >= 35 ? 'D' : 'F')));
+    return ['score' => $score, 'grade' => $grade, 'strengths' => $strengths, 'issues' => $issues];
+}
+
 function scrapeTwitter(string $url, string $token, array $cfg): array {
     // ملاحظة: قائمة الـ Apify actors لتويتر تتغيّر بسرعة (التحول من twitter.com → x.com).
     // نحاول أكثر من actor تلقائيًا. الأولوية للـ actors التي تجلب التغريدات بشكل افتراضي.
@@ -1724,11 +1858,9 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
         $primaryActor,
         'apidojo/tweet-scraper',          // يدعم startUrls لبروفايل + تغريدات
         'kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest',
-        'apidojo/twitter-scraper-lite',
-        'kaitoeasyapi/twitter-x-profile-scraper',
-        'shanes/twitter-profile-scraper',
-        'u6ppkMWAx2E2MpEuF',
     ])));
+    // TW-1 FIX: حد أقصى 3 actors لتجنب timeout مفرط (كان 7 actors = حتى 17.5 دقيقة)
+    $candidates = array_slice($candidates, 0, 3);
 
     // ── استخراج username ──
     if (!str_contains($url, 'twitter.com') && !str_contains($url, 'x.com')) {
@@ -1760,30 +1892,37 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
     foreach ($candidates as $actorId) {
         logInfo('Starting Twitter scrape attempt', ['username' => $username, 'actor' => $actorId, 'tweets' => $maxTweets]);
 
-        // Schema موحّد يغطي معظم الـ actors
-        $input = json_encode([
-            // Tweet-oriented scrapers
-            'startUrls'        => [$profileUrlTwitter, $profileUrlX, $url],
-            'twitterHandles'   => [$username],
-            'handles'          => [$username],
-            'searchTerms'      => ['from:' . $username],
+        // TW-1 FIX: تخطي actors مُدرجة في blacklist
+        if (function_exists('_isActorBlacklisted') && _isActorBlacklisted($actorId)) {
+            logInfo('Skipping blacklisted Twitter actor', ['actor' => $actorId]);
+            continue;
+        }
 
-            // عدد التغريدات المراد جلبها
-            'maxItems'         => $maxTweets,
-            'maxTweets'        => $maxTweets,
-            'tweetsDesired'    => $maxTweets,
-            'maxRequestRetries'=> 4,
-
-            // محتوى ثري
-            'addUserInfo'      => true,
-            'getFollowers'     => false,
-            'getFollowing'     => false,
-            'getRetweets'      => true,
-            'getReplies'       => false,
-            'includeReplies'   => false,
-            'getAbout'         => true,
-            'sort'             => 'Latest',
-        ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK | JSON_UNESCAPED_UNICODE);
+        // TW-2 FIX: بناء input مخصص لكل actor بدلاً من schema موحّد (بعض actors تفشل 400 مع حقول غير معروفة)
+        if (str_contains($actorId, 'tweet-scraper') || str_contains($actorId, 'apidojo')) {
+            $input = json_encode([
+                'startUrls'        => [$profileUrlTwitter, $profileUrlX],
+                'maxItems'         => $maxTweets,
+                'addUserInfo'      => true,
+                'sort'             => 'Latest',
+            ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK | JSON_UNESCAPED_UNICODE);
+        } elseif (str_contains($actorId, 'profile-scraper') || str_contains($actorId, 'kaitoeasyapi')) {
+            $input = json_encode([
+                'handles'          => [$username],
+                'tweetsDesired'    => $maxTweets,
+                'getAbout'         => true,
+            ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK | JSON_UNESCAPED_UNICODE);
+        } else {
+            // fallback عام
+            $input = json_encode([
+                'startUrls'        => [$profileUrlTwitter],
+                'twitterHandles'   => [$username],
+                'handles'          => [$username],
+                'maxItems'         => $maxTweets,
+                'addUserInfo'      => true,
+                'sort'             => 'Latest',
+            ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK | JSON_UNESCAPED_UNICODE);
+        }
 
         $runId = _apifyStartRun($actorId, $input, $token);
         if (!$runId) {
@@ -1791,7 +1930,7 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
             continue;
         }
 
-        $result = _apifyWaitAndFetch($runId, $token, 150, $maxTweets + 5);
+        $result = _apifyWaitAndFetch($runId, $token, 90, $maxTweets + 5); // TW-1 FIX: كان 150 — قلّلناه لتجنب timeout مفرط
         if (!$result) {
             logError('Twitter scrape timeout; trying next actor', ['run_id' => $runId, 'actor' => $actorId]);
             continue;
@@ -1828,8 +1967,16 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
         if (!$profile && !empty($tweets)) {
             $profile = $tweets[0]['user'] ?? $tweets[0]['author'] ?? $tweets[0];
         }
+        // TW-3 FIX: تأكد أنه بروفايل فعلاً (يحتوي followers أو screen_name) وليس تغريدة
         if (!$profile && !empty($result[0])) {
-            $profile = $result[0];
+            $candidate = $result[0];
+            if (is_array($candidate) && (
+                isset($candidate['followers']) || isset($candidate['followersCount'])
+                || isset($candidate['followers_count']) || isset($candidate['screenName'])
+                || isset($candidate['screen_name'])
+            )) {
+                $profile = $candidate;
+            }
         }
 
         // التحقق من وجود حقول تويتر معروفة
@@ -1946,6 +2093,16 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
             'followers'=> $followers,
         ]);
 
+        // TW-4 FIX: حساب Twitter Health Score مخصص
+        $twHealthScore = _calcTwitterHealthScore([
+            'followers' => $followers,
+            'engagement_rate' => $engByViews > 0 ? $engByViews : $engByFollowers,
+            'posts_per_week' => $postsPerWeek,
+            'is_verified' => $parsed['is_verified'] ?? false,
+            'website' => $parsed['website'] ?? '',
+            'bio' => $parsed['bio'] ?? '',
+        ]);
+
         return array_merge($parsed, [
             'success'      => true,
             'source'       => 'apify_tw_v3',
@@ -1999,6 +2156,7 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
                 'hashtags'     => $t['hashtags'],
             ], $parsedTweets)),
             'latest_posts'     => $parsedTweets,    // كل التغريدات
+            'health_score'     => $twHealthScore,    // TW-4 FIX: Twitter Health Score
         ]);
     }
 
@@ -2231,6 +2389,18 @@ function calcPostsPerWeek(array $posts): float {
     if (count($posts) < 2) return 0;
     $timestamps = array_filter(array_map(fn($p) => strtotime($p['timestamp'] ?? $p['takenAt'] ?? ''), $posts));
     if (count($timestamps) < 2) return 0;
+
+    // IG-2 FIX: استخدم آخر 30 يوم فقط لحساب المعدل الحالي (أدق من range كامل للحسابات القديمة)
+    $now = time();
+    $thirtyDaysAgo = $now - (30 * 86400);
+    $recentPosts = array_filter($timestamps, fn($ts) => $ts >= $thirtyDaysAgo);
+
+    if (count($recentPosts) >= 2) {
+        // معدل بناءً على آخر 30 يوم
+        return round(count($recentPosts) / (30 / 7), 1);
+    }
+
+    // fallback: لو أقل من 2 منشور في 30 يوم، استخدم range كامل
     $range = (max($timestamps) - min($timestamps));
     if ($range <= 0) return 0;
     return round(count($timestamps) / ($range / 604800), 1); // 604800 = ثواني الأسبوع
@@ -2395,12 +2565,32 @@ function scrapeWebsiteApify(string $url, string $token, array $cfg): ?string {
     $actorId = $cfg['apis']['apify_actor_website'] ?? 'apify/puppeteer-scraper';
 
     // نستخدم puppeteer-scraper لاستخراج الكود بعد الجافاسكربت
-    // الانتظار 3.5 ثوانٍ يضمن لـ Google Tag manager والبيكسلات أن تحقن نفسها
+    // WEB-3 FIX: إضافة scroll + waitForNetworkIdle + performance metrics بدلاً من wait 3.5s فقط
     $pageFunction = "async function pageFunction(context) {
-        await new Promise(r => setTimeout(r, 3500));
-        return {
-            html: await context.page.content()
-        };
+        const page = context.page;
+
+        // انتظار تحميل الشبكة
+        await page.waitForNetworkIdle({timeout: 8000}).catch(() => {});
+
+        // Scroll لتحميل lazy content
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+        await new Promise(r => setTimeout(r, 1500));
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await new Promise(r => setTimeout(r, 1500));
+
+        // جمع البيانات
+        const html = await page.content();
+
+        // Performance timing
+        const perf = await page.evaluate(() => {
+            const t = performance.timing;
+            return {
+                dom_load: t.domContentLoadedEventEnd - t.navigationStart,
+                full_load: t.loadEventEnd - t.navigationStart,
+            };
+        }).catch(() => ({}));
+
+        return { html, perf };
     }";
 
     $input = json_encode([

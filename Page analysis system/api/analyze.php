@@ -808,8 +808,12 @@ function runAnalysis(int $assessmentId): array {
     // ─── 5e) Google Maps Reviews — إذا وُجد رابط Maps ────────────
     if (($cfg['analysis']['enable_apify'] ?? false)) {
         $mapsUrl = $row['maps_url'] ?? '';
-        // محاولة اكتشاف رابط Maps من الموقع
+        // MAPS-1 FIX: جلب من website_scan مباشرة (الحقل الجديد)
         if (!$mapsUrl) {
+            $mapsUrl = $scanResult['website_scan']['google_maps_url'] ?? '';
+        }
+        if (!$mapsUrl) {
+            // fallback: بحث في links القديمة (للتوافق الخلفي)
             $wsLinks = $scanResult['website_scan']['links'] ?? [];
             foreach ((array)$wsLinks as $link) {
                 if (is_string($link) && str_contains($link, 'google.com/maps')) {
