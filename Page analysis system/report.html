@@ -365,6 +365,112 @@
     .hero-meta { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: var(--text); }
     .h-meta-item { display: flex; align-items: center; gap: 4px; }
 
+    /* ════════════ Facebook Deep Insight (V3) ════════════ */
+    #fbDeepInsight .fb-kpi {
+      background: rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.18);
+      border-radius:12px; padding:10px 12px; text-align:center;
+    }
+    #fbDeepInsight .fb-kpi-lbl { font-size:11px; color:#6b7280; font-weight:700; margin-bottom:4px; }
+    #fbDeepInsight .fb-kpi-val { font-size:18px; font-weight:900; color:#1e3a8a; }
+    #fbDeepInsight .fb-panel {
+      background:#fff; border:1px solid rgba(59,130,246,0.18); border-radius:14px;
+      padding:14px 16px;
+    }
+    #fbDeepInsight .fb-panel-title {
+      font-size:13px; font-weight:900; color:#1e3a8a; margin:0 0 10px;
+    }
+    #fbDeepInsight .fb-gauge {
+      width:120px; height:120px; border-radius:50%;
+      background: conic-gradient(#10b981 calc(var(--p,0)*1%), #f1f5f9 0);
+      display:flex; align-items:center; justify-content:center;
+      flex-direction:column; margin:6px auto;
+      box-shadow: inset 0 0 0 8px #fff;
+    }
+    #fbDeepInsight .fb-gauge.fb-gauge-blue { background: conic-gradient(#3b82f6 calc(var(--p,0)*1%), #dbeafe 0); }
+    #fbDeepInsight .fb-gauge span { font-size:26px; font-weight:900; color:#0f172a; }
+    #fbDeepInsight .fb-gauge small { font-size:11px; color:#64748b; }
+    #fbDeepInsight .fb-grade { text-align:center; font-weight:900; font-size:14px; margin-bottom:8px; }
+    #fbDeepInsight .fb-list { list-style:none; padding:0; margin:0 0 8px; font-size:12px; }
+    #fbDeepInsight .fb-list li { padding:4px 0; border-bottom:1px dashed rgba(0,0,0,0.05); }
+    #fbDeepInsight .fb-list-ok li::before { content:"✅ "; }
+    #fbDeepInsight .fb-list-bad li::before { content:"⚠️ "; }
+    #fbDeepInsight .fb-list-q li::before  { content:"❓ "; }
+    #fbDeepInsight .fb-list-title { font-size:11px; font-weight:900; color:#1e3a8a; margin:8px 0 4px; }
+    #fbDeepInsight .fb-bars { display:flex; flex-direction:column; gap:8px; }
+    #fbDeepInsight .fb-bar-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+    #fbDeepInsight .fb-bar-row .lbl { width:80px; font-weight:700; color:#475569; }
+    #fbDeepInsight .fb-bar-row .bar { flex:1; height:10px; background:#dbeafe; border-radius:6px; overflow:hidden; }
+    #fbDeepInsight .fb-bar-row .bar > div { height:100%; background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+    #fbDeepInsight .fb-bar-row .pct { width:120px; text-align:left; font-weight:800; color:#1e3a8a; font-size:11px; }
+    #fbDeepInsight .fb-meta { font-size:11px; color:#64748b; margin-top:6px; }
+    #fbDeepInsight .fb-flags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    #fbDeepInsight .fb-flag { padding:3px 8px; border-radius:999px; font-size:11px; font-weight:800; }
+    #fbDeepInsight .fb-flag.ok  { background:#dcfce7; color:#166534; }
+    #fbDeepInsight .fb-flag.bad { background:#fee2e2; color:#991b1b; }
+    #fbDeepInsight .fb-heatmap-scroll { overflow-x:auto; }
+    #fbDeepInsight .fb-heatmap { border-collapse:separate; border-spacing:2px; font-size:10px; }
+    #fbDeepInsight .fb-heatmap th,
+    #fbDeepInsight .fb-heatmap td { padding:0; min-width:18px; min-height:18px; text-align:center; color:#475569; font-weight:700; }
+    #fbDeepInsight .fb-heatmap th { background:transparent; }
+    #fbDeepInsight .fb-heatmap td { border-radius:3px; background:#f1f5f9; }
+    #fbDeepInsight .fb-heatmap td.has { color:#fff; }
+    #fbDeepInsight .fb-heatmap-meta { font-size:11px; color:#1e3a8a; font-weight:800; margin-bottom:6px; }
+    #fbDeepInsight .fb-hashtag-cloud { display:flex; flex-wrap:wrap; gap:6px; }
+    #fbDeepInsight .fb-hashtag-cloud .fb-tag {
+      background:#dbeafe; color:#1e3a8a; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:800;
+    }
+    #fbDeepInsight .fb-hashtag-cloud .fb-tag .c { opacity:0.6; margin-inline-start:4px; font-size:10px; }
+    #fbDeepInsight .fb-rank-list { list-style:none; padding:0; margin:0; font-size:12px; }
+    #fbDeepInsight .fb-rank-list li {
+      display:flex; justify-content:space-between; padding:5px 6px; border-bottom:1px dashed rgba(59,130,246,0.15);
+    }
+    #fbDeepInsight .fb-rank-list li .c { font-weight:900; color:#3b82f6; }
+    #fbDeepInsight .fb-react-row { display:flex; align-items:center; gap:8px; font-size:12px; padding:4px 0; }
+    #fbDeepInsight .fb-react-row .emoji { font-size:18px; }
+    #fbDeepInsight .fb-react-row .lbl { width:60px; font-weight:700; color:#475569; }
+    #fbDeepInsight .fb-react-row .bar { flex:1; height:10px; background:#dbeafe; border-radius:6px; overflow:hidden; }
+    #fbDeepInsight .fb-react-row .bar > div { height:100%; background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+    #fbDeepInsight .fb-react-row .pct { width:110px; text-align:left; font-weight:800; color:#1e3a8a; font-size:11px; }
+    #fbDeepInsight .fb-top-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+    #fbDeepInsight .fb-top-card {
+      background:#fff; border:1px solid rgba(59,130,246,0.2); border-radius:12px; overflow:hidden;
+      display:flex; flex-direction:column; transition:transform 0.2s; text-decoration:none; color:inherit;
+    }
+    #fbDeepInsight .fb-top-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(59,130,246,0.15); }
+    #fbDeepInsight .fb-top-card .img { aspect-ratio:1/1; background:#f1f5f9 center/cover no-repeat; position:relative; }
+    #fbDeepInsight .fb-top-card .body { padding:8px 10px; font-size:11px; }
+    #fbDeepInsight .fb-top-card .stats { display:flex; gap:6px; font-weight:800; color:#1e3a8a; margin-top:4px; font-size:10px; flex-wrap:wrap; }
+    #fbDeepInsight .fb-top-card .badge-type {
+      position:absolute; bottom:6px; left:6px; padding:2px 6px; border-radius:6px;
+      background:rgba(0,0,0,0.6); color:#fff; font-size:10px; font-weight:800;
+    }
+    #fbDeepInsight .fb-sentiment-bar { height:14px; border-radius:8px; overflow:hidden; display:flex; }
+    #fbDeepInsight .fb-sentiment-bar .pos { background:#10b981; }
+    #fbDeepInsight .fb-sentiment-bar .neu { background:#94a3b8; }
+    #fbDeepInsight .fb-sentiment-bar .neg { background:#ef4444; }
+    #fbDeepInsight .fb-sentiment-meta { font-size:11px; color:#64748b; margin-top:6px; font-weight:700; }
+    #fbDeepInsight .fb-ai-summary {
+      background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:10px 12px;
+      font-size:12px; color:#78350f; margin-top:10px; line-height:1.7;
+    }
+    #fbDeepInsight .fb-vision-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+    #fbDeepInsight .fb-vision-card {
+      background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;
+    }
+    #fbDeepInsight .fb-vision-card .img { aspect-ratio:1/1; background:#f1f5f9 center/cover no-repeat; }
+    #fbDeepInsight .fb-vision-card .body { padding:8px 10px; font-size:11px; color:#374151; line-height:1.6; }
+    #fbDeepInsight .fb-vision-card .tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+    #fbDeepInsight .fb-vision-card .tag { background:#dbeafe; color:#1e3a8a; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; }
+    #fbDeepInsight .fb-vision-summary { margin-top:10px; font-size:12px; color:#475569; }
+    #fbDeepInsight .fb-service-card {
+      background:#fff; border:1px solid rgba(59,130,246,0.2); border-radius:10px;
+      padding:10px; font-size:12px;
+    }
+    #fbDeepInsight .fb-service-card .name { font-weight:900; color:#1e3a8a; margin-bottom:4px; }
+    #fbDeepInsight .fb-service-card .desc { color:#64748b; font-size:11px; }
+    #fbDeepInsight .fb-service-card .price { color:#10b981; font-weight:800; margin-top:4px; }
+    #fbDeepInsight .fb-services-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+
     /* ════════════ Instagram Deep Insight (V3) ════════════ */
     #igDeepInsight .ig-kpi {
       background: rgba(236,72,153,0.06); border:1px solid rgba(236,72,153,0.18);
@@ -852,6 +958,141 @@
         </div>
 
 
+        <!-- ============= Facebook Deep Insight (V3) ============= -->
+        <div class="plat-card" id="fbDeepInsight" style="display:none; grid-column: 1 / -1; background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;">
+          <div class="plat-header" style="background:linear-gradient(135deg,#3b82f6,#60a5fa);color:#fff;">
+            <div class="plat-icon">🔬</div>
+            <div>
+              <div class="plat-title">📘 تحليل Facebook العميق</div>
+              <div class="plat-sub">Deep Page · Posts · Reactions · Sentiment · Vision</div>
+            </div>
+            <div class="plat-badge" id="fbHealthBadge" style="background:rgba(255,255,255,0.25);color:#fff;">—</div>
+          </div>
+
+          <div class="plat-body" style="display:flex; flex-direction:column; gap:24px;">
+
+            <!-- KPIs -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px;">
+              <div class="fb-kpi"><div class="fb-kpi-lbl">متوسط إعجابات</div><div class="fb-kpi-val" id="fbAvgLikes">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">متوسط تعليقات</div><div class="fb-kpi-val" id="fbAvgComments">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">متوسط مشاركات</div><div class="fb-kpi-val" id="fbAvgShares">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">مشاهدات الفيديو</div><div class="fb-kpi-val" id="fbAvgVideoViews">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">منشور/أسبوع</div><div class="fb-kpi-val" id="fbPostsPerWeek">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">آخر منشور</div><div class="fb-kpi-val" id="fbLastPost">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">معدل التفاعل</div><div class="fb-kpi-val" id="fbEngagementRate">—</div></div>
+              <div class="fb-kpi"><div class="fb-kpi-lbl">المراجعات</div><div class="fb-kpi-val" id="fbReviewsSummary">—</div></div>
+            </div>
+
+            <!-- Health + Page Optimization -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">🩺 صحة الصفحة</h4>
+                <div id="fbHealthGauge" class="fb-gauge"><span id="fbHealthScore">0</span><small>/100</small></div>
+                <div class="fb-grade" id="fbHealthGrade">—</div>
+                <div class="fb-list-title">نقاط القوة</div>
+                <ul class="fb-list fb-list-ok" id="fbHealthStrengths"></ul>
+                <div class="fb-list-title">نقاط للتحسين</div>
+                <ul class="fb-list fb-list-bad" id="fbHealthIssues"></ul>
+              </div>
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">📋 تحسين الصفحة</h4>
+                <div id="fbOptGauge" class="fb-gauge fb-gauge-blue"><span id="fbOptScore">0</span><small>/100</small></div>
+                <div class="fb-grade" id="fbOptGrade">—</div>
+                <div id="fbOptFlags" class="fb-flags"></div>
+                <div class="fb-list-title">نقاط القوة</div>
+                <ul class="fb-list fb-list-ok" id="fbOptStrengths"></ul>
+                <div class="fb-list-title">للتحسين</div>
+                <ul class="fb-list fb-list-bad" id="fbOptIssues"></ul>
+              </div>
+            </div>
+
+            <!-- Content Distribution + Heatmap -->
+            <div style="display:grid; grid-template-columns:1fr 2fr; gap:16px;" class="fb-grid-2">
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">📊 توزيع المحتوى</h4>
+                <div id="fbContentDist" class="fb-bars"></div>
+                <div class="fb-meta" id="fbAlbumPhotos"></div>
+              </div>
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">🕒 خريطة أوقات النشر (Engagement Heatmap)</h4>
+                <div class="fb-heatmap-meta" id="fbHeatmapMeta"></div>
+                <div class="fb-heatmap-scroll"><table class="fb-heatmap" id="fbHeatmap"></table></div>
+              </div>
+            </div>
+
+            <!-- Reactions Breakdown -->
+            <div class="fb-panel">
+              <h4 class="fb-panel-title">😍 تفصيل تفاعل المنشورات (Reactions)</h4>
+              <div id="fbReactions"></div>
+            </div>
+
+            <!-- Hashtags + Mentions + Locations -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">🏷️ Hashtags الأكثر استخداماً</h4>
+                <div class="fb-hashtag-cloud" id="fbHashtagCloud"></div>
+              </div>
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">@ Mentions الأكثر تكراراً</h4>
+                <ul class="fb-rank-list" id="fbMentionsList"></ul>
+                <h4 class="fb-panel-title" style="margin-top:14px;">🏷 صفحات Tagged</h4>
+                <ul class="fb-rank-list" id="fbTaggedList"></ul>
+              </div>
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">📍 المواقع (Check-ins)</h4>
+                <ul class="fb-rank-list" id="fbLocationsList"></ul>
+                <h4 class="fb-panel-title" style="margin-top:14px;">🌐 توزيع اللغة</h4>
+                <div id="fbLanguageMix" class="fb-bars"></div>
+              </div>
+            </div>
+
+            <!-- Top 5 Posts -->
+            <div class="fb-panel">
+              <h4 class="fb-panel-title">🏆 أفضل 5 منشورات (الأعلى تفاعلاً)</h4>
+              <div class="fb-top-grid" id="fbTop5Posts"></div>
+            </div>
+
+            <!-- Reviews + Hours -->
+            <div style="display:grid; grid-template-columns:2fr 1fr; gap:16px;" class="fb-grid-2">
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">⭐ المراجعات</h4>
+                <div id="fbReviewsBox"></div>
+              </div>
+              <div class="fb-panel">
+                <h4 class="fb-panel-title">⏰ ساعات العمل</h4>
+                <ul class="fb-rank-list" id="fbHoursList"></ul>
+              </div>
+            </div>
+
+            <!-- Services -->
+            <div class="fb-panel">
+              <h4 class="fb-panel-title">🛍️ الخدمات / المنتجات</h4>
+              <div class="fb-services-grid" id="fbServicesGrid"></div>
+            </div>
+
+            <!-- Sentiment (optional) -->
+            <div class="fb-panel" id="fbSentimentBox" style="display:none;">
+              <h4 class="fb-panel-title">💬 تحليل مشاعر التعليقات</h4>
+              <div class="fb-sentiment-bar" id="fbSentimentBar"></div>
+              <div class="fb-sentiment-meta" id="fbSentimentMeta"></div>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:12px;">
+                <div><div class="fb-list-title">🚩 أبرز الاعتراضات</div><ul class="fb-list fb-list-bad" id="fbObjections"></ul></div>
+                <div><div class="fb-list-title">⭐ أبرز الإشادات</div><ul class="fb-list fb-list-ok" id="fbPraise"></ul></div>
+                <div><div class="fb-list-title">❓ الأسئلة الشائعة</div><ul class="fb-list fb-list-q" id="fbQuestions"></ul></div>
+              </div>
+              <div id="fbAiSentimentSummary" class="fb-ai-summary" style="display:none;"></div>
+            </div>
+
+            <!-- Vision (optional) -->
+            <div class="fb-panel" id="fbVisionBox" style="display:none;">
+              <h4 class="fb-panel-title">👁️ تحليل الصور بالذكاء الاصطناعي</h4>
+              <div class="fb-vision-grid" id="fbVisionGrid"></div>
+              <div class="fb-vision-summary" id="fbVisionSummary"></div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- بطاقة انستجرام -->
         <div class="plat-card" id="platInstagram" style="display:none;">
           <div class="plat-header ig-header">
@@ -1213,8 +1454,10 @@
   <script src="js/report-connect.js?v=5.5"></script>
   <script src="js/report-page.js?v=6.0"></script>
   <script src="js/ig-deep-insight.js?v=1.0"></script>
+  <script src="js/fb-deep-insight.js?v=1.0"></script>
   <!-- v6.0: report-connect.js fetches + renders main data; report-page.js renders platform cards using shared data -->
   <!-- ig-deep-insight.js: V3 deep Instagram insight (heatmap, hashtags, sentiment, vision...) -->
+  <!-- fb-deep-insight.js: V3 deep Facebook insight (page health, optimization, reactions, reviews, sentiment, vision...) -->
 
 </body>
 </html>
