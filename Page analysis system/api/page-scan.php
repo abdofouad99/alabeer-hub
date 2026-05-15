@@ -960,8 +960,18 @@ function computeScanScore(array $result): int {
 // ============================================================
 function normalizeUrl(string $url): ?string {
     $url = trim($url);
+    if ($url === '') return null;
     if (!preg_match('/^https?:\/\//i', $url)) $url = 'https://' . $url;
-    return filter_var($url, FILTER_VALIDATE_URL) ? $url : null;
+    if (!filter_var($url, FILTER_VALIDATE_URL)) return null;
+    // تحقق إضافي: يجب أن يحتوي host على نقطة (TLD) أو يكون localhost / IP صريح
+    $host = parse_url($url, PHP_URL_HOST) ?: '';
+    if (
+        $host === '' ||
+        (!str_contains($host, '.') && $host !== 'localhost' && !filter_var($host, FILTER_VALIDATE_IP))
+    ) {
+        return null;
+    }
+    return $url;
 }
 
 // تحويل أرقام بصيغة K/M إلى أرقام كاملة (10K → 10000, 1.5M → 1500000)

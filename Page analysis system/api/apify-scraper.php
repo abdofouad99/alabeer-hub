@@ -767,8 +767,17 @@ function _extractReviews(array $page): array {
                 $author = $r['author'] ?? $r['userName'] ?? $r['user']['name'] ?? '';
                 $date   = $r['date'] ?? $r['createdTime'] ?? $r['timestamp'] ?? '';
                 if (!$text && $rating === null) continue;
+                // Normalize rating: numeric → float, semantic strings → 5.0/1.0 (consistent type)
+                $normalizedRating = null;
+                if (is_numeric($rating)) {
+                    $normalizedRating = (float)$rating;
+                } elseif (is_string($rating)) {
+                    $low = strtolower($rating);
+                    if (in_array($low, ['positive','recommends','recommend'], true))           $normalizedRating = 5.0;
+                    elseif (in_array($low, ['negative','doesnt-recommend','dont-recommend'], true)) $normalizedRating = 1.0;
+                }
                 $reviews[] = [
-                    'rating' => is_numeric($rating) ? (float)$rating : (in_array($rating, ['positive','recommends','POSITIVE'], true) ? 5 : (in_array($rating, ['negative','doesnt-recommend','NEGATIVE'], true) ? 1 : null)),
+                    'rating' => $normalizedRating,
                     'text'   => is_string($text) ? mb_substr(trim($text), 0, 500) : '',
                     'author' => is_string($author) ? $author : '',
                     'date'   => is_string($date) ? $date : '',
