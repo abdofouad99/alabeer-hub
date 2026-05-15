@@ -607,9 +607,12 @@ function analyzeFBCommentsSentiment(array $topPosts, string $token, array $cfg):
 
 if (!function_exists('_fbHeuristicSentiment')) {
 function _fbHeuristicSentiment(array $comments): array {
+    // SENT-1 FIX: أزلنا "لا" — كلمة عامة جداً تسبب false positives (مثل "لا يوجد أفضل منكم")
     $negWords = ['غالي','مكلف','سيء','وحش','رديء','ضعيف','فاشل','تأخر','تعطل','مزعج','خايس','خداع','نصب','احتيال','bad','worst','expensive','scam','poor','rude','slow','terrible'];
     $posWords = ['رائع','ممتاز','جيد','حلو','عظيم','جميل','شكر','الله يعطيكم','يعطيك','مبدع','أفضل','كفو','كويس','great','love','excellent','amazing','perfect','awesome'];
     $qMarkers = ['?','؟','كيف','متى','كم','هل','وين','أين','الأسعار','السعر','price','how','when','where'];
+    // SENT-1 FIX: كلمات استثناء — لو "غالي" مع كلمة إيجابية = neutral وليس negative
+    $negExceptions = ['يستاهل','يستحق','بس','لكن الجودة','worth','ولكن'];
 
     $pos=0; $neg=0; $q=0; $neu=0;
     $obj=[]; $praise=[]; $questions=[]; $samples=[];
@@ -618,7 +621,16 @@ function _fbHeuristicSentiment(array $comments): array {
         $samples[] = mb_substr($t, 0, 100);
         $isQ=false; $isN=false; $isP=false;
         foreach ($qMarkers as $w) if (mb_stripos($t,$w)!==false) { $isQ=true; break; }
-        foreach ($negWords as $w) if (mb_stripos($t,$w)!==false) { $isN=true; break; }
+        foreach ($negWords as $w) {
+            if (mb_stripos($t,$w)!==false) {
+                // SENT-1 FIX: فحص سياقي — هل توجد كلمة استثناء بالقرب؟
+                $hasException = false;
+                foreach ($negExceptions as $ex) {
+                    if (mb_stripos($t, $ex) !== false) { $hasException = true; break; }
+                }
+                if (!$hasException) { $isN = true; break; }
+            }
+        }
         foreach ($posWords as $w) if (mb_stripos($t,$w)!==false) { $isP=true; break; }
         if ($isQ) { $q++; $questions[] = mb_substr($t, 0, 120); }
         if ($isN) { $neg++; $obj[]      = mb_substr($t, 0, 120); }

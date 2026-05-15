@@ -14,6 +14,18 @@ function runPageScan(string $rawUrl, array $cfg): array {
     $url  = normalizeUrl($rawUrl);
     if (!$url) return ['success' => false, 'error' => 'الرابط غير صالح'];
 
+    // ── GLB-3 FIX: Cache — لو نفس الرابط فُحص خلال آخر ساعة، أرجع النتيجة المخزنة ──
+    $cacheKey = md5($url);
+    $cacheDir = __DIR__ . '/../cache';
+    $cacheFile = $cacheDir . '/scan_' . $cacheKey . '.json';
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 3600) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        if ($cached && ($cached['success'] ?? false)) {
+            $cached['from_cache'] = true;
+            return $cached;
+        }
+    }
+
     $type = detectUrlType($url);
 
     $result = [
@@ -269,12 +281,34 @@ function runPageScan(string $rawUrl, array $cfg): array {
     // ── Step 5: حساب درجة الفحص الجزئية ───────────────────────
     $result['scan_score'] = computeScanScore($result);
 
+    // ── GLB-3 FIX: حفظ النتيجة في الـ cache ──
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+    @file_put_contents($cacheFile, json_encode($result, JSON_UNESCAPED_UNICODE));
+
     return $result;
 }
 
 // ── مساعد: فحص الموقع وإرجاع نتيجة منظمة ────────────────────
 function _fetchAndScanWebsite(string $url, array $cfg): array {
-    return scanWebsiteHTML($url, $cfg) ?: [];
+    $ws = scanWebsiteHTML($url, $cfg) ?: [];
+    // WEB-1 FIX: إضافة multi-page crawl لاكتشاف محتوى إضافي
+    if (!empty($ws) && !isset($ws['error'])) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 12,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/123.0.0.0 Safari/537.36',
+        ]);
+        $html = curl_exec($ch);
+        curl_close($ch);
+        if ($html) {
+            $multiPage = scanWebsiteMultiPage($url, $html, $cfg);
+            $ws = array_merge($ws, $multiPage);
+        }
+    }
+    return $ws;
 }
 
 // ── مساعد: استخراج روابط سوشيال من Sitemap.xml ───────────────
@@ -859,16 +893,51 @@ function scanWebsiteHTML(string $url, array $cfg = []): array {
     preg_match_all('/<h2[^>]*>(.*?)<\/h2>/is', $html, $mH2);
 
     // ── استخراج نص الخدمات / المنتجات ──────────────────────
+    // WEB-2 FIX: إزالة nav, header, footer قبل البحث عن services (كان يلتقط navigation + footer links)
+    $cleanHtml = preg_replace('/<nav[^>]*>.*?<\/nav>/is', '', $html);
+    $cleanHtml = preg_replace('/<header[^>]*>.*?<\/header>/is', '', $cleanHtml);
+    $cleanHtml = preg_replace('/<footer[^>]*>.*?<\/footer>/is', '', $cleanHtml);
+
     $services = [];
-    preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $html, $liMatches);
+    preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $cleanHtml, $liMatches);
     foreach (($liMatches[1] ?? []) as $li) {
         $text = trim(strip_tags($li));
-        if (mb_strlen($text) > 5 && mb_strlen($text) < 100 && !preg_match('/^\d+$/', $text)) {
+        // WEB-2 FIX: استبعاد العناصر القصيرة جداً أو التي تبدو روابط تنقل
+        if (mb_strlen($text) > 10 && mb_strlen($text) < 100
+            && !preg_match('/^\d+$/', $text)
+            && !preg_match('/^(home|about|contact|الرئيسية|من نحن|اتصل|تسجيل|دخول)$/iu', $text)) {
             $services[] = $text;
         }
     }
     preg_match_all('/<h[23][^>]*>(.*?)<\/h[23]>/is', $html, $hMatches);
     $sections = array_map(fn($h) => trim(strip_tags($h)), $hMatches[1] ?? []);
+
+    // MAPS-1 FIX: استخراج Google Maps URL من HTML
+    $googleMapsUrl = null;
+    if (preg_match('/https?:\/\/(?:maps\.google\.com|www\.google\.com\/maps|goo\.gl\/maps)[^\s"\'<>]+/i', $html, $mMaps)) {
+        $googleMapsUrl = $mMaps[0];
+    }
+    // أيضاً iframe embedded maps
+    if (!$googleMapsUrl && preg_match('/src=["\']([^"\']*google\.com\/maps\/embed[^"\']*)/i', $html, $mEmbed)) {
+        $googleMapsUrl = $mEmbed[1];
+    }
+
+    // WEB-5 FIX: Tech Stack Detection
+    $techStack = [];
+    if (preg_match('/wp-content|wp-includes|wordpress/i', $html)) $techStack[] = 'WordPress';
+    if (preg_match('/cdn\.shopify\.com|shopify/i', $html)) $techStack[] = 'Shopify';
+    if (preg_match('/wix\.com|wixstatic/i', $html)) $techStack[] = 'Wix';
+    if (preg_match('/squarespace/i', $html)) $techStack[] = 'Squarespace';
+    if (preg_match('/__next|_next\/static/i', $html)) $techStack[] = 'Next.js';
+    if (preg_match('/react|reactDOM/i', $html)) $techStack[] = 'React';
+    if (preg_match('/vue\.js|vuejs\.org|v-bind|v-if/i', $html)) $techStack[] = 'Vue.js';
+    if (preg_match('/angular\.io|ng-version/i', $html)) $techStack[] = 'Angular';
+    if (preg_match('/bootstrap/i', $html)) $techStack[] = 'Bootstrap';
+    if (preg_match('/tailwindcss|tailwind/i', $html)) $techStack[] = 'Tailwind CSS';
+    if (preg_match('/jquery/i', $html)) $techStack[] = 'jQuery';
+    if (preg_match('/laravel|csrf-token.*content/i', $html)) $techStack[] = 'Laravel';
+    if (preg_match('/generator.*content=.*joomla/i', $html)) $techStack[] = 'Joomla';
+    if (preg_match('/generator.*content=.*drupal/i', $html)) $techStack[] = 'Drupal';
 
     return [
         'final_url'       => $finalUrl,
@@ -901,7 +970,77 @@ function scanWebsiteHTML(string $url, array $cfg = []): array {
         // ✅ خدمات وأقسام الموقع
         'services_list'   => array_slice(array_unique($services), 0, 15),
         'sections_titles' => array_slice(array_filter($sections), 0, 10),
+        // MAPS-1 FIX: رابط خرائط Google المكتشف
+        'google_maps_url' => $googleMapsUrl,
+        // WEB-5 FIX: Tech Stack Detection
+        'tech_stack'      => $techStack,
+        // WEB-4 FIX: ملاحظة أن قياس السرعة أوّلي + حجم HTML
+        'speed_note'      => 'قياس أوّلي (HTML فقط) — استخدم PageSpeed لقياس شامل',
+        'html_size_kb'    => round(strlen($html) / 1024, 1),
     ];
+}
+
+// ============================================================
+// WEB-1 FIX: Multi-page crawl — فحص صفحات داخلية إضافية (about, services, products, contact)
+// ============================================================
+function scanWebsiteMultiPage(string $baseUrl, string $html, array $cfg): array {
+    $extra = ['pages_crawled' => 1, 'all_services' => [], 'all_products' => [], 'tech_stack' => []];
+
+    // 1) استخراج الروابط الداخلية من الصفحة الرئيسية
+    $baseDomain = parse_url($baseUrl, PHP_URL_HOST);
+    preg_match_all('/href=["\']([^"\']+)["\']/', $html, $links);
+    $internalLinks = [];
+    foreach (($links[1] ?? []) as $link) {
+        $link = trim($link);
+        if (str_starts_with($link, '/') && !str_starts_with($link, '//')) {
+            $link = rtrim($baseUrl, '/') . $link;
+        }
+        if (!filter_var($link, FILTER_VALIDATE_URL)) continue;
+        $linkHost = parse_url($link, PHP_URL_HOST);
+        if ($linkHost !== $baseDomain) continue;
+        $internalLinks[] = $link;
+    }
+    $internalLinks = array_unique($internalLinks);
+
+    // 2) فحص أهم 4 صفحات فقط (لتجنب الثقل)
+    $priorityPaths = ['/about', '/services', '/products', '/contact', '/pricing', '/من-نحن', '/خدماتنا'];
+    $toScan = [];
+    foreach ($internalLinks as $link) {
+        $path = strtolower(parse_url($link, PHP_URL_PATH) ?? '');
+        foreach ($priorityPaths as $pp) {
+            if (str_contains($path, $pp)) { $toScan[] = $link; break; }
+        }
+        if (count($toScan) >= 4) break;
+    }
+
+    // 3) سحب كل صفحة واستخراج محتوى إضافي
+    foreach ($toScan as $pageUrl) {
+        $ch = curl_init($pageUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/123.0.0.0 Safari/537.36',
+        ]);
+        $pageHtml = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (!$pageHtml || $code !== 200) continue;
+        $extra['pages_crawled']++;
+
+        // استخراج خدمات/منتجات من H2/H3
+        preg_match_all('/<h[23][^>]*>(.*?)<\/h[23]>/is', $pageHtml, $hm);
+        foreach (($hm[1] ?? []) as $h) {
+            $t = trim(strip_tags($h));
+            if (mb_strlen($t) > 3 && mb_strlen($t) < 100) $extra['all_services'][] = $t;
+        }
+    }
+    $extra['all_services'] = array_slice(array_unique($extra['all_services']), 0, 25);
+    $extra['internal_links_count'] = count($internalLinks);
+
+    return $extra;
 }
 
 // ============================================================
