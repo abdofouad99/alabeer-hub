@@ -118,11 +118,37 @@ return [
         // Meta / Facebook
         'facebook_access_token' => $get('FACEBOOK_ACCESS_TOKEN', ''),
         'meta_ads_token'        => $get('META_ADS_TOKEN', ''),
+
+        // Google PageSpeed Insights
+        'google_pagespeed_key'  => $get('GOOGLE_PAGESPEED_KEY', ''),
     ],
 
     // ── 5) إعدادات التطبيق ───────────────────────────────────
     'app' => [
         'env'   => $get('APP_ENV', 'production'),
         'debug' => filter_var($get('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    // ── 6) إعدادات التسجيل (Logging) ─────────────────────────
+    'logging' => [
+        'enabled'       => true,
+        'level'         => $get('LOG_LEVEL', 'INFO'),
+        'file_path'     => __DIR__ . '/../logs/app.log',
+        'max_file_size' => 10 * 1024 * 1024, // 10MB
+        'max_files'     => 5,
+    ],
+
+    // ── 7) إعدادات الكاش (Cache) ─────────────────────────────
+    'cache' => [
+        'enabled' => filter_var($get('CACHE_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'driver'  => $get('CACHE_DRIVER', 'file'), // file | redis | apcu
+        'ttl'     => (int)$get('CACHE_TTL', '3600'),
+        'file'    => [
+            'path' => __DIR__ . '/../cache',
+        ],
+        'redis'   => [
+            'url'   => $get('REDIS_URL', ''),
+            'token' => $get('REDIS_TOKEN', ''),
+        ],
     ],
 ];

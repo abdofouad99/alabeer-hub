@@ -607,23 +607,30 @@ function runAnalysis(int $assessmentId): array {
 
     // ─── 2) الفحص الأساسي الذكي ─────────────────────────────
     $cacheKey = 'scan_' . md5($primaryUrl);
-    $scanResult = cacheRemember($cacheKey, function() use ($primaryUrl, $cfg, $assessmentId, $db, $updateStep) {
+    $scanResult = cacheGet($cacheKey);
+
+    // لا نستخدم الكاش إذا كانت النتيجة فاشلة أو غير موجودة
+    if (!$scanResult || !($scanResult['success'] ?? false)) {
         logInfo('Starting page scan', ['url' => $primaryUrl, 'assessment_id' => $assessmentId]);
 
         try {
             // تحديث حالة assessment الى running
             $db->prepare("UPDATE assessments SET status='running' WHERE id=?")->execute([$assessmentId]);
 
-            $result = runPageScan($primaryUrl, $cfg);
+            $scanResult = runPageScan($primaryUrl, $cfg);
             $updateStep(2); // step 2: اكتمل فحص الموقع واكتُشفت المنصات
 
-            logInfo('Page scan completed', ['url' => $primaryUrl, 'success' => $result['success'] ?? false]);
-            return $result;
+            logInfo('Page scan completed', ['url' => $primaryUrl, 'success' => $scanResult['success'] ?? false]);
+
+            // ✅ نخزّن في الكاش فقط إذا نجح الفحص — لا نُخزّن الفشل
+            if ($scanResult['success'] ?? false) {
+                cacheSet($cacheKey, $scanResult, 6 * 3600);
+            }
         } catch (\Throwable $e) {
             logError('Page scan failed', ['url' => $primaryUrl, 'error' => $e->getMessage()]);
-            return ['success' => false, 'error' => $e->getMessage()];
+            $scanResult = ['success' => false, 'error' => $e->getMessage()];
         }
-    }, 6 * 3600); // cache for 6 hours
+    }
 
     // ─── 3) استخدم نتائج محرك الاكتشاف مباشرة ──────────────
     // runPageScan v5 يكتشف FB/IG ويشغّل Apify داخلياً
@@ -1065,7 +1072,7 @@ function runAnalysis(int $assessmentId): array {
                                ?? null;
 
     if (empty($scanResult['facebook']['whatsapp']) && !empty($scanResult['hasWhatsApp'])) {
-        $scanResult['facebook']['whatsapp'] = $scanResult['facebook']['phone'] ?? $ws['phone'] ?? '+967';
+        $scanResult['facebook']['whatsapp'] = $scanResult['facebook']['phone'] ?? $ws['phone'] ?? '';
     }
     $scanResult['hasCTA']      = $ws['has_cta']           ?? null;
     $scanResult['hasSchema']   = $ws['has_schema']        ?? null;

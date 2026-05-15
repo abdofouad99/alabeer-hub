@@ -768,8 +768,8 @@ function callGeminiAgent(
     string $userMessage,
     int $maxTokens = 65536
 ): array {
-    // Override model for OpenAI (we ignore the Gemini model name passed in)
-    $model = getenv('OPENAI_MODEL') ?: 'gpt-3.5-turbo';
+    // Use OpenAI as the actual provider (function name kept for backward compatibility)
+    $model = getenv('OPENAI_MODEL') ?: 'gpt-4o-mini';
     
     $url = "https://api.openai.com/v1/chat/completions";
 
@@ -780,7 +780,7 @@ function callGeminiAgent(
             ['role' => 'user', 'content' => $userMessage]
         ],
         'temperature' => 0.7,
-        'max_tokens' => 4096, // Safe limit for OpenAI outputs
+        'max_tokens' => min($maxTokens, 16384), // OpenAI safe limit per request
         'response_format' => ['type' => 'json_object']
     ];
 
