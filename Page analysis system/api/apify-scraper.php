@@ -594,6 +594,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         'description'    => $page['intro'] ?? $page['description'] ?? $page['about'] ?? $page['text'] ?? '',
         'rating'         => _cleanRating($page['rating'] ?? $page['overallStarRating'] ?? null),
         'ratings_count'  => $page['ratingsCount'] ?? $page['ratingCount'] ?? null,
+        'response_time'  => $page['responseTime'] ?? $page['response_time'] ?? $page['messagingResponseTime'] ?? null,
         'posts_count'    => count($posts),
         'avg_engagement' => calcAvgEngagement($posts),
         'top_post'       => getTopPost($posts),
@@ -601,7 +602,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         'instagram_url'  => $igUrl,
         'ads_running'    => $adsActive,
         'ads_count'      => $adsCount,
-        'creation_date'  => $page['creation_date'] ?? '',
+        'creation_date'  => $page['creation_date'] ?? $page['createdTime'] ?? $page['pageCreatedDate'] ?? $page['foundedDate'] ?? '',
         'profile_pic'    => $page['profilePic'] ?? $page['profile_pic'] ?? '',
         'cover_photo'    => $page['cover'] ?? $page['cover_photo'] ?? '',
         'posts_per_week' => calcPostsPerWeek($posts),
@@ -669,7 +670,7 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
     $igUser    = $firstPost['ownerUsername']  ?? $firstPost['owner']['username']   ?? $username;
     $fullName  = $firstPost['ownerFullName']  ?? $firstPost['owner']['full_name']  ?? '';
     $followers = $firstPost['ownerFollowersCount'] ?? $firstPost['owner']['edge_followed_by']['count'] ?? null;
-    $following = $firstPost['ownerFollowingCount'] ?? null;
+    $following = $firstPost['ownerFollowingCount'] ?? $firstPost['owner']['edge_follow']['count'] ?? 0;
     $postsTotal= $firstPost['ownerPostsCount']     ?? count($posts);
     $bio       = $firstPost['ownerBiography']      ?? '';
     $website   = $firstPost['ownerExternalUrl']    ?? '';
@@ -707,6 +708,8 @@ function scrapeInstagram(string $url, string $token, array $cfg): array {
         'bio_length'       => mb_strlen($bio),
         'website'          => $website,
         'is_verified'      => $verified,
+        'is_business'      => (bool)($firstPost['ownerIsBusinessAccount'] ?? $firstPost['owner']['is_business_account'] ?? false),
+        'has_reels'        => $reelsCount > 0,
         'profile_pic'      => $picUrl,
         'avg_likes'        => $avgLikes,
         'avg_comments'     => $avgComments,
@@ -763,21 +766,27 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
     $author   = $firstItem['authorMeta'] ?? [];
     $videos   = $result;
 
-    // حساب Shares + Saves + Trending Sounds
-    $totalShares = 0; $totalSaves = 0; $totalViews = 0;
+    // حساب Likes + Shares + Saves + Views + Trending Sounds
+    // ⚠️ ملاحظة هامة: diggCount في TikTok API = عدد الإعجابات (❤️)
+    // shareCount = عدد المشاركات الفعلية
+    $totalLikes = 0; $totalShares = 0; $totalSaves = 0; $totalViews = 0; $totalComments = 0;
     $sounds = [];
     foreach ($videos as $v) {
-        $totalShares += (int)($v['diggCount']   ?? $v['shareCount'] ?? 0);
-        $totalSaves  += (int)($v['collectCount'] ?? 0);
-        $totalViews  += (int)($v['playCount']   ?? 0);
+        $totalLikes    += (int)($v['diggCount']    ?? $v['likesCount']   ?? $v['likes']    ?? 0);
+        $totalShares   += (int)($v['shareCount']   ?? $v['shares']       ?? 0);
+        $totalComments += (int)($v['commentCount'] ?? $v['commentsCount'] ?? $v['comments'] ?? 0);
+        $totalSaves    += (int)($v['collectCount'] ?? $v['savesCount']   ?? 0);
+        $totalViews    += (int)($v['playCount']    ?? $v['viewCount']    ?? 0);
         $sound = $v['musicMeta']['musicName'] ?? $v['music']['title'] ?? '';
         if ($sound) $sounds[$sound] = ($sounds[$sound] ?? 0) + 1;
     }
-    $cnt       = max(count($videos), 1);
+    $cnt        = max(count($videos), 1);
     $followers  = (int)($author['fans'] ?? $author['followerCount'] ?? 0);
-    $avgViews   = round($totalViews  / $cnt);
-    $avgShares  = round($totalShares / $cnt, 1);
-    $avgSaves   = round($totalSaves  / $cnt, 1);
+    $avgLikes   = round($totalLikes    / $cnt, 1);
+    $avgComments= round($totalComments / $cnt, 1);
+    $avgViews   = round($totalViews    / $cnt);
+    $avgShares  = round($totalShares   / $cnt, 1);
+    $avgSaves   = round($totalSaves    / $cnt, 1);
     arsort($sounds);
     $trendingSounds = array_slice(array_keys($sounds), 0, 5);
 
@@ -796,13 +805,13 @@ function scrapeTikTok(string $url, string $token, array $cfg): array {
         'is_verified'      => (bool)($author['verified'] ?? false),
         'website'          => $author['externalUrl'] ?? '',
         'avatar'           => $author['avatar']     ?? '',
-        'avg_likes'        => calcAvgLikes($videos),
-        'avg_comments'     => calcAvgComments($videos),
-        'avg_shares'       => $avgShares,          // ✅ جديد
-        'avg_saves'        => $avgSaves,           // ✅ جديد
-        'avg_views'        => $avgViews,           // ✅ جديد
-        'trending_sounds'  => $trendingSounds,     // ✅ جديد
-        'engagement_rate'  => calcIGEngagement($videos, $followers ?: 1),
+        'avg_likes'        => $avgLikes,
+        'avg_comments'     => $avgComments,
+        'avg_shares'       => $avgShares,
+        'avg_saves'        => $avgSaves,
+        'avg_views'        => $avgViews,
+        'trending_sounds'  => $trendingSounds,
+        'engagement_rate'  => $followers > 0 ? round((($avgLikes + $avgComments + $avgShares) / $followers) * 100, 2) : 0,
         'posts_per_week'   => calcPostsPerWeek($videos),
         'deep_analysis'    => analyzeDeepContent($videos),
         'latest_posts'     => array_slice($videos, 0, 30),

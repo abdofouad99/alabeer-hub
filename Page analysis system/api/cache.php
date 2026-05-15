@@ -5,7 +5,7 @@
 
 interface CacheInterface {
     public function get(string $key);
-    public function set(string $key, $value, int $ttl = null): bool;
+    public function set(string $key, $value, ?int $ttl = null): bool;
     public function delete(string $key): bool;
     public function clear(): bool;
     public function has(string $key): bool;
@@ -40,7 +40,7 @@ class FileCache implements CacheInterface {
         return $data['value'];
     }
 
-    public function set(string $key, $value, int $ttl = null): bool {
+    public function set(string $key, $value, ?int $ttl = null): bool {
         $file = $this->getFilePath($key);
         $ttl = $ttl ?? $this->defaultTtl;
 
@@ -101,7 +101,7 @@ class RedisCache implements CacheInterface {
         return $value === false ? null : unserialize($value);
     }
 
-    public function set(string $key, $value, int $ttl = null): bool {
+    public function set(string $key, $value, ?int $ttl = null): bool {
         $ttl = $ttl ?? $this->defaultTtl;
         return $this->redis->setex($key, $ttl, serialize($value));
     }
@@ -128,7 +128,7 @@ class Cache {
         if (!$cacheConfig['enabled']) {
             $this->driver = new class implements CacheInterface {
                 public function get(string $key) { return null; }
-                public function set(string $key, $value, int $ttl = null): bool { return true; }
+                public function set(string $key, $value, ?int $ttl = null): bool { return true; }
                 public function delete(string $key): bool { return true; }
                 public function clear(): bool { return true; }
                 public function has(string $key): bool { return false; }
@@ -155,7 +155,7 @@ class Cache {
                         private $defaultTtl;
                         public function __construct(int $ttl) { $this->defaultTtl = $ttl; }
                         public function get(string $key) { $val = apcu_fetch($key, $success); return $success ? $val : null; }
-                        public function set(string $key, $value, int $ttl = null): bool { return apcu_store($key, $value, $ttl ?? $this->defaultTtl); }
+                        public function set(string $key, $value, ?int $ttl = null): bool { return apcu_store($key, $value, $ttl ?? $this->defaultTtl); }
                         public function delete(string $key): bool { return apcu_delete($key); }
                         public function clear(): bool { return apcu_clear_cache(); }
                         public function has(string $key): bool { return apcu_exists($key); }
@@ -175,7 +175,7 @@ class Cache {
         return $this->driver->get($key);
     }
 
-    public function set(string $key, $value, int $ttl = null): bool {
+    public function set(string $key, $value, ?int $ttl = null): bool {
         return $this->driver->set($key, $value, $ttl);
     }
 
@@ -191,7 +191,7 @@ class Cache {
         return $this->driver->has($key);
     }
 
-    public function remember(string $key, callable $callback, int $ttl = null) {
+    public function remember(string $key, callable $callback, ?int $ttl = null) {
         $value = $this->get($key);
         if ($value !== null) {
             return $value;
