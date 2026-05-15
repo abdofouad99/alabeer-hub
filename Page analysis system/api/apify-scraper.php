@@ -453,6 +453,8 @@ function _apifyWaitAndFetch(string $runId, string $token, int $maxWait, int $dat
 // نفس المنهجية التي تعمل للإنستقرام
 // ============================================================
 function scrapeFacebook(string $url, string $token, array $cfg): array {
+    require_once __DIR__ . '/facebook-deep.php';
+
     $actorId = $cfg['apis']['apify_actor_fb'] ?? 'apify~facebook-pages-scraper';
 
     $isPostsScraper = ($actorId === 'KoJrdxJCTtpon81KY');
@@ -631,6 +633,80 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
     // ── Reviews Summary (متوسط + توزيع نجوم) ──
     $reviewsSummary = _summarizeReviews($reviews);
 
+    // ── 🎯 طبقات التحليل العميق (Facebook V3) ─────────────────
+    // مكافئ لطبقات Instagram V3 الـ 11
+    $hashtags         = extractFBHashtagsFromPosts($posts);
+    $mentionsAnalysis = extractFBMentionsAnalysis($posts);
+    $contentDist      = calcFBContentDistribution($posts);
+    $heatmap          = calcFBPostingHeatmap($posts);
+    $langMix          = detectFBPostsLanguageMix($posts);
+    $locations        = extractFBLocations($posts);
+    $sponsored        = calcFBSponsoredRatio($posts);
+
+    // Page Optimization Score (مكافئ لـ analyzeBioOptimization)
+    $pageOpt = analyzeFBPageOptimization([
+        'about'         => $aboutMe,
+        'description'   => $page['intro'] ?? $page['description'] ?? '',
+        'category'      => $category,
+        'website'       => $website,
+        'phone'         => $phone,
+        'whatsapp'      => $whatsapp,
+        'email'         => $email,
+        'address'       => $address,
+        'cover_photo'   => $page['cover'] ?? $page['cover_photo'] ?? '',
+        'profile_pic'   => $page['profilePic'] ?? $page['profile_pic'] ?? '',
+        'is_verified'   => $is_verified,
+        'rating'        => _cleanRating($page['rating'] ?? $page['overallStarRating'] ?? null) ?? $reviewsSummary['avg_rating'],
+        'opening_hours' => $hours,
+        'services'      => $services,
+    ]);
+
+    // Page Health Score (مكافئ لـ calcAccountHealthScore)
+    $pageHealth = calcFBPageHealthScore([
+        'followers'            => (int)($followers ?? 0),
+        'likes'                => (int)($likes ?? 0),
+        'posts_count'          => count($posts),
+        'engagement_rate'      => $engagementRate,
+        'is_verified'          => $is_verified,
+        'has_reviews'          => $reviewsSummary['count'] > 0,
+        'rating'               => $reviewsSummary['avg_rating'],
+        'reviews_count'        => $reviewsSummary['count'],
+        'has_shop'             => !empty($page['hasShop']) || !empty($page['shop_enabled']),
+        'website'              => $website,
+        'about_length'         => mb_strlen((string)$aboutMe),
+        'posts_per_week'       => calcPostsPerWeek($posts),
+        'last_post_days'       => calcLastPostDays($posts),
+        'ads_running'          => $adsActive,
+        'content_distribution' => $contentDist,
+    ]);
+
+    // أفضل 5 منشورات تفاعلاً (تُستخدم في Sentiment + Vision)
+    $sortedByEng = $posts;
+    usort($sortedByEng, function($a, $b) {
+        $ea = (int)($a['likesCount']    ?? $a['likes']    ?? $a['reactionsCount'] ?? 0)
+            + (int)($a['commentsCount'] ?? $a['comments'] ?? $a['commentCount']   ?? 0)
+            + (int)($a['sharesCount']   ?? $a['shareCount'] ?? $a['shares']       ?? 0);
+        $eb = (int)($b['likesCount']    ?? $b['likes']    ?? $b['reactionsCount'] ?? 0)
+            + (int)($b['commentsCount'] ?? $b['comments'] ?? $b['commentCount']   ?? 0)
+            + (int)($b['sharesCount']   ?? $b['shareCount'] ?? $b['shares']       ?? 0);
+        return $eb - $ea;
+    });
+    $top5 = array_slice($sortedByEng, 0, 5);
+
+    // Comments Sentiment (اختياري — مفعّل افتراضياً)
+    $sentiment = null;
+    if (!empty($cfg['analysis']['enable_fb_comments'])) {
+        try { $sentiment = analyzeFBCommentsSentiment($top5, $token, $cfg); }
+        catch (\Throwable $e) { logError('FB sentiment failed', ['err' => $e->getMessage()]); $sentiment = ['success' => false, 'reason' => $e->getMessage()]; }
+    }
+
+    // Vision AI (اختياري — معطّل افتراضياً)
+    $vision = null;
+    if (!empty($cfg['analysis']['enable_fb_vision'])) {
+        try { $vision = analyzeFBImagesVision($top5, $cfg); }
+        catch (\Throwable $e) { logError('FB vision failed', ['err' => $e->getMessage()]); $vision = ['success' => false, 'reason' => $e->getMessage()]; }
+    }
+
     $res = [
         'success'         => true,
         'source'          => 'apify',
@@ -663,6 +739,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         // ✅ تفصيل تفاعل المنشورات (Love/Haha/Wow/Sad/Angry)
         'reactions_breakdown' => $stats['reactions_breakdown'],
         'top_post'        => getTopPost($posts),
+        'top_5_posts'     => $top5,
         'deep_analysis'   => analyzeDeepContent($posts),
         'instagram_url'   => $igUrl,
         'ads_running'     => $adsActive,
@@ -678,6 +755,20 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         'reviews_summary' => $reviewsSummary,
         'services'        => $services,
         'opening_hours'   => $hours,
+        // 🎯 طبقات التحليل العميق (Facebook V3)
+        'hashtags_analysis'    => $hashtags,
+        'mentions_analysis'    => $mentionsAnalysis,
+        'content_distribution' => $contentDist,
+        'posting_heatmap'      => $heatmap,
+        'language_mix'         => $langMix,
+        'locations'            => $locations,
+        'sponsored_ratio'      => $sponsored,
+        'page_optimization'    => $pageOpt,
+        'page_health'          => $pageHealth,
+        'comments_sentiment'   => $sentiment,
+        'vision_analysis'      => $vision,
+        // علامة الإصدار
+        'fb_version'           => 'v3',
     ];
 
     // فقط أضف الـ signals إذا كانت حقيقية (حتى لا نمسح ما يجده الـ Scraper العام)

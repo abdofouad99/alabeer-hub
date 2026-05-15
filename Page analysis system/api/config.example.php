@@ -87,6 +87,18 @@ return [
         // عدد المنشورات/الصور التي يُجرى عليها تحليل المشاعر/الرؤية (تكلفة)
         'ig_comments_top_posts' => (int)$get('IG_COMMENTS_TOP_POSTS', '5'),
         'ig_vision_top_images'  => (int)$get('IG_VISION_TOP_IMAGES',  '5'),
+
+        // ── Facebook Deep Scan switches (V3) ───────────────────────
+        // enable_fb_comments:     استدعاء FB Comments Actor لأفضل 5 منشورات → Sentiment
+        // enable_fb_vision:       تحليل أفضل 5 صور Facebook عبر OpenAI Vision (مكلف)
+        // enable_fb_sentiment_ai: استخدام OpenAI لتلخيص مشاعر التعليقات (دقة أعلى)
+        'enable_fb_comments'    => filter_var($get('ENABLE_FB_COMMENTS',    'true'),  FILTER_VALIDATE_BOOLEAN),
+        'enable_fb_vision'      => filter_var($get('ENABLE_FB_VISION',      'false'), FILTER_VALIDATE_BOOLEAN),
+        'enable_fb_sentiment_ai'=> filter_var($get('ENABLE_FB_SENTIMENT_AI','true'),  FILTER_VALIDATE_BOOLEAN),
+        'fb_comments_top_posts' => (int)$get('FB_COMMENTS_TOP_POSTS', '5'),
+        'fb_vision_top_images'  => (int)$get('FB_VISION_TOP_IMAGES',  '5'),
+        // عدد المنشورات الافتراضي عند سحب Facebook (50 = تحليل أعمق)
+        'fb_max_posts'          => (int)$get('FB_MAX_POSTS', '50'),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
@@ -124,8 +136,9 @@ return [
         'apify_actor_ig_comments'  => $get('APIFY_ACTOR_IG_COMMENTS',  'SbK00X0JYCPblD2wp'),
         'apify_actor_ig_stories'   => $get('APIFY_ACTOR_IG_STORIES',   'apify/instagram-stories-scraper'),
         'apify_actor_fb'      => $get('APIFY_ACTOR_FB', 'apify/facebook-pages-scraper'),
-        'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/tiktok-scraper'),
-        'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'apidojo/tweet-scraper'),
+        'apify_actor_fb_comments' => $get('APIFY_ACTOR_FB_COMMENTS', 'us5srxAYnsrkgUv2v'),
+        'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/free-tiktok-scraper'),
+        'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'u6ppkMWAx2E2MpEuF'),
         'apify_actor_website' => $get('APIFY_ACTOR_WEBSITE', 'apify/website-content-crawler'),
         'apify_actor_ads_fb'  => $get('APIFY_ACTOR_ADS_FB', 'whoareyouanas/meta-ad-scraper'),
         'ads_default_country' => $get('ADS_DEFAULT_COUNTRY', 'SA'),
