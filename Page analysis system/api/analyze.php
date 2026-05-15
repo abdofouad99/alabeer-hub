@@ -1127,7 +1127,7 @@ function runAnalysis(int $assessmentId): array {
     if (!$skipAiDueToTimeout && $openAiEnabled) {
         try {
             require_once __DIR__ . '/ai-analyze.php';
-            $aiResult = runOpenAIAnalysis([
+            $aiResult = runGeminiAnalysis([
                 'id'              => $assessmentId,
                 'score'           => $finalScore,
                 'breakdown'       => $breakdown,
