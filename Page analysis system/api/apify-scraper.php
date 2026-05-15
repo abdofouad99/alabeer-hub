@@ -492,8 +492,11 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
 
         // جلب الإعلانات من المنشور الأول
         $adLib = $firstItem['pageAdLibrary'] ?? [];
-        $adsActive = !empty($adLib['is_business_page_active']);
-        $adsCount = 0;
+        $adsActive = !empty($adLib['is_business_page_active']) || (($adLib['ad_count'] ?? 0) > 0);
+        $adsCount  = (int)($adLib['ad_count'] ?? 0);
+        if (!$adsActive && !empty($firstItem['ad_status'])) {
+            $adsActive = strtoupper($firstItem['ad_status']) === 'ACTIVE';
+        }
 
         // تعيين $page ليكون $firstItem لاستخدامه في الحقول المشتركة بالأسفل
         $page = $firstItem;
@@ -594,7 +597,8 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         'description'    => $page['intro'] ?? $page['description'] ?? $page['about'] ?? $page['text'] ?? '',
         'rating'         => _cleanRating($page['rating'] ?? $page['overallStarRating'] ?? null),
         'ratings_count'  => $page['ratingsCount'] ?? $page['ratingCount'] ?? null,
-        'posts_count'    => count($posts),
+        'posts_count'    => (int) ($page['postsCount'] ?? $page['posts_count'] ?? $page['postCount'] ?? count($posts)),
+        'posts_sampled'  => count($posts),
         'avg_engagement' => calcAvgEngagement($posts),
         'top_post'       => getTopPost($posts),
         'deep_analysis'  => analyzeDeepContent($posts),
