@@ -586,10 +586,24 @@ function scanFacebookPublic(string $url, array $cfg = []): array {
 
 // ============================================================
 // Instagram Public Scanner
+// ------------------------------------------------------------
+// يحاول بالترتيب:
+//   1) Apify scraper (apify/instagram-scraper) — أعمق وأشمل
+//   2) Public web_profile_info API (بدون توكن)
+//   3) HTML regex
+//
+// (1) إن نجح → يُرجع النموذج الكامل من scrapeInstagram (V3) ويتضمن:
+//     hashtags_analysis, mentions_analysis, content_distribution,
+//     posting_heatmap, bio_optimization, account_health,
+//     comments_sentiment, vision_analysis, stories_data, related_profiles…
+// (2) و(3) → يرجعان نموذجاً مبسّطاً موحداً مع نفس مفاتيح Apify
+//          لتسهيل عرض الواجهة بدون شروط معقدة.
 // ============================================================
 function scanInstagramPublic(string $url, array $cfg = []): array {
-    // ── 1) محاولة Apify Scraper (الأدق والأقوى) ─────────────────
-    if ($cfg['analysis']['enable_apify'] ?? false) {
+    // ── 1) محاولة Apify Scraper (الأقوى) ─────────────────────
+    // ⚠️ افتراضياً enable_apify = true في config.example.php لكن نقرأ true كذلك
+    //    هنا في حال لم يضبط المستخدم config صراحة.
+    if ($cfg['analysis']['enable_apify'] ?? true) {
         try {
             require_once __DIR__ . '/apify-scraper.php';
             if (function_exists('getValidApifyToken') && function_exists('scrapeInstagram')) {
@@ -602,27 +616,64 @@ function scanInstagramPublic(string $url, array $cfg = []): array {
                     }
                 }
             }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            if (function_exists('logError')) {
+                logError('IG Apify path failed, falling back to public', ['err' => $e->getMessage()]);
+            }
+        }
     }
 
     // استخراج username
     preg_match('/instagram\.com\/([^\/\?]+)/i', $url, $mUser);
     $username = $mUser[1] ?? '';
 
+    // النموذج الموحد — كل المفاتيح الأساسية حتى لا تفشل الواجهة
     $data = [
-        'platform'    => 'instagram',
-        'username'    => $username,
-        'followers'   => null,
-        'following'   => null,
-        'posts_count' => null,
-        'bio'         => null,
-        'bio_length'  => 0,
-        'has_link'    => false,
-        'is_verified' => false,
-        'is_business' => false,
-        'has_reels'   => false,
-        'highlights'  => 0,
-        'accessible'  => false,
+        'success'              => false,
+        'source'               => 'public',
+        'platform'             => 'instagram',
+        'username'             => $username,
+        'profile_url'          => $username ? "https://www.instagram.com/{$username}/" : '',
+        'full_name'            => '',
+        'bio'                  => '',
+        'bio_length'           => 0,
+        'website'              => '',
+        'has_link'              => false,
+        'followers'            => null,
+        'following'            => null,
+        'posts_count'          => null,
+        'highlights'           => 0,
+        'highlight_reel_count' => 0,
+        'is_verified'          => false,
+        'is_business'          => false,
+        'business_category'    => '',
+        'private'              => false,
+        'has_reels'            => false,
+        'profile_pic'          => '',
+        'engagement_rate'      => 0,
+        'avg_likes'            => 0,
+        'avg_comments'         => 0,
+        'avg_saves'            => 0,
+        'reels_count'          => 0,
+        'posts_per_week'       => 0,
+        'last_post_days'       => null,
+        'top_5_posts'          => [],
+        'latest_posts'         => [],
+        'related_profiles'     => [],
+        'hashtags_analysis'    => null,
+        'mentions_analysis'    => null,
+        'content_distribution' => null,
+        'posting_heatmap'      => null,
+        'language_mix'         => null,
+        'locations'            => null,
+        'sponsored_ratio'      => null,
+        'reels_performance'    => null,
+        'bio_optimization'     => null,
+        'account_health'       => null,
+        'comments_sentiment'   => null,
+        'vision_analysis'      => null,
+        'stories_data'         => null,
+        'accessible'           => false,
     ];
 
     if (!$username) return $data;
@@ -639,21 +690,61 @@ function scanInstagramPublic(string $url, array $cfg = []): array {
 
     if ($json && isset($json['data']['user'])) {
         $u = $json['data']['user'];
-        $data['accessible'] = true;
-        $data['followers']  = $u['edge_followed_by']['count'] ?? null;
-        $data['following']  = $u['edge_follow']['count'] ?? null;
-        $data['posts_count']= $u['edge_owner_to_timeline_media']['count'] ?? null;
-        $data['bio']        = $u['biography'] ?? '';
-        $data['bio_length'] = mb_strlen($data['bio']);
-        $data['has_link']   = !empty($u['external_url']);
-        $data['website']    = $u['external_url'] ?? '';
-        $data['is_verified']= $u['is_verified'] ?? false;
-        $data['is_business']= $u['is_business_account'] ?? false;
-        $data['has_reels']  = !empty($u['is_eligible_for_reels_remixing']);
+        $data['success']     = true;
+        $data['source']      = 'web_profile_info';
+        $data['accessible']  = true;
+        $data['id']          = $u['id'] ?? null;
+        $data['full_name']   = $u['full_name'] ?? '';
+        $data['followers']   = $u['edge_followed_by']['count'] ?? null;
+        $data['following']   = $u['edge_follow']['count'] ?? null;
+        $data['posts_count'] = $u['edge_owner_to_timeline_media']['count'] ?? null;
+        $data['bio']         = $u['biography'] ?? '';
+        $data['bio_length']  = mb_strlen($data['bio']);
+        $data['has_link']    = !empty($u['external_url']);
+        $data['website']     = $u['external_url'] ?? '';
+        $data['is_verified'] = $u['is_verified'] ?? false;
+        $data['is_business'] = $u['is_business_account'] ?? false;
+        $data['business_category'] = $u['category_name'] ?? $u['business_category_name'] ?? '';
+        $data['private']     = $u['is_private'] ?? false;
+        $data['has_reels']   = !empty($u['is_eligible_for_reels_remixing']);
+        $data['profile_pic'] = $u['profile_pic_url'] ?? '';
+        $data['highlight_reel_count'] = $u['highlight_reel_count'] ?? 0;
+        $data['highlights']  = $data['highlight_reel_count'];
+
+        // حلل البايو حتى من المسار العام (لا يحتاج Apify)
+        if (function_exists('analyzeBioOptimization')) {
+            $data['bio_optimization'] = analyzeBioOptimization(
+                $data['bio'], $data['website'], (bool)$data['is_business'], (string)$data['business_category']
+            );
+        } else {
+            require_once __DIR__ . '/instagram-deep.php';
+            $data['bio_optimization'] = analyzeBioOptimization(
+                $data['bio'], $data['website'], (bool)$data['is_business'], (string)$data['business_category']
+            );
+        }
+        // Account Health (مبسّط — بدون متوسطات تفاعل لأن لا توجد منشورات)
+        require_once __DIR__ . '/instagram-deep.php';
+        $data['account_health'] = calcAccountHealthScore([
+            'followers'            => (int)$data['followers'],
+            'following'            => (int)$data['following'],
+            'posts_count'          => (int)$data['posts_count'],
+            'engagement_rate'      => 0,
+            'is_verified'          => $data['is_verified'],
+            'is_business'          => $data['is_business'],
+            'private'              => $data['private'],
+            'has_reels'            => $data['has_reels'],
+            'website'              => $data['website'],
+            'bio_length'           => $data['bio_length'],
+            'posts_per_week'       => 0,
+            'last_post_days'       => null,
+            'highlight_reel_count' => $data['highlight_reel_count'],
+        ]);
     } else {
         // fallback: scraping HTML
         $html = fetchHtml("https://www.instagram.com/{$username}/", 12);
         if ($html) {
+            $data['success']    = true;
+            $data['source']     = 'html_regex';
             $data['accessible'] = true;
             preg_match('/"edge_followed_by":\{"count":(\d+)\}/', $html, $mF);
             if ($mF) $data['followers'] = (int)$mF[1];

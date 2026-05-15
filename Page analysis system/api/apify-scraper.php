@@ -910,108 +910,362 @@ function _normalizeAddress($addr): string {
 
 
 // ============================================================
-// Instagram Scraper (apify~instagram-profile-scraper)
+// Instagram Scraper V3 — Deep Profile + Posts + Media + Comments + Vision
+// ------------------------------------------------------------
+// Default actor: apify/instagram-scraper (returns rich fields:
+//   id, businessCategoryName, joinedRecently, relatedProfiles,
+//   latestPosts[] with hashtags, mentions, taggedUsers, images,
+//   videoUrl, displayUrl, videoPlayCount, videoViewCount,
+//   locationName, isSponsored, alt, latestComments[], highlightReelCount).
+// Pipeline:
+//   1. fetch profile + 100 posts via Apify
+//   2. normalize each post to a unified shape
+//   3. run deep analytics layer (instagram-deep.php)
+//   4. (optional) sentiment via Comments Actor + OpenAI
+//   5. (optional) Vision AI on top images
+//   6. (optional) Stories + Highlights
 // ============================================================
 function scrapeInstagram(string $url, string $token, array $cfg): array {
-    // ── Actor القوي الجديد: يسحب 100 منشور + تعليقات + Reels ──
-    $actorId = $cfg['apis']['apify_actor_ig'] ?? 'shu8hvrXbJbY3Eb9W';
+    require_once __DIR__ . '/instagram-deep.php';
 
-    // بناء رابط البروفايل
-    preg_match('/instagram\.com\/([^\/\?#]+)/i', $url, $m);
-    $username = trim($m[1] ?? '', '/@');
+    $actorId = $cfg['apis']['apify_actor_ig'] ?? 'apify/instagram-scraper';
+
+    // 1) extract username
+    if (!str_contains($url, 'instagram.com')) {
+        $username = ltrim(trim($url), '@');
+    } else {
+        preg_match('/instagram\.com\/([^\/\?#]+)/i', $url, $m);
+        $username = trim($m[1] ?? '', '/@');
+    }
     $username = preg_replace('/[^a-zA-Z0-9_\.]/', '', $username);
-    if (!$username) return ['success' => false, 'error' => 'لم يتم استخراج username'];
+    if (!$username) return ['success' => false, 'error' => 'failed to extract username'];
 
     $profileUrl = 'https://www.instagram.com/' . $username . '/';
+    logInfo('IG scrape v3 start', ['username' => $username, 'actor' => $actorId]);
 
-    if (strpos($actorId, 'apify~instagram-profile-scraper') !== false) {
-        // Schema for apify~instagram-profile-scraper
+    // 2) build flexible input
+    $isOfficial = (str_contains($actorId, 'apify/instagram-scraper') || $actorId === 'shu8hvrXbJbY3Eb9W');
+    if (str_contains($actorId, 'instagram-profile-scraper')) {
+        $inputData = ['usernames' => [$username], 'resultsLimit' => 100];
+    } elseif ($isOfficial) {
         $inputData = [
-            'usernames'    => [$username],
-            'resultsLimit' => 100
+            'directUrls'    => [$profileUrl],
+            'resultsType'   => 'details',
+            'resultsLimit'  => 100,
+            'addParentData' => true,
+            'searchLimit'   => 1,
         ];
     } else {
-        // Original schema for shu8hvrXbJbY3Eb9W
         $inputData = [
-            'resultsType'  => 'posts',
-            'directUrls'   => [$profileUrl],
-            'resultsLimit' => 100,
-            'searchType'   => 'hashtag',
-            'searchLimit'  => 10,
-            'addParentData'=> true,
+            'directUrls'    => [$profileUrl],
+            'resultsType'   => 'posts',
+            'resultsLimit'  => 100,
+            'searchType'    => 'hashtag',
+            'searchLimit'   => 10,
+            'addParentData' => true,
         ];
     }
     $input = json_encode($inputData, JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
 
     $runId = _apifyStartRun($actorId, $input, $token);
-    if (!$runId) return ['success' => false, 'error' => 'فشل تشغيل Instagram Scraper'];
+    if (!$runId) return ['success' => false, 'error' => 'failed to start IG actor'];
 
-    $result = _apifyWaitAndFetch($runId, $token, 150);
-    if ($result === null) return ['success' => false, 'error' => 'انتهت مهلة Instagram Scraper'];
-    if (empty($result)) return ['success' => false, 'error' => 'لا بيانات Instagram'];
+    $result = _apifyWaitAndFetch($runId, $token, 180);
+    if ($result === null) return ['success' => false, 'error' => 'IG actor timeout'];
+    if (empty($result))   return ['success' => false, 'error' => 'no IG data'];
 
-    // أول عنصر يحتوي على بيانات المنشور مع ownerFullName/ownerUsername
-    $firstPost = $result[0] ?? [];
-    $posts     = $result;   // كل عنصر = منشور
-
-    // استخراج بيانات الحساب من ownerFullName / ownerId / meta
-    $igUser    = $firstPost['ownerUsername']  ?? $firstPost['owner']['username']   ?? $username;
-    $fullName  = $firstPost['ownerFullName']  ?? $firstPost['owner']['full_name']  ?? '';
-    $followers = $firstPost['ownerFollowersCount'] ?? $firstPost['owner']['edge_followed_by']['count'] ?? null;
-    $following = $firstPost['ownerFollowingCount'] ?? $firstPost['owner']['edge_follow']['count'] ?? 0;
-    $postsTotal= $firstPost['ownerPostsCount']     ?? count($posts);
-    $bio       = $firstPost['ownerBiography']      ?? '';
-    $website   = $firstPost['ownerExternalUrl']    ?? '';
-    $verified  = $firstPost['ownerIsVerified']     ?? false;
-    $picUrl    = $firstPost['ownerProfilePicUrl']  ?? '';
-
-    // حساب متوسطات أدق بما يشمل Saves
-    $totalLikes   = 0; $totalComments = 0; $totalViews = 0;
-    $reelsCount   = 0; $savesTotal = 0;
-    foreach ($posts as $p) {
-        $totalLikes    += (int)($p['likesCount']    ?? $p['likes']    ?? 0);
-        $totalComments += (int)($p['commentsCount'] ?? $p['comments'] ?? 0);
-        $totalViews    += (int)($p['videoViewCount'] ?? 0);
-        $savesTotal    += (int)($p['savesCount']    ?? $p['saves']    ?? 0);
-        $t = strtolower($p['type'] ?? $p['mediaType'] ?? '');
-        if (str_contains($t, 'video') || str_contains($t, 'reel')) $reelsCount++;
+    // 3) split profile vs posts (multi-schema tolerant)
+    $profile = null;
+    $posts   = [];
+    foreach ($result as $item) {
+        if (!is_array($item)) continue;
+        if ((isset($item['latestPosts']) && is_array($item['latestPosts'])) ||
+            (isset($item['username']) && (isset($item['followersCount']) || isset($item['followers_count']) || isset($item['followsCount'])))) {
+            $profile = $item;
+            if (!empty($item['latestPosts']) && is_array($item['latestPosts'])) {
+                foreach ($item['latestPosts'] as $lp) if (is_array($lp)) $posts[] = $lp;
+            }
+            continue;
+        }
+        if (isset($item['caption']) || isset($item['shortCode']) || isset($item['type']) || isset($item['mediaType'])) {
+            $posts[] = $item;
+        }
     }
-    $cnt = max(count($posts), 1);
+    if ($profile === null && !empty($posts)) {
+        $first = $posts[0];
+        $profile = [
+            'id'                  => $first['ownerId']             ?? null,
+            'username'            => $first['ownerUsername']       ?? $username,
+            'fullName'            => $first['ownerFullName']       ?? '',
+            'biography'           => $first['ownerBiography']      ?? '',
+            'externalUrl'         => $first['ownerExternalUrl']    ?? '',
+            'followersCount'      => $first['ownerFollowersCount'] ?? null,
+            'followsCount'        => $first['ownerFollowingCount'] ?? null,
+            'postsCount'          => $first['ownerPostsCount']     ?? count($posts),
+            'verified'            => $first['ownerIsVerified']     ?? false,
+            'isBusinessAccount'   => $first['ownerIsBusinessAccount'] ?? false,
+            'profilePicUrl'       => $first['ownerProfilePicUrl']  ?? '',
+            'profilePicUrlHD'     => $first['ownerProfilePicUrlHD'] ?? '',
+        ];
+    }
+    if ($profile === null) {
+        return ['success' => false, 'error' => 'no profile in Apify response'];
+    }
+
+    // helper for tolerant key reads
+    $get = function (array $a, array $keys, $default = null) {
+        foreach ($keys as $k) if (array_key_exists($k, $a) && $a[$k] !== null && $a[$k] !== '') return $a[$k];
+        return $default;
+    };
+
+    // 4) profile mapping
+    $igUserId    = $get($profile, ['id','userId','user_id','pk']);
+    $igUser      = $get($profile, ['username','userName','handle'], $username);
+    $fullName    = $get($profile, ['fullName','full_name','name'], '');
+    $bio         = (string)$get($profile, ['biography','bio'], '');
+    $externalUrl = (string)$get($profile, ['externalUrl','external_url','website'], '');
+    $followers   = (int)$get($profile, ['followersCount','followers_count','followerCount','followers'], 0);
+    $following   = (int)$get($profile, ['followsCount','followingCount','following_count','following'], 0);
+    $postsTotal  = (int)$get($profile, ['postsCount','posts_count','mediaCount','media_count'], count($posts));
+    $highlights  = (int)$get($profile, ['highlightReelCount','highlight_reel_count','highlightsCount'], 0);
+    $isBusiness  = (bool)$get($profile, ['isBusinessAccount','is_business_account','isBusiness'], false);
+    $bizCategory = (string)$get($profile, ['businessCategoryName','business_category_name','category_name','category'], '');
+    $verified    = (bool)$get($profile, ['verified','isVerified','is_verified'], false);
+    $isPrivate   = (bool)$get($profile, ['private','isPrivate','is_private'], false);
+    $picUrl      = (string)$get($profile, ['profilePicUrl','profile_pic_url'], '');
+    $picUrlHD    = (string)$get($profile, ['profilePicUrlHD','profile_pic_url_hd'], $picUrl);
+    $joinedNew   = (bool)$get($profile, ['joinedRecently','joined_recently'], false);
+    $relatedRaw  = $get($profile, ['relatedProfiles','related_profiles'], []);
+    $relatedProfiles = [];
+    if (is_array($relatedRaw)) {
+        foreach ($relatedRaw as $rp) {
+            if (is_array($rp)) {
+                $relatedProfiles[] = [
+                    'username'    => $rp['username'] ?? $rp['user']['username'] ?? '',
+                    'full_name'   => $rp['fullName'] ?? $rp['full_name'] ?? '',
+                    'verified'    => (bool)($rp['isVerified'] ?? $rp['is_verified'] ?? false),
+                    'profile_pic' => $rp['profilePicUrl'] ?? $rp['profile_pic_url'] ?? '',
+                ];
+            } elseif (is_string($rp)) {
+                $relatedProfiles[] = ['username' => $rp];
+            }
+        }
+    }
+
+    // 5) normalize each post — unified rich shape
+    $normalizedPosts = [];
+    foreach ($posts as $p) {
+        if (!is_array($p)) continue;
+        $type = strtolower($p['type'] ?? $p['mediaType'] ?? $p['productType'] ?? '');
+        $isReel = str_contains($type, 'reel') || !empty($p['isReel']) || (!empty($p['videoUrl']) && (int)($p['videoPlayCount'] ?? 0) > 0);
+
+        $imgs = [];
+        if (!empty($p['images']) && is_array($p['images'])) {
+            foreach ($p['images'] as $im) $imgs[] = is_string($im) ? $im : ($im['url'] ?? $im['src'] ?? '');
+        }
+        if (!empty($p['childPosts']) && is_array($p['childPosts'])) {
+            foreach ($p['childPosts'] as $cp) {
+                if (is_array($cp)) {
+                    $u = $cp['displayUrl'] ?? $cp['imageUrl'] ?? '';
+                    if ($u) $imgs[] = $u;
+                }
+            }
+        }
+
+        $tagged = [];
+        if (!empty($p['taggedUsers']) && is_array($p['taggedUsers'])) {
+            foreach ($p['taggedUsers'] as $tu) {
+                if (is_array($tu))      $tagged[] = ['username' => $tu['username'] ?? $tu['user']['username'] ?? '', 'full_name' => $tu['fullName'] ?? ''];
+                elseif (is_string($tu)) $tagged[] = ['username' => ltrim($tu,'@'), 'full_name' => ''];
+            }
+        }
+
+        $latestComments = [];
+        if (!empty($p['latestComments']) && is_array($p['latestComments'])) {
+            foreach ($p['latestComments'] as $c) {
+                if (!is_array($c)) continue;
+                $latestComments[] = [
+                    'text'         => $c['text'] ?? $c['comment'] ?? '',
+                    'ownerUsername'=> $c['ownerUsername'] ?? $c['owner']['username'] ?? '',
+                    'likesCount'   => (int)($c['likesCount'] ?? 0),
+                    'timestamp'    => $c['timestamp'] ?? null,
+                ];
+            }
+        }
+
+        $normalizedPosts[] = [
+            'id'              => $p['id'] ?? $p['pk'] ?? null,
+            'shortCode'       => $p['shortCode'] ?? $p['code'] ?? '',
+            'url'             => $p['url'] ?? $p['postUrl'] ?? (!empty($p['shortCode']) ? 'https://www.instagram.com/p/' . $p['shortCode'] . '/' : ''),
+            'type'            => $type ?: ($isReel ? 'reel' : 'image'),
+            'isReel'          => $isReel,
+            'caption'         => (string)($p['caption'] ?? $p['text'] ?? ''),
+            'hashtags'        => $p['hashtags'] ?? [],
+            'mentions'        => $p['mentions'] ?? [],
+            'likesCount'      => (int)($p['likesCount']    ?? $p['likes']    ?? 0),
+            'commentsCount'   => (int)($p['commentsCount'] ?? $p['comments'] ?? 0),
+            'savesCount'      => (int)($p['savesCount']    ?? $p['saves']    ?? 0),
+            'videoViewCount'  => (int)($p['videoViewCount'] ?? 0),
+            'videoPlayCount'  => (int)($p['videoPlayCount'] ?? 0),
+            'videoDuration'   => $p['videoDuration'] ?? null,
+            'videoUrl'        => $p['videoUrl'] ?? '',
+            'displayUrl'      => $p['displayUrl'] ?? $p['imageUrl'] ?? $p['thumbnailUrl'] ?? '',
+            'images'          => $imgs,
+            'alt'             => $p['alt'] ?? $p['accessibilityCaption'] ?? '',
+            'locationName'    => $p['locationName'] ?? $p['location']['name'] ?? '',
+            'locationId'      => $p['locationId']   ?? $p['location']['id']   ?? null,
+            'isSponsored'     => (bool)($p['isSponsored'] ?? $p['is_paid_partnership'] ?? false),
+            'taggedUsers'     => $tagged,
+            'latestComments'  => $latestComments,
+            'timestamp'       => $p['timestamp'] ?? $p['takenAt'] ?? null,
+            'ownerUsername'   => $p['ownerUsername'] ?? $igUser,
+        ];
+    }
+
+    // 6) aggregates
+    $cnt = max(count($normalizedPosts), 1);
+    $totalLikes = 0; $totalComments = 0; $totalSaves = 0; $totalViews = 0; $totalPlays = 0; $reelsCount = 0;
+    foreach ($normalizedPosts as $p) {
+        $totalLikes    += $p['likesCount'];
+        $totalComments += $p['commentsCount'];
+        $totalSaves    += $p['savesCount'];
+        $totalViews    += $p['videoViewCount'];
+        $totalPlays    += $p['videoPlayCount'];
+        if ($p['isReel']) $reelsCount++;
+    }
     $avgLikes    = round($totalLikes    / $cnt, 1);
     $avgComments = round($totalComments / $cnt, 1);
-    $avgSaves    = round($savesTotal    / $cnt, 1);
+    $avgSaves    = round($totalSaves    / $cnt, 1);
     $avgViews    = round($totalViews    / $cnt, 1);
-    $engRate     = $followers ? round((($avgLikes + $avgComments) / $followers) * 100, 2) : 0;
+    $avgPlays    = round($totalPlays    / $cnt, 1);
+    $engRate     = $followers > 0 ? round((($avgLikes + $avgComments) / $followers) * 100, 2) : 0;
+
+    // 7) deep analytics
+    $hashtags    = extractHashtagsFromPosts($normalizedPosts);
+    $mentions    = extractMentionsFromPosts($normalizedPosts);
+    $contentDist = calcContentTypeDistribution($normalizedPosts);
+    $heatmap     = calcPostingHeatmap($normalizedPosts);
+    $bioOpt      = analyzeBioOptimization($bio, $externalUrl, $isBusiness, $bizCategory);
+    $langMix     = detectPostsLanguageMix($normalizedPosts);
+    $locations   = extractTopLocations($normalizedPosts);
+    $sponsored   = calcSponsoredRatio($normalizedPosts);
+    $reelsPerf   = analyzeReelsPerformance($normalizedPosts);
+
+    // 8) top 5 posts (used by sentiment + vision)
+    $sortedByEng = $normalizedPosts;
+    usort($sortedByEng, fn($a, $b) => ($b['likesCount'] + $b['commentsCount']) - ($a['likesCount'] + $a['commentsCount']));
+    $top5 = array_slice($sortedByEng, 0, 5);
+
+    // 9) comments + sentiment (optional)
+    $sentiment = null;
+    if (!empty($cfg['analysis']['enable_ig_comments'])) {
+        try { $sentiment = analyzeIGCommentsSentiment($top5, $token, $cfg); }
+        catch (\Throwable $e) { logError('IG sentiment failed', ['err' => $e->getMessage()]); $sentiment = ['success' => false, 'reason' => $e->getMessage()]; }
+    }
+
+    // 10) vision (optional)
+    $vision = null;
+    if (!empty($cfg['analysis']['enable_ig_vision'])) {
+        try { $vision = analyzeIGImagesVision($top5, $cfg); }
+        catch (\Throwable $e) { logError('IG vision failed', ['err' => $e->getMessage()]); $vision = ['success' => false, 'reason' => $e->getMessage()]; }
+    }
+
+    // 11) stories + highlights (optional)
+    $stories = null;
+    if (!empty($cfg['analysis']['enable_ig_stories']) && !$isPrivate) {
+        try { $stories = scrapeIGStoriesAndHighlights($igUser, $token, $cfg); }
+        catch (\Throwable $e) { logError('IG stories failed', ['err' => $e->getMessage()]); }
+    }
+
+    // 12) account health
+    $health = calcAccountHealthScore([
+        'followers'            => $followers,
+        'following'            => $following,
+        'posts_count'          => $postsTotal,
+        'engagement_rate'      => $engRate,
+        'is_verified'          => $verified,
+        'is_business'          => $isBusiness,
+        'private'              => $isPrivate,
+        'has_reels'            => $reelsCount > 0,
+        'website'              => $externalUrl,
+        'bio_length'           => mb_strlen($bio),
+        'posts_per_week'       => calcPostsPerWeek($normalizedPosts),
+        'last_post_days'       => calcLastPostDays($normalizedPosts),
+        'highlight_reel_count' => $highlights,
+    ]);
+
+    logInfo('IG scrape v3 done', [
+        'username' => $igUser, 'posts' => $cnt, 'followers' => $followers,
+        'sentiment' => $sentiment['success'] ?? false,
+        'vision'    => $vision['success']    ?? false,
+        'stories'   => $stories['success']   ?? false,
+    ]);
 
     return [
-        'success'          => true,
-        'source'           => 'apify_ig_v2',
-        'platform'         => 'instagram',
-        'username'         => $igUser,
-        'full_name'        => $fullName,
-        'followers'        => $followers,
-        'following'        => $following,
-        'posts_count'      => $postsTotal,
-        'bio'              => $bio,
-        'bio_length'       => mb_strlen($bio),
-        'website'          => $website,
-        'is_verified'      => $verified,
-        'is_business'      => (bool)($firstPost['ownerIsBusinessAccount'] ?? $firstPost['owner']['is_business_account'] ?? false),
-        'has_reels'        => $reelsCount > 0,
-        'profile_pic'      => $picUrl,
-        'avg_likes'        => $avgLikes,
-        'avg_comments'     => $avgComments,
-        'avg_saves'        => $avgSaves,          // ✅ جديد
-        'avg_video_views'  => $avgViews,          // ✅ جديد
-        'reels_count'      => $reelsCount,        // ✅ جديد
-        'engagement_rate'  => $engRate,
-        'top_post'         => getTopIGPost($posts),
-        'deep_analysis'    => analyzeDeepContent($posts),
-        'posts_per_week'   => calcPostsPerWeek($posts),
-        'last_post_days'   => calcLastPostDays($posts),
-        'latest_posts'     => array_slice($posts, 0, 30),
+        'success'              => true,
+        'source'               => 'apify_ig_v3',
+        'platform'             => 'instagram',
+        // Identity
+        'id'                   => $igUserId,
+        'username'             => $igUser,
+        'full_name'            => $fullName,
+        'profile_url'          => $profileUrl,
+        'profile_pic'          => $picUrl,
+        'profile_pic_hd'       => $picUrlHD,
+        // Profile data
+        'bio'                  => $bio,
+        'bio_length'           => mb_strlen($bio),
+        'website'              => $externalUrl,
+        'has_link'             => !empty($externalUrl),
+        'followers'            => $followers,
+        'following'            => $following,
+        'posts_count'          => $postsTotal,
+        'highlight_reel_count' => $highlights,
+        'highlights'           => $highlights,
+        'is_verified'          => $verified,
+        'is_business'          => $isBusiness,
+        'business_category'    => $bizCategory,
+        'private'              => $isPrivate,
+        'joined_recently'      => $joinedNew,
+        'related_profiles'     => $relatedProfiles,
+        // Engagement aggregates
+        'avg_likes'            => $avgLikes,
+        'avg_comments'         => $avgComments,
+        'avg_saves'            => $avgSaves,
+        'avg_video_views'      => $avgViews,
+        'avg_video_plays'      => $avgPlays,
+        'reels_count'          => $reelsCount,
+        'has_reels'            => $reelsCount > 0,
+        'engagement_rate'      => $engRate,
+        'followers_following_ratio' => $following > 0 ? round($followers / $following, 2) : null,
+        // Activity
+        'posts_per_week'       => calcPostsPerWeek($normalizedPosts),
+        'last_post_days'       => calcLastPostDays($normalizedPosts),
+        // Top performers
+        'top_post'             => $top5[0] ?? null,
+        'top_5_posts'          => $top5,
+        // Deep content analytics
+        'hashtags_analysis'    => $hashtags,
+        'mentions_analysis'    => $mentions,
+        'content_distribution' => $contentDist,
+        'posting_heatmap'      => $heatmap,
+        'language_mix'         => $langMix,
+        'locations'            => $locations,
+        'sponsored_ratio'      => $sponsored,
+        'reels_performance'    => $reelsPerf,
+        'bio_optimization'     => $bioOpt,
+        'account_health'       => $health,
+        // Optional layers
+        'comments_sentiment'   => $sentiment,
+        'vision_analysis'      => $vision,
+        'stories_data'         => $stories,
+        // Legacy compat
+        'deep_analysis'        => analyzeDeepContent($normalizedPosts),
+        'latest_posts'         => array_slice($normalizedPosts, 0, 30),
+        'accessible'           => true,
     ];
 }
+
 
 // ============================================================
 // TikTok Scraper
