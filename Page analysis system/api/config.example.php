@@ -109,11 +109,15 @@ return [
         'apify_tokens'        => $apifyTokensList(),
         'apify_actor_ig'      => $get('APIFY_ACTOR_IG', 'apify/instagram-scraper'),
         'apify_actor_fb'      => $get('APIFY_ACTOR_FB', 'apify/facebook-pages-scraper'),
-        'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/free-tiktok-scraper'),
-        'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'u6ppkMWAx2E2MpEuF'),
+        'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/tiktok-scraper'),
+        'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'apidojo/tweet-scraper'),
         'apify_actor_website' => $get('APIFY_ACTOR_WEBSITE', 'apify/website-content-crawler'),
         'apify_actor_ads_fb'  => $get('APIFY_ACTOR_ADS_FB', 'whoareyouanas/meta-ad-scraper'),
         'ads_default_country' => $get('ADS_DEFAULT_COUNTRY', 'SA'),
+
+        // عدد العناصر للسحب لكل منصة
+        'tiktok_videos_limit'  => (int)$get('TIKTOK_VIDEOS_LIMIT', '200'),
+        'twitter_tweets_limit' => (int)$get('TWITTER_TWEETS_LIMIT', '100'),
 
         // Meta / Facebook
         'facebook_access_token' => $get('FACEBOOK_ACCESS_TOKEN', ''),
