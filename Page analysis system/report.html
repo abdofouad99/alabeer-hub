@@ -365,6 +365,105 @@
     .hero-meta { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: var(--text); }
     .h-meta-item { display: flex; align-items: center; gap: 4px; }
 
+    /* ════════════ Instagram Deep Insight (V3) ════════════ */
+    #igDeepInsight .ig-kpi {
+      background: rgba(236,72,153,0.06); border:1px solid rgba(236,72,153,0.18);
+      border-radius:12px; padding:10px 12px; text-align:center;
+    }
+    #igDeepInsight .ig-kpi-lbl { font-size:11px; color:#6b7280; font-weight:700; margin-bottom:4px; }
+    #igDeepInsight .ig-kpi-val { font-size:18px; font-weight:900; color:#ec4899; }
+    #igDeepInsight .ig-panel {
+      background:#fff; border:1px solid rgba(236,72,153,0.18); border-radius:14px;
+      padding:14px 16px;
+    }
+    #igDeepInsight .ig-panel-title {
+      font-size:13px; font-weight:900; color:#831843; margin:0 0 10px;
+    }
+    #igDeepInsight .ig-gauge {
+      width:120px; height:120px; border-radius:50%;
+      background: conic-gradient(#10b981 calc(var(--p,0)*1%), #f1f5f9 0);
+      display:flex; align-items:center; justify-content:center;
+      flex-direction:column; margin:6px auto;
+      box-shadow: inset 0 0 0 8px #fff;
+    }
+    #igDeepInsight .ig-gauge.ig-gauge-pink { background: conic-gradient(#ec4899 calc(var(--p,0)*1%), #fce7f3 0); }
+    #igDeepInsight .ig-gauge span { font-size:26px; font-weight:900; color:#0f172a; }
+    #igDeepInsight .ig-gauge small { font-size:11px; color:#64748b; }
+    #igDeepInsight .ig-grade { text-align:center; font-weight:900; font-size:14px; margin-bottom:8px; }
+    #igDeepInsight .ig-list { list-style:none; padding:0; margin:0 0 8px; font-size:12px; }
+    #igDeepInsight .ig-list li { padding:4px 0; border-bottom:1px dashed rgba(0,0,0,0.05); }
+    #igDeepInsight .ig-list-ok li::before { content:"✅ "; }
+    #igDeepInsight .ig-list-bad li::before { content:"⚠️ "; }
+    #igDeepInsight .ig-list-q li::before  { content:"❓ "; }
+    #igDeepInsight .ig-list-title { font-size:11px; font-weight:900; color:#9f1239; margin:8px 0 4px; }
+    #igDeepInsight .ig-bars { display:flex; flex-direction:column; gap:8px; }
+    #igDeepInsight .ig-bar-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+    #igDeepInsight .ig-bar-row .lbl { width:80px; font-weight:700; color:#475569; }
+    #igDeepInsight .ig-bar-row .bar { flex:1; height:10px; background:#fce7f3; border-radius:6px; overflow:hidden; }
+    #igDeepInsight .ig-bar-row .bar > div { height:100%; background:linear-gradient(90deg,#ec4899,#f472b6); }
+    #igDeepInsight .ig-bar-row .pct { width:45px; text-align:left; font-weight:800; color:#9f1239; }
+    #igDeepInsight .ig-meta { font-size:11px; color:#64748b; margin-top:6px; }
+    #igDeepInsight .ig-flags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    #igDeepInsight .ig-flag { padding:3px 8px; border-radius:999px; font-size:11px; font-weight:800; }
+    #igDeepInsight .ig-flag.ok  { background:#dcfce7; color:#166534; }
+    #igDeepInsight .ig-flag.bad { background:#fee2e2; color:#991b1b; }
+    #igDeepInsight .ig-heatmap-scroll { overflow-x:auto; }
+    #igDeepInsight .ig-heatmap { border-collapse:separate; border-spacing:2px; font-size:10px; }
+    #igDeepInsight .ig-heatmap th,
+    #igDeepInsight .ig-heatmap td { padding:0; min-width:18px; min-height:18px; text-align:center; color:#475569; font-weight:700; }
+    #igDeepInsight .ig-heatmap th { background:transparent; }
+    #igDeepInsight .ig-heatmap td { border-radius:3px; background:#f1f5f9; }
+    #igDeepInsight .ig-heatmap td.has { color:#fff; }
+    #igDeepInsight .ig-heatmap-meta { font-size:11px; color:#9f1239; font-weight:800; margin-bottom:6px; }
+    #igDeepInsight .ig-hashtag-cloud { display:flex; flex-wrap:wrap; gap:6px; }
+    #igDeepInsight .ig-hashtag-cloud .ig-tag {
+      background:#fce7f3; color:#9f1239; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:800;
+    }
+    #igDeepInsight .ig-hashtag-cloud .ig-tag .c { opacity:0.6; margin-inline-start:4px; font-size:10px; }
+    #igDeepInsight .ig-rank-list { list-style:none; padding:0; margin:0; font-size:12px; }
+    #igDeepInsight .ig-rank-list li {
+      display:flex; justify-content:space-between; padding:5px 6px; border-bottom:1px dashed rgba(236,72,153,0.15);
+    }
+    #igDeepInsight .ig-rank-list li .c { font-weight:900; color:#ec4899; }
+    #igDeepInsight .ig-top-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+    #igDeepInsight .ig-top-card {
+      background:#fff; border:1px solid rgba(236,72,153,0.2); border-radius:12px; overflow:hidden;
+      display:flex; flex-direction:column; transition:transform 0.2s;
+    }
+    #igDeepInsight .ig-top-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(236,72,153,0.15); }
+    #igDeepInsight .ig-top-card .img { aspect-ratio:1/1; background:#f1f5f9 center/cover no-repeat; position:relative; }
+    #igDeepInsight .ig-top-card .img::after { content:""; position:absolute; top:6px; right:6px; width:20px; height:20px; }
+    #igDeepInsight .ig-top-card .body { padding:8px 10px; font-size:11px; }
+    #igDeepInsight .ig-top-card .stats { display:flex; gap:8px; font-weight:800; color:#9f1239; margin-top:4px; }
+    #igDeepInsight .ig-top-card .badge-type {
+      position:absolute; bottom:6px; left:6px; padding:2px 6px; border-radius:6px;
+      background:rgba(0,0,0,0.6); color:#fff; font-size:10px; font-weight:800;
+    }
+    #igDeepInsight .ig-sentiment-bar { height:14px; border-radius:8px; overflow:hidden; display:flex; }
+    #igDeepInsight .ig-sentiment-bar .pos { background:#10b981; }
+    #igDeepInsight .ig-sentiment-bar .neu { background:#94a3b8; }
+    #igDeepInsight .ig-sentiment-bar .neg { background:#ef4444; }
+    #igDeepInsight .ig-sentiment-meta { font-size:11px; color:#64748b; margin-top:6px; font-weight:700; }
+    #igDeepInsight .ig-ai-summary {
+      background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:10px 12px;
+      font-size:12px; color:#78350f; margin-top:10px; line-height:1.7;
+    }
+    #igDeepInsight .ig-vision-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+    #igDeepInsight .ig-vision-card {
+      background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;
+    }
+    #igDeepInsight .ig-vision-card .img { aspect-ratio:1/1; background:#f1f5f9 center/cover no-repeat; }
+    #igDeepInsight .ig-vision-card .body { padding:8px 10px; font-size:11px; color:#374151; line-height:1.6; }
+    #igDeepInsight .ig-vision-card .tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+    #igDeepInsight .ig-vision-card .tag { background:#dbeafe; color:#1e3a8a; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; }
+    #igDeepInsight .ig-vision-summary { margin-top:10px; font-size:12px; color:#475569; }
+    #igDeepInsight .ig-related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; }
+    #igDeepInsight .ig-related-card { background:#fff; border:1px solid rgba(236,72,153,0.2); border-radius:10px; padding:10px; text-align:center; font-size:11px; }
+    #igDeepInsight .ig-related-card img { width:48px; height:48px; border-radius:50%; object-fit:cover; margin-bottom:6px; }
+    #igDeepInsight .ig-highlights-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; }
+    #igDeepInsight .ig-highlight-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:8px; text-align:center; font-size:11px; }
+    #igDeepInsight .ig-highlight-card .cover { aspect-ratio:1/1; border-radius:50%; background:#f1f5f9 center/cover no-repeat; margin-bottom:6px; }
+
   </style>
 </head>
 <body>
@@ -773,6 +872,262 @@
           </div>
         </div>
 
+        <!-- ================ Instagram Deep Insight (V3) ================ -->
+        <div class="plat-card" id="igDeepInsight" style="display:none; grid-column: 1 / -1; background:linear-gradient(135deg,#fdf2f8,#fff);border:1px solid #fbcfe8;">
+          <div class="plat-header" style="background:linear-gradient(135deg,#ec4899,#f472b6);color:#fff;">
+            <div class="plat-icon">🔬</div>
+            <div>
+              <div class="plat-title">📸 تحليل Instagram العميق</div>
+              <div class="plat-sub">Deep Profile · Posts · Sentiment · Vision</div>
+            </div>
+            <div class="plat-badge" id="igHealthBadge" style="background:rgba(255,255,255,0.25);color:#fff;">—</div>
+          </div>
+
+          <div class="plat-body" style="display:flex; flex-direction:column; gap:24px;">
+
+            <div class="ig-kpi-row" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px;">
+              <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط إعجابات</div><div class="ig-kpi-val" id="igAvgLikes">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط تعليقات</div><div class="ig-kpi-val" id="igAvgComments">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط حفظ</div><div class="ig-kpi-val" id="igAvgSaves">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">عدد Reels</div><div class="ig-kpi-val" id="igReelsCount">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">منشور/أسبوع</div><div class="ig-kpi-val" id="igPostsPerWeek">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">آخر منشور</div><div class="ig-kpi-val" id="igLastPost">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">F/F Ratio</div><div class="ig-kpi-val" id="igFFRatio">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">Highlights</div><div class="ig-kpi-val" id="igHighlights">—</div></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">🩺 صحة الحساب</h4>
+                <div id="igHealthGauge" class="ig-gauge"><span id="igHealthScore">0</span><small>/100</small></div>
+                <div class="ig-grade" id="igHealthGrade">—</div>
+                <div class="ig-list-title">نقاط القوة</div>
+                <ul class="ig-list ig-list-ok" id="igHealthStrengths"></ul>
+                <div class="ig-list-title">نقاط للتحسين</div>
+                <ul class="ig-list ig-list-bad" id="igHealthIssues"></ul>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">✏️ تحسين البايو</h4>
+                <div id="igBioGauge" class="ig-gauge ig-gauge-pink"><span id="igBioScore">0</span><small>/100</small></div>
+                <div class="ig-grade" id="igBioGrade">—</div>
+                <div id="igBioFlags" class="ig-flags"></div>
+                <div class="ig-list-title">نقاط القوة</div>
+                <ul class="ig-list ig-list-ok" id="igBioStrengths"></ul>
+                <div class="ig-list-title">للتحسين</div>
+                <ul class="ig-list ig-list-bad" id="igBioIssues"></ul>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 2fr; gap:16px;" class="ig-grid-2">
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">📊 توزيع المحتوى</h4>
+                <div id="igContentDist" class="ig-bars"></div>
+                <div class="ig-meta" id="igCarouselSlides"></div>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">🕒 خريطة أوقات النشر (Engagement Heatmap)</h4>
+                <div id="igHeatmapWrapper">
+                  <div class="ig-heatmap-meta" id="igHeatmapMeta"></div>
+                  <div class="ig-heatmap-scroll"><table class="ig-heatmap" id="igHeatmap"></table></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">🏷️ Hashtags الأكثر استخداماً</h4>
+                <div class="ig-hashtag-cloud" id="igHashtagCloud"></div>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">@ Mentions الأكثر تكراراً</h4>
+                <ul class="ig-rank-list" id="igMentionsList"></ul>
+                <h4 class="ig-panel-title" style="margin-top:14px;">🏷 Tagged في الصور</h4>
+                <ul class="ig-rank-list" id="igTaggedList"></ul>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">📍 المواقع الجغرافية</h4>
+                <ul class="ig-rank-list" id="igLocationsList"></ul>
+                <h4 class="ig-panel-title" style="margin-top:14px;">🌐 توزيع اللغة</h4>
+                <div id="igLanguageMix" class="ig-bars"></div>
+              </div>
+            </div>
+
+            <div class="ig-panel">
+              <h4 class="ig-panel-title">🏆 أفضل 5 منشورات (الأعلى تفاعلاً)</h4>
+              <div class="ig-top-grid" id="igTop5Posts"></div>
+            </div>
+
+            <div class="ig-panel" id="igReelsBox" style="display:none;">
+              <h4 class="ig-panel-title">🎬 أداء Reels</h4>
+              <div class="ig-kpi-row" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;">
+                <div class="ig-kpi"><div class="ig-kpi-lbl">عدد</div><div class="ig-kpi-val" id="igReelsTotalCount">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط Plays</div><div class="ig-kpi-val" id="igReelsAvgPlays">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط Views</div><div class="ig-kpi-val" id="igReelsAvgViews">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">المدة (ث)</div><div class="ig-kpi-val" id="igReelsAvgDur">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">تفاعل/مشاهدة %</div><div class="ig-kpi-val" id="igReelsEngPerPlay">—</div></div>
+              </div>
+            </div>
+
+            <div class="ig-panel" id="igSentimentBox" style="display:none;">
+              <h4 class="ig-panel-title">💬 تحليل مشاعر التعليقات</h4>
+              <div class="ig-sentiment-bar" id="igSentimentBar"></div>
+              <div class="ig-sentiment-meta" id="igSentimentMeta"></div>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:12px;">
+                <div><div class="ig-list-title">🚩 أبرز الاعتراضات</div><ul class="ig-list ig-list-bad" id="igObjections"></ul></div>
+                <div><div class="ig-list-title">⭐ أبرز الإشادات</div><ul class="ig-list ig-list-ok" id="igPraise"></ul></div>
+                <div><div class="ig-list-title">❓ الأسئلة الشائعة</div><ul class="ig-list ig-list-q" id="igQuestions"></ul></div>
+              </div>
+              <div id="igAiSentimentSummary" class="ig-ai-summary" style="display:none;"></div>
+            </div>
+
+            <div class="ig-panel" id="igVisionBox" style="display:none;">
+              <h4 class="ig-panel-title">👁️ تحليل الصور بالذكاء الاصطناعي</h4>
+              <div class="ig-vision-grid" id="igVisionGrid"></div>
+              <div class="ig-vision-summary" id="igVisionSummary"></div>
+            </div>
+
+            <div class="ig-panel" id="igStoriesBox" style="display:none;">
+              <h4 class="ig-panel-title">📚 Stories + Highlights</h4>
+              <div class="ig-stories-meta" id="igStoriesMeta"></div>
+              <div class="ig-highlights-grid" id="igHighlightsGrid"></div>
+            </div>
+
+            <div class="ig-panel" id="igRelatedBox" style="display:none;">
+              <h4 class="ig-panel-title">🔗 حسابات مشابهة (يقترحها انستجرام)</h4>
+              <div class="ig-related-grid" id="igRelatedGrid"></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================ Instagram Deep Insight (V3) ================ -->
+        <div class="plat-card" id="igDeepInsight" style="display:none; grid-column: 1 / -1; background:linear-gradient(135deg,#fdf2f8,#fff);border:1px solid #fbcfe8;">
+          <div class="plat-header" style="background:linear-gradient(135deg,#ec4899,#f472b6);color:#fff;">
+            <div class="plat-icon">🔬</div>
+            <div>
+              <div class="plat-title">📸 تحليل Instagram العميق</div>
+              <div class="plat-sub">Deep Profile · Posts · Sentiment · Vision</div>
+            </div>
+            <div class="plat-badge" id="igHealthBadge" style="background:rgba(255,255,255,0.25);color:#fff;">—</div>
+          </div>
+
+          <div class="plat-body" style="display:flex; flex-direction:column; gap:24px;">
+
+            <div class="ig-kpi-row" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px;">
+              <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط إعجابات</div><div class="ig-kpi-val" id="igAvgLikes">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط تعليقات</div><div class="ig-kpi-val" id="igAvgComments">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط حفظ</div><div class="ig-kpi-val" id="igAvgSaves">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">عدد Reels</div><div class="ig-kpi-val" id="igReelsCount">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">منشور/أسبوع</div><div class="ig-kpi-val" id="igPostsPerWeek">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">آخر منشور</div><div class="ig-kpi-val" id="igLastPost">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">F/F Ratio</div><div class="ig-kpi-val" id="igFFRatio">—</div></div>
+              <div class="ig-kpi"><div class="ig-kpi-lbl">Highlights</div><div class="ig-kpi-val" id="igHighlights">—</div></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">🩺 صحة الحساب</h4>
+                <div id="igHealthGauge" class="ig-gauge"><span id="igHealthScore">0</span><small>/100</small></div>
+                <div class="ig-grade" id="igHealthGrade">—</div>
+                <div class="ig-list-title">نقاط القوة</div>
+                <ul class="ig-list ig-list-ok" id="igHealthStrengths"></ul>
+                <div class="ig-list-title">نقاط للتحسين</div>
+                <ul class="ig-list ig-list-bad" id="igHealthIssues"></ul>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">✏️ تحسين البايو</h4>
+                <div id="igBioGauge" class="ig-gauge ig-gauge-pink"><span id="igBioScore">0</span><small>/100</small></div>
+                <div class="ig-grade" id="igBioGrade">—</div>
+                <div id="igBioFlags" class="ig-flags"></div>
+                <div class="ig-list-title">نقاط القوة</div>
+                <ul class="ig-list ig-list-ok" id="igBioStrengths"></ul>
+                <div class="ig-list-title">للتحسين</div>
+                <ul class="ig-list ig-list-bad" id="igBioIssues"></ul>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 2fr; gap:16px;" class="ig-grid-2">
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">📊 توزيع المحتوى</h4>
+                <div id="igContentDist" class="ig-bars"></div>
+                <div class="ig-meta" id="igCarouselSlides"></div>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">🕒 خريطة أوقات النشر (Engagement Heatmap)</h4>
+                <div id="igHeatmapWrapper">
+                  <div class="ig-heatmap-meta" id="igHeatmapMeta"></div>
+                  <div class="ig-heatmap-scroll"><table class="ig-heatmap" id="igHeatmap"></table></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">🏷️ Hashtags الأكثر استخداماً</h4>
+                <div class="ig-hashtag-cloud" id="igHashtagCloud"></div>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">@ Mentions الأكثر تكراراً</h4>
+                <ul class="ig-rank-list" id="igMentionsList"></ul>
+                <h4 class="ig-panel-title" style="margin-top:14px;">🏷 Tagged في الصور</h4>
+                <ul class="ig-rank-list" id="igTaggedList"></ul>
+              </div>
+              <div class="ig-panel">
+                <h4 class="ig-panel-title">📍 المواقع الجغرافية</h4>
+                <ul class="ig-rank-list" id="igLocationsList"></ul>
+                <h4 class="ig-panel-title" style="margin-top:14px;">🌐 توزيع اللغة</h4>
+                <div id="igLanguageMix" class="ig-bars"></div>
+              </div>
+            </div>
+
+            <div class="ig-panel">
+              <h4 class="ig-panel-title">🏆 أفضل 5 منشورات (الأعلى تفاعلاً)</h4>
+              <div class="ig-top-grid" id="igTop5Posts"></div>
+            </div>
+
+            <div class="ig-panel" id="igReelsBox" style="display:none;">
+              <h4 class="ig-panel-title">🎬 أداء Reels</h4>
+              <div class="ig-kpi-row" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;">
+                <div class="ig-kpi"><div class="ig-kpi-lbl">عدد</div><div class="ig-kpi-val" id="igReelsTotalCount">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط Plays</div><div class="ig-kpi-val" id="igReelsAvgPlays">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">متوسط Views</div><div class="ig-kpi-val" id="igReelsAvgViews">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">المدة (ث)</div><div class="ig-kpi-val" id="igReelsAvgDur">—</div></div>
+                <div class="ig-kpi"><div class="ig-kpi-lbl">تفاعل/مشاهدة %</div><div class="ig-kpi-val" id="igReelsEngPerPlay">—</div></div>
+              </div>
+            </div>
+
+            <div class="ig-panel" id="igSentimentBox" style="display:none;">
+              <h4 class="ig-panel-title">💬 تحليل مشاعر التعليقات</h4>
+              <div class="ig-sentiment-bar" id="igSentimentBar"></div>
+              <div class="ig-sentiment-meta" id="igSentimentMeta"></div>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:12px;">
+                <div><div class="ig-list-title">🚩 أبرز الاعتراضات</div><ul class="ig-list ig-list-bad" id="igObjections"></ul></div>
+                <div><div class="ig-list-title">⭐ أبرز الإشادات</div><ul class="ig-list ig-list-ok" id="igPraise"></ul></div>
+                <div><div class="ig-list-title">❓ الأسئلة الشائعة</div><ul class="ig-list ig-list-q" id="igQuestions"></ul></div>
+              </div>
+              <div id="igAiSentimentSummary" class="ig-ai-summary" style="display:none;"></div>
+            </div>
+
+            <div class="ig-panel" id="igVisionBox" style="display:none;">
+              <h4 class="ig-panel-title">👁️ تحليل الصور بالذكاء الاصطناعي</h4>
+              <div class="ig-vision-grid" id="igVisionGrid"></div>
+              <div class="ig-vision-summary" id="igVisionSummary"></div>
+            </div>
+
+            <div class="ig-panel" id="igStoriesBox" style="display:none;">
+              <h4 class="ig-panel-title">📚 Stories + Highlights</h4>
+              <div class="ig-stories-meta" id="igStoriesMeta"></div>
+              <div class="ig-highlights-grid" id="igHighlightsGrid"></div>
+            </div>
+
+            <div class="ig-panel" id="igRelatedBox" style="display:none;">
+              <h4 class="ig-panel-title">🔗 حسابات مشابهة (يقترحها انستجرام)</h4>
+              <div class="ig-related-grid" id="igRelatedGrid"></div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- بطاقة الإعلانات -->
         <div class="plat-card" id="platAds" style="display:none;">
           <div class="plat-header ads-header">
@@ -985,6 +1340,9 @@
 
   <script src="js/report-connect.js?v=5.5"></script>
   <script src="js/report-page.js?v=6.0"></script>
+  <script src="js/ig-deep-insight.js?v=1.0"></script>
   <!-- v6.0: report-connect.js fetches + renders main data; report-page.js renders platform cards using shared data -->
+  <!-- ig-deep-insight.js: V3 deep Instagram insight (heatmap, hashtags, sentiment, vision...) -->
+
 </body>
 </html>

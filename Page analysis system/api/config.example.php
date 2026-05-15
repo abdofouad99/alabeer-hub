@@ -74,6 +74,19 @@ return [
         // enable_competitor_enrich مُعطَّل افتراضياً لأنه يضاعف استهلاك Apify ×6
         // لكل منافس (يُستدعى runPageScan الكامل لكل صفحة منافس).
         'enable_competitor_enrich' => filter_var($get('ENABLE_COMPETITOR_ENRICH', 'false'), FILTER_VALIDATE_BOOLEAN),
+
+        // ── Instagram Deep Scan switches (مهمة لتقرير IG شامل) ─────
+        // enable_ig_comments: استدعاء Comments Actor لأفضل 5 منشورات → Sentiment + Objections
+        // enable_ig_vision:   تحليل أفضل 5 صور عبر OpenAI Vision (gpt-4o-mini) → OCR + content tags
+        // enable_ig_stories:  محاولة سحب Stories + Highlights (Actor مخصص)
+        // enable_ig_sentiment_ai: استخدام OpenAI لتحليل المشاعر بدلاً من heuristic بسيط
+        'enable_ig_comments'    => filter_var($get('ENABLE_IG_COMMENTS',    'true'),  FILTER_VALIDATE_BOOLEAN),
+        'enable_ig_vision'      => filter_var($get('ENABLE_IG_VISION',      'false'), FILTER_VALIDATE_BOOLEAN),
+        'enable_ig_stories'     => filter_var($get('ENABLE_IG_STORIES',     'false'), FILTER_VALIDATE_BOOLEAN),
+        'enable_ig_sentiment_ai'=> filter_var($get('ENABLE_IG_SENTIMENT_AI','true'),  FILTER_VALIDATE_BOOLEAN),
+        // عدد المنشورات/الصور التي يُجرى عليها تحليل المشاعر/الرؤية (تكلفة)
+        'ig_comments_top_posts' => (int)$get('IG_COMMENTS_TOP_POSTS', '5'),
+        'ig_vision_top_images'  => (int)$get('IG_VISION_TOP_IMAGES',  '5'),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
@@ -108,6 +121,8 @@ return [
         // يدعم APIFY_TOKENS (CSV) و APIFY_TOKEN / APIFY_TOKEN_1..9 (مفرد).
         'apify_tokens'        => $apifyTokensList(),
         'apify_actor_ig'      => $get('APIFY_ACTOR_IG', 'apify/instagram-scraper'),
+        'apify_actor_ig_comments'  => $get('APIFY_ACTOR_IG_COMMENTS',  'SbK00X0JYCPblD2wp'),
+        'apify_actor_ig_stories'   => $get('APIFY_ACTOR_IG_STORIES',   'apify/instagram-stories-scraper'),
         'apify_actor_fb'      => $get('APIFY_ACTOR_FB', 'apify/facebook-pages-scraper'),
         'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/free-tiktok-scraper'),
         'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'u6ppkMWAx2E2MpEuF'),
