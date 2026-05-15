@@ -169,8 +169,24 @@ function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false):
                 $result['weaknesses']      = $result['page_15_weaknesses'] ?? [];
                 $result['recommendations'] = $result['page_16_recommendations'] ?? [];
                 $result['source']          = 'openai_agents';
-                cacheSet($cacheKey, $result, 3600);
-                return $result;
+
+                // ── فحص: هل النتيجة فعلاً تحوي محتوى؟ (كل الوكلاء فشلوا → defaults فارغة) ──
+                $hasRealContent = !empty($result['summary'])
+                    || !empty($result['strengths'])
+                    || !empty($result['weaknesses'])
+                    || !empty($result['recommendations'])
+                    || !empty($result['page_4_core_problem']['root_cause'] ?? '')
+                    || !empty($result['page_1_report']['top_3_wins'] ?? []);
+
+                if (!$hasRealContent) {
+                    logError('Multi-agent returned empty result, falling back to single-prompt', [
+                        'meta' => $result['meta'] ?? [],
+                    ]);
+                    // لا تُرجع — دع الكود يكمل للـ fallback (single-prompt) في الأسفل
+                } else {
+                    cacheSet($cacheKey, $result, 3600);
+                    return $result;
+                }
             }
         } catch (\Throwable $e) {
             logError('Multi-agent failed — falling back to single OpenAI request', ['error' => $e->getMessage()]);
@@ -188,10 +204,17 @@ function buildAgentInputData(array $data): array
     $scan    = $data['scan_result'] ?? [];
     $answers = $data['answers'] ?? [];
 
+    // ── المراجع المختصرة لكائنات scan الفرعية (لتجنب التكرار) ──
+    $ws = $scan['website_scan'] ?? [];
+    $fb = $scan['facebook']     ?? [];
+    $ig = $scan['instagram']    ?? [];
+    $tt = $scan['tiktok']       ?? [];
+    $tw = $scan['twitter']      ?? [];
+
     $industry    = $answers['industry'] ?? $scan['industry'] ?? '';
-    $igFollowers = (int)($scan['instagram']['followers'] ?? 0);
-    $fbFollowers = (int)($scan['facebook']['followers'] ?? 0);
-    $tkFollowers = (int)($scan['tiktok']['followers'] ?? 0);
+    $igFollowers = (int)($ig['followers'] ?? 0);
+    $fbFollowers = (int)($fb['followers'] ?? 0);
+    $tkFollowers = (int)($tt['followers'] ?? 0);
 
     return [
         'business_info' => [
@@ -218,6 +241,24 @@ function buildAgentInputData(array $data): array
             'schema'            => (bool)($scan['schema'] ?? false),
             'pagespeed_mobile'  => (int)($scan['pagespeed_mobile'] ?? 0),
             'pagespeed_desktop' => (int)($scan['pagespeed_desktop'] ?? 0),
+            // ── حقول إضافية من website_scan (محتوى الموقع الغني) ──
+            'title'             => $ws['title'] ?? '',
+            'description'       => $ws['description'] ?? '',
+            'h1'                => $ws['h1'] ?? '',
+            'h2_count'          => (int)($ws['h2_count'] ?? 0),
+            'load_time_s'       => (float)($ws['load_time_s'] ?? 0),
+            'speed_rating'      => $ws['speed_rating'] ?? '',
+            'html_size_kb'      => (float)($ws['html_size_kb'] ?? 0),
+            'word_count'        => (int)($ws['word_count'] ?? 0),
+            'has_contact_form'  => (bool)($ws['has_contact_form'] ?? false),
+            'has_phone'         => (bool)($ws['has_phone'] ?? false),
+            'has_live_chat'     => (bool)($ws['has_live_chat'] ?? false),
+            'tech_stack'        => $ws['tech_stack'] ?? [],
+            'services_list'     => array_slice($ws['services_list'] ?? [], 0, 15),
+            'sections_titles'   => array_slice($ws['sections_titles'] ?? [], 0, 10),
+            'google_maps_url'   => $ws['google_maps_url'] ?? null,
+            'internal_links_count' => (int)($ws['internal_links_count'] ?? 0),
+            'pages_crawled'     => (int)($ws['pages_crawled'] ?? 1),
         ],
         'facebook' => [
             'page_name'           => $scan['facebook']['page_name'] ?? '',
@@ -265,6 +306,26 @@ function buildAgentInputData(array $data): array
             'best_hours'          => $scan['facebook']['deep_analysis']['best_hours'] ?? [],
             'best_days'           => $scan['facebook']['deep_analysis']['best_days'] ?? [],
             'top_post_comments'   => $scan['facebook']['top_post_comments'] ?? [],
+            // ── أمثلة المنشورات الفعلية (10) — يحتاجها Content Agent لتحليل النوع الحقيقي ──
+            'top_posts' => array_map(function($p) {
+                return [
+                    'text'     => mb_substr($p['caption'] ?? $p['text'] ?? $p['message'] ?? '', 0, 200),
+                    'likes'    => (int)($p['likesCount'] ?? $p['likes'] ?? $p['reactionsCount'] ?? 0),
+                    'comments' => (int)($p['commentsCount'] ?? $p['comments'] ?? 0),
+                    'shares'   => (int)($p['sharesCount'] ?? $p['shareCount'] ?? $p['shares'] ?? 0),
+                    'type'     => $p['type'] ?? $p['mediaType'] ?? 'unknown',
+                ];
+            }, array_slice($fb['top_5_posts'] ?? $fb['posts'] ?? [], 0, 10)),
+            // ── حقول التحليل العميق الإضافية ──
+            'page_optimization' => $fb['page_optimization'] ?? null,
+            'page_health'       => $fb['page_health'] ?? null,
+            'hashtags_analysis' => $fb['hashtags_analysis'] ?? null,
+            'posting_heatmap'   => [
+                'best_hour' => $fb['posting_heatmap']['best_hour'] ?? null,
+                'best_day'  => $fb['posting_heatmap']['best_day'] ?? null,
+            ],
+            'language_mix'      => $fb['language_mix'] ?? null,
+            'sponsored_ratio'   => $fb['sponsored_ratio'] ?? null,
         ],
         'instagram' => [
             'username'          => $scan['instagram']['username'] ?? '',
@@ -281,6 +342,34 @@ function buildAgentInputData(array $data): array
             'content_types'     => $scan['instagram']['deep_analysis']['content_types'] ?? [],
             'top_hashtags'      => $scan['instagram']['deep_analysis']['top_hashtags'] ?? [],
             'top_post_comments' => $scan['instagram']['top_post_comments'] ?? [],
+            // ── حقول هوية + توثيق + bio length ──
+            'full_name'         => $ig['full_name'] ?? '',
+            'is_verified'       => (bool)($ig['is_verified'] ?? false),
+            'website'           => $ig['website'] ?? '',
+            'is_business'       => (bool)($ig['is_business'] ?? $ig['is_business_account'] ?? false),
+            'bio_length'        => (int)($ig['bio_length'] ?? mb_strlen($ig['bio'] ?? '')),
+            // ── أمثلة المنشورات الفعلية (10) ──
+            'top_posts' => array_map(function($p) {
+                return [
+                    'text'     => mb_substr($p['caption'] ?? '', 0, 200),
+                    'likes'    => (int)($p['likesCount'] ?? 0),
+                    'comments' => (int)($p['commentsCount'] ?? 0),
+                    'saves'    => (int)($p['savesCount'] ?? 0),
+                    'type'     => $p['type'] ?? (!empty($p['isReel']) ? 'reel' : 'image'),
+                    'views'    => (int)($p['videoViewCount'] ?? 0),
+                ];
+            }, array_slice($ig['top_5_posts'] ?? $ig['latest_posts'] ?? [], 0, 10)),
+            // ── حقول التحليل العميق الإضافية ──
+            'bio_optimization'  => $ig['bio_optimization'] ?? null,
+            'account_health'    => $ig['account_health'] ?? null,
+            'hashtags_analysis' => $ig['hashtags_analysis'] ?? null,
+            'posting_heatmap'   => [
+                'best_hour' => $ig['posting_heatmap']['best_hour'] ?? null,
+                'best_day'  => $ig['posting_heatmap']['best_day'] ?? null,
+            ],
+            'language_mix'      => $ig['language_mix'] ?? null,
+            'reels_performance' => $ig['reels_performance'] ?? null,
+            'sponsored_ratio'   => $ig['sponsored_ratio'] ?? null,
         ],
         'tiktok' => [
             'username'        => $scan['tiktok']['username'] ?? '',
@@ -304,7 +393,19 @@ function buildAgentInputData(array $data): array
             'top_hashtags'    => $scan['tiktok']['top_hashtags'] ?? ($scan['tiktok']['deep_analysis']['top_hashtags'] ?? []),
             'top_mentions'    => $scan['tiktok']['top_mentions'] ?? [],
             'content_types'   => $scan['tiktok']['content_types'] ?? [],
-            'top_videos'      => array_slice($scan['tiktok']['top_videos'] ?? [], 0, 5),
+            // ── أمثلة الفيديوهات (15 بدل 5) مع البيانات الكاملة ──
+            'top_videos' => array_map(function($v) {
+                return [
+                    'caption'   => mb_substr($v['caption'] ?? '', 0, 150),
+                    'likes'     => (int)($v['likes'] ?? 0),
+                    'comments'  => (int)($v['comments'] ?? 0),
+                    'shares'    => (int)($v['shares'] ?? 0),
+                    'views'     => (int)($v['views'] ?? 0),
+                    'duration'  => (int)($v['duration'] ?? 0),
+                    'hashtags'  => array_slice($v['hashtags'] ?? [], 0, 5),
+                ];
+            }, array_slice($tt['top_videos'] ?? [], 0, 15)),
+            'comments_sentiment' => $tt['comments_sentiment'] ?? null,
             'bio'             => $scan['tiktok']['bio'] ?? '',
             'is_verified'     => (bool)($scan['tiktok']['is_verified'] ?? false),
         ],
@@ -331,7 +432,18 @@ function buildAgentInputData(array $data): array
             'top_hashtags'     => $scan['twitter']['top_hashtags'] ?? [],
             'top_mentions'     => $scan['twitter']['top_mentions'] ?? [],
             'content_types'    => $scan['twitter']['content_types'] ?? [],
-            'top_tweets'       => array_slice($scan['twitter']['top_tweets'] ?? [], 0, 5),
+            // ── أمثلة التغريدات (15 بدل 5) مع البيانات الكاملة ──
+            'top_tweets' => array_map(function($t) {
+                return [
+                    'text'      => mb_substr($t['text'] ?? '', 0, 280),
+                    'likes'     => (int)($t['likes'] ?? 0),
+                    'retweets'  => (int)($t['retweets'] ?? 0),
+                    'replies'   => (int)($t['replies'] ?? 0),
+                    'views'     => (int)($t['views'] ?? 0),
+                    'type'      => !empty($t['has_video']) ? 'video' : (!empty($t['has_photo']) ? 'photo' : 'text'),
+                ];
+            }, array_slice($tw['top_tweets'] ?? [], 0, 15)),
+            'health_score'     => $tw['health_score'] ?? null,
         ],
         'ads_library' => [
             'total_ads'  => (int)($scan['ads_library']['total_ads'] ?? 0),
@@ -722,7 +834,7 @@ function callOpenAI(string $prompt, array $data, array $cfg): array
     if (!$key) throw new \Exception('No OpenAI key');
 
     // Keep the request small enough to avoid long OpenAI hangs on large scans.
-    $maxChars = (int)($cfg['apis']['openai_prompt_max_chars'] ?? 12000);
+    $maxChars = (int)($cfg['apis']['openai_prompt_max_chars'] ?? 30000);
     if (mb_strlen($prompt) > $maxChars) {
         $prompt = mb_substr($prompt, 0, $maxChars) . "\n\n... [تم اختصار البيانات]";
     }

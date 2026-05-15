@@ -104,6 +104,26 @@ PROMPT;
 }
 
 /**
+ * Truncate long agent payloads to protect Agent 4 & 5 from context overflow.
+ * Keeps first 60% and last 30% of the payload, with a notice in the middle.
+ *
+ * @param string $payload  The full payload (typically a JSON-encoded user message body)
+ * @param int    $maxChars Maximum allowed length in characters (default 100,000)
+ * @return string          The (possibly truncated) payload
+ */
+if (!function_exists('_truncateAgentPayload')) {
+function _truncateAgentPayload(string $payload, int $maxChars = 100000): string {
+    if (mb_strlen($payload) <= $maxChars) return $payload;
+    // قطع ذكي: احتفظ بأول 60% وآخر 30% + رسالة قطع
+    $head = mb_substr($payload, 0, (int)($maxChars * 0.6));
+    $tail = mb_substr($payload, -(int)($maxChars * 0.3));
+    return $head
+        . "\n\n[... تم اختصار " . number_format(mb_strlen($payload) - $maxChars) . " حرف لتجنب تجاوز الحد ...]\n\n"
+        . $tail;
+}
+}
+
+/**
  * Agent 1: Diagnostic Intel — pages 3,4,5,7
  */
 function getAgent1Prompt(): string {
@@ -983,6 +1003,9 @@ function runStrategistAgent(
         . "\n\n═══ نتائج الوكلاء السابقين ═══\n"
         . json_encode($previousOutput, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
+    // ── حماية من تجاوز context window للوكيل 4 (rawData + 3 مخرجات وكلاء سابقين) ──
+    $userMessage = _truncateAgentPayload($userMessage, 100000);
+
     return callGeminiAgent($apiKey, 'gemini-2.5-pro', $systemPrompt, $userMessage, 65536);
 }
 
@@ -1018,6 +1041,9 @@ function runActionPlannerAgent(
         . json_encode($rawData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
         . "\n\n═══ نتائج الوكلاء السابقين ═══\n"
         . json_encode($previousOutput, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+    // ── حماية من تجاوز context window للوكيل 5 (rawData + 4 مخرجات وكلاء سابقين) ──
+    $userMessage = _truncateAgentPayload($userMessage, 100000);
 
     return callGeminiAgent($apiKey, 'gemini-2.5-pro', $systemPrompt, $userMessage, 65536);
 }
