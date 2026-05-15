@@ -127,7 +127,7 @@ return [
         'openai_model'            => $get('OPENAI_MODEL', 'gpt-4o-mini'),
         'openai_timeout'          => (int)$get('OPENAI_TIMEOUT', '120'),
         'openai_connect_timeout'  => (int)$get('OPENAI_CONNECT_TIMEOUT', '15'),
-        'openai_prompt_max_chars' => (int)$get('OPENAI_PROMPT_MAX_CHARS', '12000'),
+        'openai_prompt_max_chars' => (int)$get('OPENAI_PROMPT_MAX_CHARS', '30000'),
         'openai_max_tokens'       => (int)$get('OPENAI_MAX_TOKENS', '3500'),
         'nvidia_keys'    => $csv('NVIDIA_KEYS'),
 
