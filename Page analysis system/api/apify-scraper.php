@@ -457,17 +457,25 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
 
     $isPostsScraper = ($actorId === 'KoJrdxJCTtpon81KY');
 
+    // عدد المنشورات: قابل للتعديل من الإعدادات (افتراضياً 50 لتحليل أعمق)
+    $maxPosts = (int)($cfg['analysis']['fb_max_posts'] ?? 50);
+    if ($maxPosts < 10) $maxPosts = 10;
+
     if ($isPostsScraper) {
         $input = json_encode([
             'startUrls'    => [['url' => $url]],
-            'resultsLimit' => 30,
+            'resultsLimit' => $maxPosts,
             'captionText'  => false,
         ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK);
     } else {
+        // ✅ تفعيل scrapeReviews + scrapeServices لجلب التقييمات والخدمات
         $input = json_encode([
-            'startUrls'  => [['url' => $url]],
-            'maxPosts'   => 30,
-            'scrapeAbout'=> true,
+            'startUrls'      => [['url' => $url]],
+            'maxPosts'       => $maxPosts,
+            'scrapeAbout'    => true,
+            'scrapeReviews'  => true,
+            'scrapeServices' => true,
+            'scrapePosts'    => true,
         ]);
     }
 
@@ -478,7 +486,7 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
     }
 
     logInfo('Starting Facebook scrape', ['url' => $url, 'actor' => $actorId, 'runId' => $runId]);
-    $result = _apifyWaitAndFetch($runId, $token, 120); // 120s because posts scraper takes longer
+    $result = _apifyWaitAndFetch($runId, $token, 150); // 150s for richer scrape with reviews+services
     if ($result === null) {
         logError('Facebook scrape timed out or failed', ['url' => $url, 'runId' => $runId]);
         return ['success' => false, 'error' => 'انتهت مهلة Facebook Apify'];
@@ -486,6 +494,11 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
     logInfo('Facebook scrape successful', ['url' => $url, 'items_count' => count($result)]);
 
     // ── المعالجة بناءً على نوع الـ Actor ─────────
+    $reviews  = [];   // قائمة التقييمات (مع نصوصها)
+    $services = [];   // قائمة الخدمات / المنتجات
+    $hours    = [];   // ساعات العمل
+    $aboutMe  = '';   // نص "عن المعلن"
+
     if ($isPostsScraper) {
         // Actor الجديد يرجع مصفوفة من المنشورات، أول عنصر يحتوي على معلومات الصفحة
         if (empty($result)) return ['success' => false, 'error' => 'لا يوجد منشورات للتحليل (أو الصفحة مغلقة)'];
@@ -522,18 +535,18 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         $category  = $page['category']     ?? '';
         $is_verified = !empty($page['isVerified']) || !empty($page['verified']);
 
-        // ── جلب النواقص (معلومات الصفحة) عبر Actor الصفحات السريع ──
+        // ── جلب النواقص (معلومات الصفحة + التقييمات + الخدمات) عبر Actor الصفحات السريع ──
         if (empty($followers) && empty($email) && empty($phone) && empty($website)) {
             $aboutInput = json_encode([
-                'startUrls' => [['url' => $url]],
-                'maxPosts' => 0,
-                'scrapeAbout' => true,
-                'scrapeServices' => false,
-                'scrapeReviews' => false
+                'startUrls'      => [['url' => $url]],
+                'maxPosts'       => 0,
+                'scrapeAbout'    => true,
+                'scrapeServices' => true,   // ✅ تفعيل
+                'scrapeReviews'  => true,   // ✅ تفعيل
             ]);
             $aboutRunId = _apifyStartRun('apify~facebook-pages-scraper', $aboutInput, $token);
             if ($aboutRunId) {
-                $aboutResult = _apifyWaitAndFetch($aboutRunId, $token, 60);
+                $aboutResult = _apifyWaitAndFetch($aboutRunId, $token, 90);
                 if (!empty($aboutResult[0])) {
                     $ap = $aboutResult[0];
                     $followers = $ap['followers'] ?? $ap['followersCount'] ?? $ap['fans'] ?? $ap['likesCount'] ?? $followers;
@@ -553,8 +566,14 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
                     $is_verified = !empty($ap['verified']) || !empty($ap['isVerified']) || ($ap['verifiedStatus'] ?? '') === 'BLUE_VERIFIED' || $is_verified;
 
                     // استخدام صورة الغلاف والشخصية إذا توفرت
-                    $page['cover'] = $ap['cover'] ?? $page['cover'] ?? null;
+                    $page['cover']      = $ap['cover'] ?? $page['cover'] ?? null;
                     $page['profilePic'] = $ap['profilePic'] ?? $page['profilePic'] ?? null;
+
+                    // استخراج التقييمات والخدمات وساعات العمل
+                    $reviews  = _extractReviews($ap);
+                    $services = _extractServices($ap);
+                    $hours    = _extractHours($ap);
+                    $aboutMe  = _extractAboutText($ap);
                 }
             }
         }
@@ -589,41 +608,76 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
         if (!$adsActive && !empty($page['ad_status'])) {
             $adsActive = strtoupper($page['ad_status']) === 'ACTIVE';
         }
+
+        // استخراج التقييمات والخدمات وساعات العمل والـ About
+        $reviews  = _extractReviews($page);
+        $services = _extractServices($page);
+        $hours    = _extractHours($page);
+        $aboutMe  = _extractAboutText($page);
     }
 
+    // ── حساب المتوسطات المنفصلة (likes/comments/shares) + reactions ──
+    $stats = _calcFacebookPostStats($posts);
+
+    // ── معدّل التفاعل الحقيقي (Engagement Rate) ──
+    $followersInt    = (int)($followers ?? 0);
+    $engagementRate  = $followersInt > 0
+        ? round((($stats['avg_likes'] + $stats['avg_comments'] + $stats['avg_shares']) / $followersInt) * 100, 2)
+        : 0.0;
+
+    // ── تنظيف العنوان: قد يكون object أو string ──
+    $address = _normalizeAddress($page['address'] ?? $page['location'] ?? $page['city'] ?? null);
+
+    // ── Reviews Summary (متوسط + توزيع نجوم) ──
+    $reviewsSummary = _summarizeReviews($reviews);
+
     $res = [
-        'success'        => true,
-        'source'         => 'apify',
-        'platform'       => 'facebook',
-        'page_name'      => $pageName,
-        'page_id'        => $pageId,
-        'url'            => $url,
-        'followers'      => $followers,
-        'likes'          => $likes,
-        'category'       => $category,
-        'is_verified'    => $is_verified,
-        'website'        => $website,
-        'phone'          => $phone,
-        'whatsapp'       => $whatsapp,
-        'email'          => $email,
-        'address'        => $page['address'] ?? $page['location'] ?? $page['city'] ?? '',
-        'description'    => $page['intro'] ?? $page['description'] ?? $page['about'] ?? $page['text'] ?? '',
-        'rating'         => _cleanRating($page['rating'] ?? $page['overallStarRating'] ?? null),
-        'ratings_count'  => $page['ratingsCount'] ?? $page['ratingCount'] ?? null,
-        'response_time'  => $page['responseTime'] ?? $page['response_time'] ?? $page['messagingResponseTime'] ?? null,
-        'posts_count'    => count($posts),
-        'avg_engagement' => calcAvgEngagement($posts),
-        'top_post'       => getTopPost($posts),
-        'deep_analysis'  => analyzeDeepContent($posts),
-        'instagram_url'  => $igUrl,
-        'ads_running'    => $adsActive,
-        'ads_count'      => $adsCount,
-        'creation_date'  => $page['creation_date'] ?? $page['createdTime'] ?? $page['pageCreatedDate'] ?? $page['foundedDate'] ?? '',
-        'profile_pic'    => $page['profilePic'] ?? $page['profile_pic'] ?? '',
-        'cover_photo'    => $page['cover'] ?? $page['cover_photo'] ?? '',
-        'posts_per_week' => calcPostsPerWeek($posts),
-        'last_post_days' => calcLastPostDays($posts),
-        'posts'          => array_slice($posts, 0, 10),  // للعرض في التقرير
+        'success'         => true,
+        'source'          => 'apify',
+        'platform'        => 'facebook',
+        'page_name'       => $pageName,
+        'page_id'         => $pageId,
+        'url'             => $url,
+        'followers'       => $followers,
+        'likes'           => $likes,
+        'category'        => $category,
+        'is_verified'     => $is_verified,
+        'website'         => $website,
+        'phone'           => $phone,
+        'whatsapp'        => $whatsapp,
+        'email'           => $email,
+        'address'         => $address,
+        'description'     => $page['intro'] ?? $page['description'] ?? $page['about'] ?? $page['text'] ?? $aboutMe,
+        'about'           => $aboutMe,
+        'rating'          => _cleanRating($page['rating'] ?? $page['overallStarRating'] ?? null) ?? $reviewsSummary['avg_rating'],
+        'ratings_count'   => $page['ratingsCount'] ?? $page['ratingCount'] ?? $reviewsSummary['count'],
+        'response_time'   => $page['responseTime'] ?? $page['response_time'] ?? $page['messagingResponseTime'] ?? null,
+        'posts_count'     => count($posts),
+        // ✅ متوسطات منفصلة (تستهلكها AI مباشرة)
+        'avg_likes'       => $stats['avg_likes'],
+        'avg_comments'    => $stats['avg_comments'],
+        'avg_shares'      => $stats['avg_shares'],
+        'avg_video_views' => $stats['avg_video_views'],
+        'avg_engagement'  => $stats['avg_engagement'],
+        'engagement_rate' => $engagementRate,
+        // ✅ تفصيل تفاعل المنشورات (Love/Haha/Wow/Sad/Angry)
+        'reactions_breakdown' => $stats['reactions_breakdown'],
+        'top_post'        => getTopPost($posts),
+        'deep_analysis'   => analyzeDeepContent($posts),
+        'instagram_url'   => $igUrl,
+        'ads_running'     => $adsActive,
+        'ads_count'       => $adsCount,
+        'creation_date'   => $page['creation_date'] ?? $page['createdTime'] ?? $page['pageCreatedDate'] ?? $page['foundedDate'] ?? '',
+        'profile_pic'     => $page['profilePic'] ?? $page['profile_pic'] ?? '',
+        'cover_photo'     => $page['cover'] ?? $page['cover_photo'] ?? '',
+        'posts_per_week'  => calcPostsPerWeek($posts),
+        'last_post_days'  => calcLastPostDays($posts),
+        'posts'           => array_slice($posts, 0, 10),  // للعرض في التقرير
+        // ✅ ميزات جديدة لتحليل أعمق
+        'reviews'         => array_slice($reviews, 0, 20),
+        'reviews_summary' => $reviewsSummary,
+        'services'        => $services,
+        'opening_hours'   => $hours,
     ];
 
     // فقط أضف الـ signals إذا كانت حقيقية (حتى لا نمسح ما يجده الـ Scraper العام)
@@ -632,8 +686,242 @@ function scrapeFacebook(string $url, string $token, array $cfg): array {
     if (!empty($email))    $res['has_email']    = true;
     if (!empty($website))  $res['has_website']  = true;
     if ($is_verified)      $res['is_verified']  = true;
+    if (!empty($services)) $res['has_services'] = true;
+    if (!empty($hours))    $res['has_hours']    = true;
 
     return $res;
+}
+
+
+// ============================================================
+// Helpers لمعالجة بيانات الفيسبوك (post stats, reactions, reviews, services, hours, address)
+// ============================================================
+
+/**
+ * حساب متوسطات التفاعل المنفصلة + Reactions Breakdown من المنشورات
+ * يقرأ من جميع الحقول الممكنة التي يُرجعها Apify Facebook Actor.
+ */
+function _calcFacebookPostStats(array $posts): array {
+    $totalLikes = 0; $totalComments = 0; $totalShares = 0; $totalVideoViews = 0;
+    $reactions  = ['like' => 0, 'love' => 0, 'haha' => 0, 'wow' => 0, 'sad' => 0, 'angry' => 0, 'care' => 0];
+    $cnt = max(count($posts), 1);
+
+    foreach ($posts as $p) {
+        // Likes / Reactions Total
+        $likes = (int)($p['likesCount']
+                    ?? $p['likes']
+                    ?? $p['reactionsCount']
+                    ?? $p['reactions']['total']
+                    ?? 0);
+        // Comments
+        $comments = (int)($p['commentsCount']
+                       ?? $p['comments']
+                       ?? $p['commentCount']
+                       ?? 0);
+        // Shares
+        $shares = (int)($p['sharesCount']
+                     ?? $p['shareCount']
+                     ?? $p['shares']
+                     ?? 0);
+        // Video Views
+        $views = (int)($p['videoViewCount']
+                    ?? $p['viewsCount']
+                    ?? $p['videoViews']
+                    ?? $p['playCount']
+                    ?? 0);
+
+        $totalLikes      += $likes;
+        $totalComments   += $comments;
+        $totalShares     += $shares;
+        $totalVideoViews += $views;
+
+        // Reactions detail — Apify يُرجع الحقول إما تحت reactions{} أو reactionsByType{} أو reactionCount
+        $rb = $p['reactions'] ?? $p['reactionsByType'] ?? $p['reactionCount'] ?? null;
+        if (is_array($rb)) {
+            foreach (['like','love','haha','wow','sad','angry','care'] as $k) {
+                // المفاتيح المحتملة: love, LOVE, REACTION_LOVE, reactions_love...
+                $val = 0;
+                foreach ([$k, strtoupper($k), 'REACTION_' . strtoupper($k), 'reactions_' . $k] as $key) {
+                    if (isset($rb[$key]) && is_numeric($rb[$key])) {
+                        $val = (int)$rb[$key];
+                        break;
+                    }
+                }
+                $reactions[$k] += $val;
+            }
+        }
+    }
+
+    return [
+        'avg_likes'           => round($totalLikes / $cnt, 1),
+        'avg_comments'        => round($totalComments / $cnt, 1),
+        'avg_shares'          => round($totalShares / $cnt, 1),
+        'avg_video_views'     => round($totalVideoViews / $cnt, 1),
+        'avg_engagement'      => round(($totalLikes + $totalComments + $totalShares) / $cnt, 1),
+        'reactions_breakdown' => $reactions,
+    ];
+}
+
+/**
+ * استخراج التقييمات (reviews) من بيانات صفحة Apify
+ * يدعم عدة هياكل ممكنة من Actors مختلفة
+ */
+function _extractReviews(array $page): array {
+    $sources = [
+        $page['reviews']         ?? null,
+        $page['pageReviews']     ?? null,
+        $page['userReviews']     ?? null,
+        $page['recommendations'] ?? null,
+    ];
+    $reviews = [];
+    foreach ($sources as $src) {
+        if (is_array($src)) {
+            foreach ($src as $r) {
+                if (!is_array($r)) continue;
+                $rating = $r['rating'] ?? $r['stars'] ?? $r['recommendation'] ?? null;
+                $text   = $r['text'] ?? $r['reviewText'] ?? $r['content'] ?? $r['comment'] ?? '';
+                $author = $r['author'] ?? $r['userName'] ?? $r['user']['name'] ?? '';
+                $date   = $r['date'] ?? $r['createdTime'] ?? $r['timestamp'] ?? '';
+                if (!$text && $rating === null) continue;
+                $reviews[] = [
+                    'rating' => is_numeric($rating) ? (float)$rating : (in_array($rating, ['positive','recommends','POSITIVE'], true) ? 5 : (in_array($rating, ['negative','doesnt-recommend','NEGATIVE'], true) ? 1 : null)),
+                    'text'   => is_string($text) ? mb_substr(trim($text), 0, 500) : '',
+                    'author' => is_string($author) ? $author : '',
+                    'date'   => is_string($date) ? $date : '',
+                ];
+            }
+        }
+    }
+    return $reviews;
+}
+
+/**
+ * تلخيص التقييمات: متوسط النجوم + توزيع + استخراج إيجابيات/سلبيات
+ */
+function _summarizeReviews(array $reviews): array {
+    if (empty($reviews)) {
+        return ['count' => 0, 'avg_rating' => null, 'distribution' => [], 'positive' => [], 'negative' => []];
+    }
+    $ratings = [];
+    $dist = [1=>0, 2=>0, 3=>0, 4=>0, 5=>0];
+    $pos = []; $neg = [];
+    foreach ($reviews as $r) {
+        $rt = $r['rating'] ?? null;
+        if (is_numeric($rt)) {
+            $ratings[] = (float)$rt;
+            $star = max(1, min(5, (int)round($rt)));
+            $dist[$star] = ($dist[$star] ?? 0) + 1;
+        }
+        if (!empty($r['text'])) {
+            if (is_numeric($rt) && $rt >= 4) $pos[] = $r['text'];
+            elseif (is_numeric($rt) && $rt <= 2) $neg[] = $r['text'];
+        }
+    }
+    return [
+        'count'        => count($reviews),
+        'avg_rating'   => $ratings ? round(array_sum($ratings) / count($ratings), 1) : null,
+        'distribution' => $dist,
+        'positive'     => array_slice($pos, 0, 5),
+        'negative'     => array_slice($neg, 0, 5),
+    ];
+}
+
+/**
+ * استخراج الخدمات/المنتجات
+ */
+function _extractServices(array $page): array {
+    $sources = [
+        $page['services']       ?? null,
+        $page['pageServices']   ?? null,
+        $page['products']       ?? null,
+        $page['servicesOffered']?? null,
+    ];
+    $out = [];
+    foreach ($sources as $src) {
+        if (is_array($src)) {
+            foreach ($src as $s) {
+                if (is_string($s)) {
+                    $name = trim($s);
+                    if ($name !== '') $out[] = ['name' => $name, 'description' => '', 'price' => ''];
+                } elseif (is_array($s)) {
+                    $name = $s['name'] ?? $s['title'] ?? '';
+                    $desc = $s['description'] ?? $s['text'] ?? '';
+                    $price = $s['price'] ?? $s['priceRange'] ?? '';
+                    if ($name) $out[] = ['name' => trim($name), 'description' => trim((string)$desc), 'price' => is_string($price) ? $price : ''];
+                }
+            }
+        }
+    }
+    return array_slice($out, 0, 30);
+}
+
+/**
+ * استخراج ساعات العمل (يُرجع array مفهوم: اليوم => "HH:MM-HH:MM")
+ */
+function _extractHours(array $page): array {
+    $h = $page['openingHours'] ?? $page['hours'] ?? $page['workingHours'] ?? null;
+    if (!is_array($h)) return [];
+    $out = [];
+    $days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    foreach ($days as $d) {
+        // قد يكون "monday" => "09:00-22:00" أو "monday" => ["09:00","22:00"]
+        $val = $h[$d] ?? $h[ucfirst($d)] ?? null;
+        if ($val === null) continue;
+        if (is_string($val))      $out[$d] = $val;
+        elseif (is_array($val))   $out[$d] = implode('-', array_map('strval', $val));
+    }
+    // إذا لم نجد بهذه المفاتيح، نُرجع $h كما هو إذا كانت associative
+    if (empty($out) && is_array($h)) {
+        foreach ($h as $k => $v) {
+            if (is_string($v))    $out[(string)$k] = $v;
+            elseif (is_array($v)) $out[(string)$k] = implode('-', array_map('strval', $v));
+        }
+    }
+    return $out;
+}
+
+/**
+ * استخراج نص "About" من حقول مختلفة
+ */
+function _extractAboutText(array $page): string {
+    $candidates = [
+        $page['about']       ?? null,
+        $page['aboutText']   ?? null,
+        $page['intro']       ?? null,
+        $page['description'] ?? null,
+        $page['bio']         ?? null,
+        $page['mission']     ?? null,
+    ];
+    foreach ($candidates as $c) {
+        if (is_string($c) && trim($c) !== '') return trim($c);
+        if (is_array($c)) {
+            $joined = implode(' ', array_filter(array_map('strval', $c)));
+            if (trim($joined) !== '') return trim($joined);
+        }
+    }
+    return '';
+}
+
+/**
+ * تطبيع العنوان (قد يأتي string أو object {street, city, country})
+ */
+function _normalizeAddress($addr): string {
+    if ($addr === null) return '';
+    if (is_string($addr)) return trim($addr);
+    if (is_array($addr)) {
+        $parts = [];
+        foreach (['street','street1','address','city','region','state','country','postalCode','zip'] as $k) {
+            if (!empty($addr[$k]) && is_string($addr[$k])) $parts[] = trim($addr[$k]);
+        }
+        if (empty($parts)) {
+            // جرب أي قيم نصية في الـ array
+            foreach ($addr as $v) {
+                if (is_string($v) && trim($v) !== '') $parts[] = trim($v);
+            }
+        }
+        return implode('، ', array_unique($parts));
+    }
+    return '';
 }
 
 
@@ -1778,7 +2066,11 @@ function fetchApifyDataset(string $datasetId, string $token): ?array {
 // ============================================================
 function calcAvgEngagement(array $posts): float {
     if (!$posts) return 0;
-    $total = array_sum(array_map(fn($p) => (int)($p['likes'] ?? $p['likesCount'] ?? 0) + (int)($p['comments'] ?? $p['commentsCount'] ?? 0), $posts));
+    $total = array_sum(array_map(fn($p) =>
+        (int)($p['likes']        ?? $p['likesCount']    ?? $p['reactionsCount'] ?? 0)
+      + (int)($p['comments']     ?? $p['commentsCount'] ?? $p['commentCount']   ?? 0)
+      + (int)($p['shares']       ?? $p['sharesCount']   ?? $p['shareCount']     ?? 0)
+    , $posts));
     return round($total / count($posts), 1);
 }
 
@@ -1813,8 +2105,20 @@ function calcIGEngagement(array $posts, int $followers): float {
 
 function getTopPost(array $posts): ?array {
     if (!$posts) return null;
-    usort($posts, fn($a, $b) => (($b['likes'] ?? 0) + ($b['comments'] ?? 0)) - (($a['likes'] ?? 0) + ($a['comments'] ?? 0)));
-    return $posts[0] ?? null;
+    usort($posts, fn($a, $b) =>
+        ((int)($b['likes'] ?? $b['likesCount'] ?? 0) + (int)($b['comments'] ?? $b['commentsCount'] ?? 0) + (int)($b['shares'] ?? $b['sharesCount'] ?? 0))
+      - ((int)($a['likes'] ?? $a['likesCount'] ?? 0) + (int)($a['comments'] ?? $a['commentsCount'] ?? 0) + (int)($a['shares'] ?? $a['sharesCount'] ?? 0))
+    );
+    // ✅ تطبيع: نضمن وجود حقل url لاستخدامه في scrapePostComments لاحقاً
+    $top = $posts[0] ?? null;
+    if (is_array($top) && empty($top['url'])) {
+        $top['url'] = $top['postUrl']
+                   ?? $top['link']
+                   ?? $top['permalink']
+                   ?? $top['permalink_url']
+                   ?? '';
+    }
+    return $top;
 }
 
 function getTopIGPost(array $posts): ?array {
@@ -1848,6 +2152,11 @@ function analyzeDeepContent(array $posts): array {
     $hashtags = [];
     $totalWords = 0;
     $ctaCount = 0;
+    $totalShares = 0;
+    $totalVideoViews = 0;
+    $reactionsTotal = ['like'=>0,'love'=>0,'haha'=>0,'wow'=>0,'sad'=>0,'angry'=>0,'care'=>0];
+    $postingHours = []; // hour-of-day distribution
+    $postingDays  = []; // day-of-week distribution
 
     // الكلمات التي لو وجدت بالنص تدل على دعوة لإجراء
     $ctaKeywords = ['رابط', 'بايو', 'bio', 'link', 'تواصل', 'واتساب', 'رسالة', 'اشتري', 'احجز', 'سجل', 'خصم', 'الآن', 'تخفيض', 'اتصل', 'موقعنا'];
@@ -1857,7 +2166,7 @@ function analyzeDeepContent(array $posts): array {
     foreach ($posts as $p) {
         $text = $p['caption'] ?? $p['text'] ?? $p['message'] ?? '';
         $type = strtolower($p['type'] ?? $p['mediaType'] ?? '');
-        $url = $p['url'] ?? $p['postUrl'] ?? '';
+        $url = $p['url'] ?? $p['postUrl'] ?? $p['permalink'] ?? $p['permalink_url'] ?? '';
         $img = $p['displayUrl'] ?? $p['thumbnailUrl'] ?? $p['imageUrl'] ?? '';
         if (empty($img) && is_string($p['image'] ?? null)) $img = $p['image'];
         if (empty($img) && isset($p['image']['uri'])) $img = $p['image']['uri'];
@@ -1866,8 +2175,24 @@ function analyzeDeepContent(array $posts): array {
         if (empty($img) && !empty($p['attachments'][0]['image'])) $img = is_string($p['attachments'][0]['image']) ? $p['attachments'][0]['image'] : ($p['attachments'][0]['image']['uri'] ?? '');
         if (empty($img) && !empty($p['attachments'][0]['media']['image']['src'])) $img = $p['attachments'][0]['media']['image']['src'];
         if (empty($img) && !empty($p['thumbnail'])) $img = $p['thumbnail'];
-        $likes = (int)($p['likesCount'] ?? $p['likes'] ?? 0);
-        $comments = (int)($p['commentsCount'] ?? $p['comments'] ?? 0);
+        $likes    = (int)($p['likesCount']    ?? $p['likes']        ?? $p['reactionsCount'] ?? 0);
+        $comments = (int)($p['commentsCount'] ?? $p['comments']     ?? $p['commentCount']   ?? 0);
+        $shares   = (int)($p['sharesCount']   ?? $p['shareCount']   ?? $p['shares']         ?? 0);
+        $views    = (int)($p['videoViewCount']?? $p['viewsCount']   ?? $p['videoViews']     ?? $p['playCount'] ?? 0);
+        $totalShares     += $shares;
+        $totalVideoViews += $views;
+
+        // Reactions detail
+        $rb = $p['reactions'] ?? $p['reactionsByType'] ?? $p['reactionCount'] ?? null;
+        if (is_array($rb)) {
+            foreach (['like','love','haha','wow','sad','angry','care'] as $k) {
+                $val = 0;
+                foreach ([$k, strtoupper($k), 'REACTION_' . strtoupper($k), 'reactions_' . $k] as $key) {
+                    if (isset($rb[$key]) && is_numeric($rb[$key])) { $val = (int)$rb[$key]; break; }
+                }
+                $reactionsTotal[$k] += $val;
+            }
+        }
 
         // 1. فرز الأنواع
         if (str_contains($type, 'video') || str_contains($type, 'reel')) {
@@ -1907,14 +2232,25 @@ function analyzeDeepContent(array $posts): array {
         }
         if ($hasCta) $ctaCount++;
 
+        // 4b. أوقات النشر (لاكتشاف أفضل وقت)
+        $ts = strtotime((string)($p['timestamp'] ?? $p['takenAt'] ?? $p['time'] ?? $p['date'] ?? ''));
+        if ($ts) {
+            $h = (int)date('G', $ts);
+            $d = (int)date('w', $ts); // 0=Sun .. 6=Sat
+            $postingHours[$h] = ($postingHours[$h] ?? 0) + 1;
+            $postingDays[$d]  = ($postingDays[$d]  ?? 0) + 1;
+        }
+
         // 5. تجميع بيانات المنشورات للأفضل
         $parsed_posts[] = [
             'url' => $url,
             'image' => $img,
             'text' => mb_strlen($text) > 80 ? mb_substr($text, 0, 80) . '...' : (empty($text) ? 'بدون نص' : $text),
-            'engagement' => $likes + $comments,
+            'engagement' => $likes + $comments + $shares,
             'likes' => $likes,
             'comments' => $comments,
+            'shares' => $shares,
+            'video_views' => $views,
         ];
     }
 
@@ -1926,17 +2262,29 @@ function analyzeDeepContent(array $posts): array {
     arsort($hashtags);
     $topHashtags = array_slice(array_keys($hashtags), 0, 10);
 
+    // أفضل 3 ساعات نشر و3 أيام
+    arsort($postingHours);
+    arsort($postingDays);
+    $bestHours = array_slice(array_keys($postingHours), 0, 3);
+    $bestDays  = array_slice(array_keys($postingDays), 0, 3);
+
     return [
         'posts_analyzed' => $total,
         'types_percent' => [
-            'video' => round(($types['video'] / $total) * 100),
-            'image' => round(($types['image'] / $total) * 100),
+            'video'    => round(($types['video']    / $total) * 100),
+            'image'    => round(($types['image']    / $total) * 100),
             'carousel' => round(($types['carousel'] / $total) * 100),
         ],
-        'avg_words' => round($totalWords / $total),
-        'top_hashtags' => $topHashtags,
-        'cta_percent' => round(($ctaCount / $total) * 100),
-        'top_5_posts' => $top5
+        'avg_words'        => round($totalWords / $total),
+        'top_hashtags'     => $topHashtags,
+        'cta_percent'      => round(($ctaCount / $total) * 100),
+        'top_5_posts'      => $top5,
+        // ✅ مقاييس أعمق
+        'avg_shares'       => round($totalShares / $total, 1),
+        'avg_video_views'  => round($totalVideoViews / $total, 1),
+        'reactions_total'  => $reactionsTotal,
+        'best_hours'       => $bestHours,   // أرقام 0-23
+        'best_days'        => $bestDays,    // أرقام 0=الأحد .. 6=السبت
     ];
 }
 

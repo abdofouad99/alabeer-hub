@@ -80,7 +80,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (document.getElementById('fbLikes')) document.getElementById('fbLikes').textContent = fmtNum(f.likes);
       if (document.getElementById('fbRating')) document.getElementById('fbRating').textContent = f.rating ? '★ ' + f.rating : '—';
       if (document.getElementById('fbPosts')) document.getElementById('fbPosts').textContent = f.posts_count != null ? f.posts_count : '—';
-      if (document.getElementById('fbEngagement')) document.getElementById('fbEngagement').textContent = f.avg_engagement != null ? f.avg_engagement + '%' : '—';
+      if (document.getElementById('fbEngagement')) {
+        const fbEng = f.engagement_rate ?? f.avg_engagement;
+        document.getElementById('fbEngagement').textContent = fbEng != null
+          ? (f.engagement_rate != null ? fbEng + '%' : Number(fbEng).toLocaleString())
+          : '—';
+      }
       if (document.getElementById('fbPhone')) document.getElementById('fbPhone').textContent = f.phone || '';
       if (document.getElementById('fbWhatsapp')) document.getElementById('fbWhatsapp').textContent = f.whatsapp || '';
       if (document.getElementById('fbEmail')) document.getElementById('fbEmail').textContent = f.email || '';

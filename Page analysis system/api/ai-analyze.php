@@ -220,16 +220,51 @@ function buildAgentInputData(array $data): array
             'pagespeed_desktop' => (int)($scan['pagespeed_desktop'] ?? 0),
         ],
         'facebook' => [
-            'page_name'         => $scan['facebook']['page_name'] ?? '',
-            'followers'         => $fbFollowers,
-            'posts_count'       => (int)($scan['facebook']['posts_count'] ?? 0),
-            'avg_likes'         => (float)($scan['facebook']['avg_likes'] ?? 0),
-            'avg_comments'      => (float)($scan['facebook']['avg_comments'] ?? 0),
-            'avg_shares'        => (float)($scan['facebook']['avg_shares'] ?? 0),
-            'engagement_rate'   => (float)($scan['facebook']['engagement_rate'] ?? 0),
-            'posts_per_week'    => $scan['facebook']['posts_per_week'] ?? 0,
-            'bio'               => $scan['facebook']['bio'] ?? '',
-            'top_post_comments' => $scan['facebook']['top_post_comments'] ?? [],
+            'page_name'           => $scan['facebook']['page_name'] ?? '',
+            'page_id'             => $scan['facebook']['page_id'] ?? '',
+            'category'            => $scan['facebook']['category'] ?? '',
+            'is_verified'         => (bool)($scan['facebook']['is_verified'] ?? false),
+            'creation_date'       => $scan['facebook']['creation_date'] ?? '',
+            'followers'           => $fbFollowers,
+            'likes'               => (int)($scan['facebook']['likes'] ?? 0),
+            'posts_count'         => (int)($scan['facebook']['posts_count'] ?? 0),
+            'avg_likes'           => (float)($scan['facebook']['avg_likes'] ?? 0),
+            'avg_comments'        => (float)($scan['facebook']['avg_comments'] ?? 0),
+            'avg_shares'          => (float)($scan['facebook']['avg_shares'] ?? 0),
+            'avg_video_views'     => (float)($scan['facebook']['avg_video_views'] ?? 0),
+            'avg_engagement'      => (float)($scan['facebook']['avg_engagement'] ?? 0),
+            'engagement_rate'     => (float)($scan['facebook']['engagement_rate'] ?? 0),
+            'posts_per_week'      => $scan['facebook']['posts_per_week'] ?? 0,
+            'last_post_days'      => $scan['facebook']['last_post_days'] ?? null,
+            'reactions_breakdown' => $scan['facebook']['reactions_breakdown'] ?? [],
+            'rating'              => (float)($scan['facebook']['rating'] ?? 0),
+            'ratings_count'       => (int)($scan['facebook']['ratings_count'] ?? 0),
+            'response_time'       => $scan['facebook']['response_time'] ?? '',
+            'description'         => $scan['facebook']['description'] ?? '',
+            'about'               => $scan['facebook']['about'] ?? '',
+            'address'             => $scan['facebook']['address'] ?? '',
+            'phone'               => $scan['facebook']['phone'] ?? '',
+            'whatsapp'            => $scan['facebook']['whatsapp'] ?? '',
+            'email'               => $scan['facebook']['email'] ?? '',
+            'website'              => $scan['facebook']['website'] ?? '',
+            'has_phone'           => (bool)($scan['facebook']['has_phone'] ?? false),
+            'has_whatsapp'        => (bool)($scan['facebook']['has_whatsapp'] ?? false),
+            'has_email'           => (bool)($scan['facebook']['has_email'] ?? false),
+            'has_website'         => (bool)($scan['facebook']['has_website'] ?? false),
+            'has_services'        => (bool)($scan['facebook']['has_services'] ?? false),
+            'has_hours'           => (bool)($scan['facebook']['has_hours'] ?? false),
+            'ads_running'         => (bool)($scan['facebook']['ads_running'] ?? false),
+            'ads_count'           => (int)($scan['facebook']['ads_count'] ?? 0),
+            'reviews_summary'     => $scan['facebook']['reviews_summary'] ?? [],
+            'reviews'             => array_slice($scan['facebook']['reviews'] ?? [], 0, 10),
+            'services'            => array_slice($scan['facebook']['services'] ?? [], 0, 10),
+            'opening_hours'       => $scan['facebook']['opening_hours'] ?? [],
+            'top_hashtags'        => $scan['facebook']['deep_analysis']['top_hashtags'] ?? [],
+            'content_types'       => $scan['facebook']['deep_analysis']['types_percent'] ?? [],
+            'cta_percent'         => (int)($scan['facebook']['deep_analysis']['cta_percent'] ?? 0),
+            'best_hours'          => $scan['facebook']['deep_analysis']['best_hours'] ?? [],
+            'best_days'           => $scan['facebook']['deep_analysis']['best_days'] ?? [],
+            'top_post_comments'   => $scan['facebook']['top_post_comments'] ?? [],
         ],
         'instagram' => [
             'username'          => $scan['instagram']['username'] ?? '',
@@ -1905,45 +1940,127 @@ function buildPrompt(array $data): string
             // ── 3) بيانات Facebook العميقة ───────────────────────
             $fb = $scan['facebook'] ?? $scan['social'] ?? [];
             if (!empty($fb)) {
-                $scanInfo .= "\n**③ بيانات Facebook:**\n";
+                $scanInfo .= "\n**③ بيانات Facebook (بيانات حقيقية من Apify):**\n";
                 $scanInfo .= "- اسم الصفحة: "      . ($fb['page_name']      ?? $fb['username'] ?? 'غير متوفر') . "\n";
+                $scanInfo .= "- التصنيف: "          . ($fb['category']       ?? 'غير محدد') . "\n";
                 $scanInfo .= "- المتابعون: "        . number_format((int)($fb['followers']     ?? 0)) . "\n";
-                $scanInfo .= "- إجمالي المنشورات: " . ($fb['posts_count']    ?? '؟') . "\n";
-                $scanInfo .= "- متوسط التفاعل: "   . number_format((float)($fb['avg_engagement'] ?? 0)) . " / منشور\n";
+                $scanInfo .= "- الإعجابات: "        . number_format((int)($fb['likes']         ?? 0)) . "\n";
+                $scanInfo .= "- إجمالي المنشورات المُحلَّلة: " . ($fb['posts_count']    ?? '؟') . "\n";
+                $scanInfo .= "- متوسط الإعجابات: "  . number_format((float)($fb['avg_likes']    ?? 0)) . " / منشور\n";
+                $scanInfo .= "- متوسط التعليقات: "  . number_format((float)($fb['avg_comments'] ?? 0)) . " / منشور\n";
+                $scanInfo .= "- متوسط المشاركات: "  . number_format((float)($fb['avg_shares']   ?? 0)) . " / منشور\n";
+                if (!empty($fb['avg_video_views']))
+                    $scanInfo .= "- متوسط مشاهدات الفيديو: " . number_format((float)$fb['avg_video_views']) . " / فيديو\n";
+                $scanInfo .= "- متوسط التفاعل الإجمالي: "   . number_format((float)($fb['avg_engagement'] ?? 0)) . " / منشور\n";
+                $scanInfo .= "- معدل التفاعل الحقيقي (Engagement Rate): " . ($fb['engagement_rate'] ?? 0) . "%\n";
                 $scanInfo .= "- معدل النشر: "       . ($fb['posts_per_week'] ?? '؟') . " منشور/أسبوع\n";
-                $scanInfo .= "- التقييم: "          . ($fb['rating']         ?? 'لا يوجد') . "\n";
-                $scanInfo .= "- التحقق: "           . ($fb['is_verified']    ?? false ? 'موثق ✅' : 'غير موثق') . "\n";
+                if (isset($fb['last_post_days']))
+                    $scanInfo .= "- آخر منشور قبل: " . (int)$fb['last_post_days'] . " يوم\n";
+                $scanInfo .= "- التقييم: "          . ($fb['rating']         ?? 'لا يوجد') . " ⭐ (" . (int)($fb['ratings_count'] ?? 0) . " تقييم)\n";
+                $scanInfo .= "- التحقق: "           . (!empty($fb['is_verified']) ? 'موثق ✅' : 'غير موثق') . "\n";
+                $scanInfo .= "- وقت الرد: "         . ($fb['response_time']  ?? 'غير محدد') . "\n";
+                if (!empty($fb['creation_date']))
+                    $scanInfo .= "- تاريخ الإنشاء: " . $fb['creation_date'] . "\n";
                 if (!empty($fb['about']))
-                    $scanInfo .= "- الوصف: " . mb_substr($fb['about'], 0, 200) . "\n";
+                    $scanInfo .= "- الوصف/About: " . mb_substr($fb['about'], 0, 200) . "\n";
+                if (!empty($fb['address']))
+                    $scanInfo .= "- العنوان: " . $fb['address'] . "\n";
+
+                // معلومات التواصل
+                $contactBits = [];
+                if (!empty($fb['phone']))    $contactBits[] = "هاتف: " . $fb['phone'];
+                if (!empty($fb['whatsapp'])) $contactBits[] = "واتساب: " . $fb['whatsapp'];
+                if (!empty($fb['email']))    $contactBits[] = "إيميل: " . $fb['email'];
+                if (!empty($fb['website']))  $contactBits[] = "موقع: " . $fb['website'];
+                if (!empty($contactBits))
+                    $scanInfo .= "- وسائل التواصل: " . implode(' | ', $contactBits) . "\n";
+
+                // الإعلانات
+                if (!empty($fb['ads_running']))
+                    $scanInfo .= "- 📢 إعلانات نشطة الآن: نعم (" . (int)($fb['ads_count'] ?? 0) . ")\n";
+                else
+                    $scanInfo .= "- 📢 إعلانات نشطة الآن: لا\n";
+
+                // Reactions Breakdown
+                $rb = $fb['reactions_breakdown'] ?? [];
+                if (!empty($rb) && array_sum($rb) > 0) {
+                    $scanInfo .= "**توزيع التفاعلات (Reactions):**\n";
+                    $rbMap = ['like'=>'👍 إعجاب','love'=>'❤️ حب','haha'=>'😂 ضحك','wow'=>'😮 إعجاب شديد','sad'=>'😢 حزن','angry'=>'😠 غضب','care'=>'🤗 اهتمام'];
+                    foreach ($rb as $k => $v) {
+                        if ($v > 0) $scanInfo .= "  - " . ($rbMap[$k] ?? $k) . ": " . number_format($v) . "\n";
+                    }
+                }
+
+                // ساعات العمل
+                if (!empty($fb['opening_hours']) && is_array($fb['opening_hours'])) {
+                    $scanInfo .= "**ساعات العمل:**\n";
+                    foreach ($fb['opening_hours'] as $day => $hrs) {
+                        $scanInfo .= "  - {$day}: {$hrs}\n";
+                    }
+                }
+
+                // الخدمات
+                if (!empty($fb['services'])) {
+                    $scanInfo .= "**الخدمات/المنتجات المُعلنة (" . count($fb['services']) . "):**\n";
+                    foreach (array_slice($fb['services'], 0, 8) as $svc) {
+                        $name = is_array($svc) ? ($svc['name'] ?? '') : (string)$svc;
+                        if ($name) $scanInfo .= "  - {$name}\n";
+                    }
+                }
+
+                // ملخص التقييمات
+                $rs = $fb['reviews_summary'] ?? [];
+                if (!empty($rs) && ($rs['count'] ?? 0) > 0) {
+                    $scanInfo .= "**ملخص التقييمات (" . $rs['count'] . " تقييم، متوسط " . ($rs['avg_rating'] ?? '؟') . " ⭐):**\n";
+                    if (!empty($rs['positive'])) {
+                        $scanInfo .= "  ✅ تقييمات إيجابية:\n";
+                        foreach (array_slice($rs['positive'], 0, 3) as $t) $scanInfo .= "    - " . mb_substr($t, 0, 150) . "\n";
+                    }
+                    if (!empty($rs['negative'])) {
+                        $scanInfo .= "  ❌ تقييمات سلبية:\n";
+                        foreach (array_slice($rs['negative'], 0, 3) as $t) $scanInfo .= "    - " . mb_substr($t, 0, 150) . "\n";
+                    }
+                }
 
                 // تحليل المحتوى العميق
                 $deep = $fb['deep_analysis'] ?? [];
                 if (!empty($deep)) {
-                    $scanInfo .= "**تحليل نوع المحتوى (من آخر 30 منشور):**\n";
-                    if (!empty($deep['content_types'])) {
-                        foreach ($deep['content_types'] as $type => $pct) {
+                    $scanInfo .= "**تحليل نوع المحتوى (من آخر " . ($deep['posts_analyzed'] ?? 30) . " منشور):**\n";
+                    $tp = $deep['types_percent'] ?? $deep['content_types'] ?? [];
+                    if (!empty($tp) && is_array($tp)) {
+                        foreach ($tp as $type => $pct) {
                             $scanInfo .= "  - {$type}: {$pct}%\n";
                         }
                     }
                     if (!empty($deep['top_hashtags']))
                         $scanInfo .= "  - أبرز الهاشتاقات: " . implode(', ', array_slice($deep['top_hashtags'], 0, 8)) . "\n";
-                    if (!empty($deep['avg_post_length']))
-                        $scanInfo .= "  - متوسط طول التعليق: " . $deep['avg_post_length'] . " حرف\n";
-                    if (!empty($deep['has_cta_in_posts']))
-                        $scanInfo .= "  - منشورات تحتوي CTA: " . ($deep['has_cta_in_posts'] ? 'نعم ✅' : 'لا ❌') . "\n";
+                    if (!empty($deep['avg_words']))
+                        $scanInfo .= "  - متوسط طول النص: " . $deep['avg_words'] . " كلمة\n";
+                    if (isset($deep['cta_percent']))
+                        $scanInfo .= "  - نسبة المنشورات بدعوة لإجراء (CTA): " . $deep['cta_percent'] . "%\n";
+                    if (!empty($deep['best_hours'])) {
+                        $hrs = array_map(fn($h) => $h . ':00', $deep['best_hours']);
+                        $scanInfo .= "  - أفضل ساعات النشر: " . implode(', ', $hrs) . "\n";
+                    }
+                    if (!empty($deep['best_days'])) {
+                        $dayNames = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+                        $days = array_map(fn($d) => $dayNames[$d] ?? "يوم{$d}", $deep['best_days']);
+                        $scanInfo .= "  - أفضل أيام النشر: " . implode(', ', $days) . "\n";
+                    }
                 }
 
-                // نماذج من آخر المنشورات
-                $posts = $fb['latest_posts'] ?? [];
+                // نماذج من أبرز المنشورات
+                $posts = $deep['top_5_posts'] ?? $fb['latest_posts'] ?? $fb['posts'] ?? [];
                 if (!empty($posts)) {
-                    $scanInfo .= "**نماذج من آخر المنشورات (أبرز 5):**\n";
+                    $scanInfo .= "**أبرز 5 منشورات (تفاعلاً):**\n";
                     $topPosts = array_slice($posts, 0, 5);
                     foreach ($topPosts as $i => $p) {
-                        $text    = mb_substr($p['message'] ?? $p['text'] ?? $p['title'] ?? '', 0, 120);
+                        $text    = mb_substr($p['text'] ?? $p['message'] ?? $p['title'] ?? '', 0, 120);
                         $likes   = $p['likes']    ?? $p['likesCount']   ?? 0;
                         $comments = $p['comments'] ?? $p['commentsCount'] ?? 0;
+                        $shares  = $p['shares']   ?? $p['sharesCount']  ?? 0;
                         $type    = $p['type']     ?? $p['postType']     ?? 'post';
-                        if ($text) $scanInfo .= "  " . ($i + 1) . ". [{$type}] \"{$text}\" | 👍{$likes} 💬{$comments}\n";
+                        if ($text) $scanInfo .= "  " . ($i + 1) . ". [{$type}] \"{$text}\" | 👍{$likes} 💬{$comments} 🔄{$shares}\n";
                     }
                 }
             }
