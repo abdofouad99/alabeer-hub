@@ -627,15 +627,46 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // ── 1.5 Update Axes Grid from breakdown ──
+            // قاموس مطابقة بين عناوين الواجهة (HTML) ومحاور قاعدة البيانات (PHP scoreFromScanData)
+            // قبل هذا الإصلاح كان `name.includes(b.axis) || b.axis.includes(name)` يفشل في
+            // 3 محاور (الرسالة التسويقية / بناء الثقة / التحويل والبيع) → تظهر صفر للعميل
+            // رغم أن البيانات موجودة في DB. الآن المطابقة صريحة وموثوقة.
+            //
+            // PHP يُنتج 6 محاور (analyze.php → scoreFromScanData):
+            //   brand → "الهوية والبراندينج"
+            //   content → "المحتوى والاستقطاب"
+            //   presence → "التواجد الرقمي (Presence)"
+            //   ads → "الإعلانات والانتشار الممول"
+            //   conversion → "رحلة العميل والتحويل"
+            //   analytics → "البيانات والتتبع (Analytics)"
+            const AXIS_DISPLAY_TO_DB = {
+                // كل عنوان واجهة → قائمة aliases تُجرَّب بالترتيب
+                'الرسالة التسويقية': ['الهوية والبراندينج', 'البراندينج'],          // brand
+                'الهوية والملف':     ['التواجد الرقمي (Presence)', 'التواجد الرقمي'], // presence
+                'المحتوى':           ['المحتوى والاستقطاب', 'المحتوى'],              // content
+                'بناء الثقة':        ['البيانات والتتبع (Analytics)', 'البيانات والتتبع', 'Analytics'], // analytics
+                'التحويل والبيع':    ['رحلة العميل والتحويل', 'التحويل', 'رحلة العميل'], // conversion
+                'الإعلانات الممولة': ['الإعلانات والانتشار الممول', 'الإعلانات'],     // ads
+            };
             if (data.breakdown && data.breakdown.length > 0) {
                 const axisCards = document.querySelectorAll('.axes-grid .axis-card');
                 axisCards.forEach(card => {
                     const axisNameEl = card.querySelector('.axis-name');
                     if (!axisNameEl) return;
                     const name = axisNameEl.textContent.trim();
-                    const item = data.breakdown.find(
-                        b => b.axis && (b.axis.includes(name) || name.includes(b.axis))
-                    );
+                    // 1) محاولة المطابقة عبر القاموس الصريح (الأولوية)
+                    let item = null;
+                    const aliases = AXIS_DISPLAY_TO_DB[name] || [];
+                    for (const alias of aliases) {
+                        item = data.breakdown.find(b => b.axis === alias);
+                        if (item) break;
+                    }
+                    // 2) Fallback للمنطق القديم (للتقارير الـ legacy)
+                    if (!item) {
+                        item = data.breakdown.find(
+                            b => b.axis && (b.axis.includes(name) || name.includes(b.axis))
+                        );
+                    }
                     if (item) {
                         const s = item.score || 0;
                         const ring = card.querySelector('.mini-ring');

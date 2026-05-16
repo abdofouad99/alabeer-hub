@@ -338,7 +338,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const ig = sr.instagram || {};
     const igPostsContainer = document.getElementById('heroPosts');
     let igPosts = [];
-    if (Array.isArray(ig.latestPosts)) igPosts = ig.latestPosts;
+    // أضف top_5_posts (أول مفتاح يُنتجه Apify scraper) لمنع البطاقات الفارغة
+    if (Array.isArray(ig.top_5_posts)) igPosts = ig.top_5_posts;
+    else if (Array.isArray(ig.latestPosts)) igPosts = ig.latestPosts;
     else if (Array.isArray(ig.top_posts)) igPosts = ig.top_posts;
     else if (Array.isArray(ig.posts)) igPosts = ig.posts;
     else if (Array.isArray(ig.latest_posts)) igPosts = ig.latest_posts;
