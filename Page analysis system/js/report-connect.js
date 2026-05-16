@@ -2752,6 +2752,30 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fallback: Dynamic Engagement Cards based on score and followers
             const ecVals = document.querySelectorAll('.ec-val');
             if (ecVals.length === 6) {
+                // ── تعريف realER (engagement rate حقيقي) ──
+                // المصادر بالأولوية: instagram.engagement_rate ← facebook.avg_engagement ← scan_result root
+                const _igER = parseFloat(
+                    ig.engagement_rate ??
+                        (ig.deep_analysis && ig.deep_analysis.engagement_rate) ??
+                        0
+                );
+                const _fbER = parseFloat(
+                    fb.engagement_rate ??
+                        fb.avg_engagement ??
+                        (fb.deep_analysis && fb.deep_analysis.engagement_rate) ??
+                        0
+                );
+                const _rootER = parseFloat(
+                    srObj.engagementRate ?? srObj.engagement_rate ?? srObj.avg_engagement ?? 0
+                );
+                const realER = Number.isFinite(_igER) && _igER > 0
+                    ? _igER
+                    : Number.isFinite(_fbER) && _fbER > 0
+                    ? _fbER
+                    : Number.isFinite(_rootER) && _rootER > 0
+                    ? _rootER
+                    : 0;
+
                 const baseER = realER > 0 ? realER.toFixed(1) : null;
                 if (baseER == null) {
                     ecVals.forEach(el => {
