@@ -1237,6 +1237,31 @@ document.addEventListener('DOMContentLoaded', () => {
                         .join('') +
                     `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${recs.length} إجراء)</a></div>`;
             }
+
+            // ── 9. صندوق "فرصة النمو الهائلة 📈" ──
+            // العنصران #growthOldVal و #growthNewVal لم يكن لهما أي ربط في JS
+            // فيعرضان صفر دائماً. نربطهما الآن:
+            //   - growthOldVal = الدرجة الحالية (data.score)
+            //   - growthNewVal = هدف واقعي بناءً على الفجوة:
+            //       منخفض جداً (<30) → +40 نقطة (الأكثر فرصةً للقفز)
+            //       متوسط (30-60)    → +30 نقطة
+            //       جيد (60+)        → +20 نقطة (لأن النمو يصبح أصعب)
+            //     مع حد أقصى 95 (نتجنب وعد الـ 100/100).
+            const growthOldEl = document.getElementById('growthOldVal');
+            const growthNewEl = document.getElementById('growthNewVal');
+            if (growthOldEl) {
+                growthOldEl.textContent = score;
+            }
+            if (growthNewEl) {
+                let bonus;
+                if (score < 30)      bonus = 40;
+                else if (score < 60) bonus = 30;
+                else                 bonus = 20;
+                const target = Math.min(95, score + bonus);
+                growthNewEl.setAttribute('data-val', target);
+                growthNewEl.textContent = target;
+                // animateCounters يلتقط .score-num[data-val] تلقائياً عند الاستدعاء التالي
+            }
         }
         } catch (__pageErr) {
             console.error('[RC] Page section failed: result.html / report.html (root)', __pageErr);
