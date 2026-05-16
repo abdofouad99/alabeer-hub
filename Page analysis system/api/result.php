@@ -379,6 +379,27 @@ if (empty($row['ai_report']['content_analysis']) && !empty($aiReport['content_an
     $row['ai_report']['content_analysis'] = $aiReport['content_analysis'];
 }
 
+// ── شبكة أمان: بناء content_analysis على الطاير للتقارير القديمة ─
+// لو الـ ai_report محفوظ في DB من قبل تطبيق fix #2 ولا يحوي content_analysis،
+// نبنيه الآن من scan_result بدون إعادة تشغيل أي AI call.
+if (empty($row['ai_report']['content_analysis']) && !empty($row['scan_result'])) {
+    $aiAnalyzePath = __DIR__ . '/ai-analyze.php';
+    if (is_file($aiAnalyzePath)) {
+        require_once $aiAnalyzePath;
+    }
+    if (function_exists('buildContentAnalysis')) {
+        try {
+            $caInput = is_array($row['scan_result']) ? $row['scan_result'] : [];
+            // buildContentAnalysis تتوقع $data كاملاً (id, score, scan_result...)
+            // فنمرر صورة موسعة منها مع الجذر.
+            $caData = array_merge($row, ['scan_result' => $caInput]);
+            $row['ai_report']['content_analysis'] = buildContentAnalysis($caData);
+        } catch (\Throwable $e) {
+            // فشل صامت — الواجهة ستعرض القيم الافتراضية بدلاً من الكسر
+        }
+    }
+}
+
 // ── action_week من next_steps ────────────────────────────────
 if (!empty($row['next_steps']) && is_array($row['next_steps'])) {
     $row['action_week'] = $row['next_steps'];

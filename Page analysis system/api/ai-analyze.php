@@ -151,6 +151,14 @@ function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false):
             $cached = cacheGet($cacheKey);
             if ($cached && !empty($cached['meta'])) {
                 $cached['_from_cache'] = true;
+                // ── شبكة أمان: حقن content_analysis لو الكاش قديم وليس فيه ──
+                if (empty($cached['content_analysis']) && function_exists('buildContentAnalysis')) {
+                    try {
+                        $cached['content_analysis'] = buildContentAnalysis($data);
+                    } catch (\Throwable $e) {
+                        logError('buildContentAnalysis failed in multi-agent cache path', ['error' => $e->getMessage()]);
+                    }
+                }
                 return $cached;
             }
         }
@@ -184,6 +192,16 @@ function runGeminiAnalysis(array $data, array $cfg, bool $forceRefresh = false):
                     ]);
                     // لا تُرجع — دع الكود يكمل للـ fallback (single-prompt) في الأسفل
                 } else {
+                    // ── حقن content_analysis (مبني من البيانات الفعلية) ──
+                    // مسار Multi-Agent لا يمر بـ parseAIResponse() لذا content_analysis
+                    // لا يُحقن تلقائياً. نبنيه هنا لضمان أن صفحة content.html تجد البيانات.
+                    if (empty($result['content_analysis']) && function_exists('buildContentAnalysis')) {
+                        try {
+                            $result['content_analysis'] = buildContentAnalysis($data);
+                        } catch (\Throwable $e) {
+                            logError('buildContentAnalysis failed in multi-agent path', ['error' => $e->getMessage()]);
+                        }
+                    }
                     cacheSet($cacheKey, $result, 3600);
                     return $result;
                 }
