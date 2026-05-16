@@ -1423,23 +1423,111 @@ document.addEventListener('DOMContentLoaded', () => {
                     sr.hasTikTokPixel !== undefined ? sr.hasTikTokPixel : sr.tiktok_pixel;
                 updateBadge('badge-tiktok-pixel', hasTTPixel, 'مفعل', 'غير مركب');
 
-                // Pagespeed
+                // ── Google Tag Manager ─────────────────────────────────
+                // GTM is checked in website_scan; if not present we still
+                // mark the field as "missing" instead of leaving "جاري..."
+                const ws = sr.website_scan || {};
+                const hasGTM =
+                    sr.hasGTM !== undefined ? sr.hasGTM
+                    : ws.has_gtm !== undefined ? ws.has_gtm
+                    : ws.has_google_tag_manager !== undefined ? ws.has_google_tag_manager
+                    : undefined;
+                const gtmBadge = document.getElementById('badge-gtm');
+                if (gtmBadge) {
+                    if (hasGTM === undefined || hasGTM === null) {
+                        gtmBadge.textContent = 'غير متوفر';
+                        gtmBadge.className = 'si-badge badge-warn data-missing';
+                    } else {
+                        gtmBadge.textContent = hasGTM ? 'مفعل' : 'غير مركب';
+                        gtmBadge.className = hasGTM ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                    }
+                }
+
+                // ── Pagespeed (CRITICAL FIX) ───────────────────────────
+                // Bug: previously code did `String(sr.pagespeed)` and got
+                // "[object Object]" because pagespeed is an OBJECT, not a
+                // number: { performance, lcp_ms, fcp_ms, cls, ... }.
+                // Now we extract the actual perf score (0-100) from the
+                // object, with multiple fallbacks for legacy/alt shapes.
                 const speedBadge = document.getElementById('badge-pagespeed');
                 if (speedBadge) {
-                    const speed = sr.load_time || sr.pagespeed || sr.performance_score;
-                    if (speed === undefined || speed === null || speed === '') {
-                        speedBadge.classList.add('data-missing');
+                    let speedNum = null; // perf score 0-100, or null = missing
+                    let loadSec  = null; // load_time in seconds, or null
+
+                    // 1) PageSpeed API object
+                    const ps = sr.pagespeed;
+                    if (ps && typeof ps === 'object' && !Array.isArray(ps)) {
+                        if (typeof ps.performance === 'number') speedNum = ps.performance;
+                        else if (typeof ps.score === 'number')  speedNum = ps.score;
+                    }
+                    // 2) Already-flattened number (legacy reports)
+                    if (speedNum === null && typeof sr.pagespeed === 'number') speedNum = sr.pagespeed;
+                    if (speedNum === null && typeof sr.performance_score === 'number') speedNum = sr.performance_score;
+
+                    // 3) load_time as seconds (different metric, not 0-100)
+                    if (typeof sr.load_time === 'number') loadSec = sr.load_time;
+                    else if (typeof ws.load_time_s === 'number') loadSec = ws.load_time_s;
+
+                    if (speedNum === null && loadSec === null) {
+                        speedBadge.textContent = 'غير متوفر';
                         speedBadge.className = 'si-badge badge-warn data-missing';
+                    } else if (speedNum !== null) {
+                        speedBadge.classList.remove('data-missing');
+                        speedBadge.textContent = Math.round(speedNum) + ' / 100';
+                        speedBadge.className = speedNum >= 70 ? 'si-badge badge-ok' : 'si-badge badge-warn';
                     } else {
                         speedBadge.classList.remove('data-missing');
-                        const sNum = parseFloat(speed);
-                        speedBadge.textContent = !isNaN(sNum)
-                            ? sNum + (sNum > 10 ? ' / 100' : ' ثانية')
-                            : speed;
-                        speedBadge.className =
-                            !isNaN(sNum) && (sNum < 3 || sNum > 80)
-                                ? 'si-badge badge-ok'
-                                : 'si-badge badge-warn';
+                        speedBadge.textContent = loadSec.toFixed(2) + ' ثانية';
+                        speedBadge.className = loadSec < 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                    }
+                }
+
+                // ── Mobile compatibility ───────────────────────────────
+                // From PageSpeed: `is_mobile_friendly` boolean.
+                const mobileBadge = document.getElementById('badge-mobile');
+                if (mobileBadge) {
+                    const ps2 = sr.pagespeed;
+                    let mob;
+                    if (ps2 && typeof ps2 === 'object' && 'is_mobile_friendly' in ps2) mob = !!ps2.is_mobile_friendly;
+                    else if (typeof sr.is_mobile_friendly === 'boolean') mob = sr.is_mobile_friendly;
+                    else if (typeof ws.is_mobile_friendly === 'boolean') mob = ws.is_mobile_friendly;
+
+                    if (mob === undefined) {
+                        mobileBadge.textContent = 'غير متوفر';
+                        mobileBadge.className = 'si-badge badge-warn data-missing';
+                    } else {
+                        mobileBadge.textContent = mob ? 'متوافق' : 'غير متوافق';
+                        mobileBadge.className = mob ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                    }
+                }
+
+                // ── Core Web Vitals ────────────────────────────────────
+                // CWV passes if all three pass: LCP < 2.5s, CLS < 0.1, TBT < 200ms
+                // (We use TBT instead of FID because Lighthouse exposes TBT.)
+                const cwvBadge = document.getElementById('badge-cwv');
+                if (cwvBadge) {
+                    const ps3 = sr.pagespeed;
+                    if (ps3 && typeof ps3 === 'object' && (ps3.lcp_ms !== undefined || ps3.cls !== undefined)) {
+                        const lcp = Number(ps3.lcp_ms || 0);
+                        const cls = Number(ps3.cls || 0);
+                        const tbt = Number(ps3.tbt_ms || 0);
+                        const lcpOk = lcp > 0 && lcp < 2500;
+                        const clsOk = cls < 0.1;
+                        const tbtOk = tbt < 200;
+                        const passed = [lcpOk, clsOk, tbtOk].filter(Boolean).length;
+                        if (passed === 3) {
+                            cwvBadge.textContent = 'ممتاز (3/3)';
+                            cwvBadge.className = 'si-badge badge-ok';
+                        } else if (passed >= 1) {
+                            cwvBadge.textContent = `يحتاج تحسين (${passed}/3)`;
+                            cwvBadge.className = 'si-badge badge-warn';
+                        } else {
+                            cwvBadge.textContent = 'ضعيف (0/3)';
+                            cwvBadge.className = 'si-badge badge-warn';
+                        }
+                    } else {
+                        cwvBadge.textContent = 'غير متوفر';
+                        cwvBadge.className = 'si-badge badge-warn data-missing';
                     }
                 }
 
