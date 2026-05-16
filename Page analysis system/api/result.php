@@ -226,17 +226,60 @@ if (is_array($page_6)) {
 }
 
 if (empty($aiReport['customer_journey'])) {
-    $aiReport['customer_journey'] = safeGet($aiReport, 'page_8_journey', [
-        'journey_score'      => 0,
-        'funnel_analysis'    => [
-            'awareness' => ['score'=>0,'current_channels'=>[],'gaps'=>[],'recommendations'=>[],'monthly_reach'=>0],
-            'interest'  => ['score'=>0,'what_hooks_them'=>[],'what_loses_them'=>[],'recommendations'=>[]],
-            'decision'  => ['score'=>0,'trust_signals_present'=>[],'trust_signals_missing'=>[],'objections'=>[],'objection_handles'=>[]],
-            'action'    => ['score'=>0,'conversion_rate_estimate'=>'—','friction_points'=>[],'cta_quality'=>0,'recommendations'=>[]],
-            'loyalty'   => ['score'=>0,'retention_tactics_used'=>[],'missing_tactics'=>[],'recommendations'=>[]],
-        ],
-        'biggest_funnel_leak' => ['stage'=>'—','problem'=>'—','monthly_lost_revenue'=>'—','fix'=>'—'],
-    ]);
+    // page_8_journey يستخدم funnel_analysis.{awareness, interest, decision, action, loyalty}
+    // لكن js/report-connect.js يتوقع customer_journey.stages.{awareness, attraction, trust, purchase, loyalty}
+    // (أسماء وبنية مختلفة) — لذلك نحوّل/نطبّع هنا قبل الإرسال للواجهة.
+    //
+    // قبل الإصلاح: الـ funnel في report.html كان يعرض كل المراحل "—" لأن
+    // cj.stages كانت غير موجودة (only cj.funnel_analysis present).
+    $page8 = safeGet($aiReport, 'page_8_journey', null);
+    if (is_array($page8) && !empty($page8['funnel_analysis'])) {
+        $fa = $page8['funnel_analysis'];
+        // مطابقة أسماء المراحل: funnel_analysis → stages
+        $stageMap = [
+            'awareness'  => 'awareness',
+            'interest'   => 'attraction',
+            'decision'   => 'trust',
+            'action'     => 'purchase',
+            'loyalty'    => 'loyalty',
+        ];
+        $stages = [];
+        foreach ($stageMap as $src => $dst) {
+            $stage = $fa[$src] ?? [];
+            $stages[$dst] = [
+                'score'        => (int) safeGetNumber($stage, 'score', 0),
+                'fix_steps'    => safeGetArray($stage, 'recommendations'),
+                'gaps'         => safeGetArray($stage, 'gaps'),
+                'channels'     => safeGetArray($stage, 'current_channels'),
+                'objections'   => safeGetArray($stage, 'objections'),
+                'cta_quality'  => (int) safeGetNumber($stage, 'cta_quality', 0),
+            ];
+        }
+        // bottleneck
+        $leak = $page8['biggest_funnel_leak'] ?? [];
+        $bottleneckRaw = safeGetString($leak, 'stage', '');
+        $bottleneckStage = $stageMap[$bottleneckRaw] ?? $bottleneckRaw;
+        $aiReport['customer_journey'] = [
+            'journey_score'    => (int) safeGetNumber($page8, 'journey_score', 0),
+            'stages'           => $stages,
+            'bottleneck_stage' => $bottleneckStage,
+            'bottleneck_fix'   => safeGetString($leak, 'fix', ''),
+            'fix_steps'        => safeGetArray($stages[$bottleneckStage] ?? [], 'fix_steps'),
+        ];
+    } else {
+        // fallback أصلي (كان موجوداً قبل الإصلاح) — لو page_8_journey مفقود تماماً
+        $aiReport['customer_journey'] = safeGet($aiReport, 'page_8_journey', [
+            'journey_score'      => 0,
+            'funnel_analysis'    => [
+                'awareness' => ['score'=>0,'current_channels'=>[],'gaps'=>[],'recommendations'=>[],'monthly_reach'=>0],
+                'interest'  => ['score'=>0,'what_hooks_them'=>[],'what_loses_them'=>[],'recommendations'=>[]],
+                'decision'  => ['score'=>0,'trust_signals_present'=>[],'trust_signals_missing'=>[],'objections'=>[],'objection_handles'=>[]],
+                'action'    => ['score'=>0,'conversion_rate_estimate'=>'—','friction_points'=>[],'cta_quality'=>0,'recommendations'=>[]],
+                'loyalty'   => ['score'=>0,'retention_tactics_used'=>[],'missing_tactics'=>[],'recommendations'=>[]],
+            ],
+            'biggest_funnel_leak' => ['stage'=>'—','problem'=>'—','monthly_lost_revenue'=>'—','fix'=>'—'],
+        ]);
+    }
 }
 
 if (empty($aiReport['competitor_analysis'])) {
