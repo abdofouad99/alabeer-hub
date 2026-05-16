@@ -2562,42 +2562,35 @@ function analyzeDeepContent(array $posts): array {
 // Website Headless Scraper (Apify Puppeteer) - حل جذري لعمق الفحص
 // ============================================================
 function scrapeWebsiteApify(string $url, string $token, array $cfg): ?string {
-    $actorId = $cfg['apis']['apify_actor_website'] ?? 'apify/puppeteer-scraper';
+    $actorId = $cfg['apis']['apify_actor_website'] ?? 'apify/website-content-crawler';
 
-    // نستخدم puppeteer-scraper لاستخراج الكود بعد الجافاسكربت
-    // WEB-3 FIX: إضافة scroll + waitForNetworkIdle + performance metrics بدلاً من wait 3.5s فقط
-    $pageFunction = "async function pageFunction(context) {
-        const page = context.page;
+    if (str_contains($actorId, 'website-content-crawler')) {
+        // Input schema for apify/website-content-crawler
+        $input = json_encode([
+            'startUrls' => [['url' => $url]],
+            'maxCrawlPages' => 1,
+            'saveHtml' => true,
+            'saveMarkdown' => false,
+        ]);
+    } else {
+        // Input schema for apify/puppeteer-scraper
+        $pageFunction = "async function pageFunction(context) {
+            const page = context.page;
+            await page.waitForNetworkIdle({timeout: 8000}).catch(() => {});
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+            await new Promise(r => setTimeout(r, 1500));
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await new Promise(r => setTimeout(r, 1500));
+            const html = await page.content();
+            return { html };
+        }";
 
-        // انتظار تحميل الشبكة
-        await page.waitForNetworkIdle({timeout: 8000}).catch(() => {});
-
-        // Scroll لتحميل lazy content
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
-        await new Promise(r => setTimeout(r, 1500));
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await new Promise(r => setTimeout(r, 1500));
-
-        // جمع البيانات
-        const html = await page.content();
-
-        // Performance timing
-        const perf = await page.evaluate(() => {
-            const t = performance.timing;
-            return {
-                dom_load: t.domContentLoadedEventEnd - t.navigationStart,
-                full_load: t.loadEventEnd - t.navigationStart,
-            };
-        }).catch(() => ({}));
-
-        return { html, perf };
-    }";
-
-    $input = json_encode([
-        'startUrls' => [['url' => $url]],
-        'pageFunction' => $pageFunction,
-        'proxyConfiguration' => ['useApifyProxy' => true]
-    ]);
+        $input = json_encode([
+            'startUrls' => [['url' => $url]],
+            'pageFunction' => $pageFunction,
+            'proxyConfiguration' => ['useApifyProxy' => true]
+        ]);
+    }
 
     // يبدأ السكربنج
     $runId = _apifyStartRun($actorId, $input, $token);

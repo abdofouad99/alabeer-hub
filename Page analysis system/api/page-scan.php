@@ -220,7 +220,7 @@ function runPageScan(string $rawUrl, array $cfg): array {
                     if (function_exists('getValidApifyToken') && function_exists('scrapeAdsLibrary')) {
                         $token = getValidApifyToken($cfg);
                         if ($token) {
-                            $adsResult = scrapeAdsLibrary($adsParam, $token, $cfg);
+                            $adsResult = scrapeAdsLibrary($adsParam, $token, $cfg, $cfg['apis']['ads_default_country'] ?? 'SA');
                             if (!($adsResult['success'] ?? false)) $adsResult = null;
                         }
                     }

@@ -578,7 +578,11 @@ function runAnalysis(int $assessmentId): array {
                 "UPDATE assessments SET scan_result = JSON_SET(COALESCE(scan_result,'{}'), ?, CAST(? AS JSON)) WHERE id=?"
             )->execute(['$.' . $key, json_encode($value, JSON_UNESCAPED_UNICODE), $assessmentId]);
         } catch (\Throwable $e) {
-            // fallback: لا توقف التحليل إذا فشل الحفظ المرحلي
+            logError('saveScanProgress failed', [
+                'key'           => $key,
+                'assessment_id' => $assessmentId,
+                'error'         => $e->getMessage(),
+            ]);
         }
     };
 
@@ -953,7 +957,7 @@ function runAnalysis(int $assessmentId): array {
                     $searchParam = $adsPageId ? "ID:{$adsPageId}" : $adsQuery;
                     logInfo('Starting Ads Library scrape', ['query' => $searchParam]);
                     // نمرر بيانات Facebook إذا توفرت لاستخدام pageAdLibrary مباشرة
-                    $r = scrapeAdsLibrary($searchParam, $token, $cfg, 'ALL', $apifyFb ?? []);
+                    $r = scrapeAdsLibrary($searchParam, $token, $cfg, $cfg['apis']['ads_default_country'] ?? 'SA', $apifyFb ?? []);
                     if ($r['success'] ?? false) {
                         logInfo('Ads Library scrape successful', ['query' => $searchParam, 'total_ads' => $r['total_ads'] ?? 0]);
                         $adsData = $r;
