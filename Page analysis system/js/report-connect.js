@@ -1423,23 +1423,111 @@ document.addEventListener('DOMContentLoaded', () => {
                     sr.hasTikTokPixel !== undefined ? sr.hasTikTokPixel : sr.tiktok_pixel;
                 updateBadge('badge-tiktok-pixel', hasTTPixel, 'مفعل', 'غير مركب');
 
-                // Pagespeed
+                // ── Google Tag Manager ─────────────────────────────────
+                // GTM is checked in website_scan; if not present we still
+                // mark the field as "missing" instead of leaving "جاري..."
+                const ws = sr.website_scan || {};
+                const hasGTM =
+                    sr.hasGTM !== undefined ? sr.hasGTM
+                    : ws.has_gtm !== undefined ? ws.has_gtm
+                    : ws.has_google_tag_manager !== undefined ? ws.has_google_tag_manager
+                    : undefined;
+                const gtmBadge = document.getElementById('badge-gtm');
+                if (gtmBadge) {
+                    if (hasGTM === undefined || hasGTM === null) {
+                        gtmBadge.textContent = 'غير متوفر';
+                        gtmBadge.className = 'si-badge badge-warn data-missing';
+                    } else {
+                        gtmBadge.textContent = hasGTM ? 'مفعل' : 'غير مركب';
+                        gtmBadge.className = hasGTM ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                    }
+                }
+
+                // ── Pagespeed (CRITICAL FIX) ───────────────────────────
+                // Bug: previously code did `String(sr.pagespeed)` and got
+                // "[object Object]" because pagespeed is an OBJECT, not a
+                // number: { performance, lcp_ms, fcp_ms, cls, ... }.
+                // Now we extract the actual perf score (0-100) from the
+                // object, with multiple fallbacks for legacy/alt shapes.
                 const speedBadge = document.getElementById('badge-pagespeed');
                 if (speedBadge) {
-                    const speed = sr.load_time || sr.pagespeed || sr.performance_score;
-                    if (speed === undefined || speed === null || speed === '') {
-                        speedBadge.classList.add('data-missing');
+                    let speedNum = null; // perf score 0-100, or null = missing
+                    let loadSec  = null; // load_time in seconds, or null
+
+                    // 1) PageSpeed API object
+                    const ps = sr.pagespeed;
+                    if (ps && typeof ps === 'object' && !Array.isArray(ps)) {
+                        if (typeof ps.performance === 'number') speedNum = ps.performance;
+                        else if (typeof ps.score === 'number')  speedNum = ps.score;
+                    }
+                    // 2) Already-flattened number (legacy reports)
+                    if (speedNum === null && typeof sr.pagespeed === 'number') speedNum = sr.pagespeed;
+                    if (speedNum === null && typeof sr.performance_score === 'number') speedNum = sr.performance_score;
+
+                    // 3) load_time as seconds (different metric, not 0-100)
+                    if (typeof sr.load_time === 'number') loadSec = sr.load_time;
+                    else if (typeof ws.load_time_s === 'number') loadSec = ws.load_time_s;
+
+                    if (speedNum === null && loadSec === null) {
+                        speedBadge.textContent = 'غير متوفر';
                         speedBadge.className = 'si-badge badge-warn data-missing';
+                    } else if (speedNum !== null) {
+                        speedBadge.classList.remove('data-missing');
+                        speedBadge.textContent = Math.round(speedNum) + ' / 100';
+                        speedBadge.className = speedNum >= 70 ? 'si-badge badge-ok' : 'si-badge badge-warn';
                     } else {
                         speedBadge.classList.remove('data-missing');
-                        const sNum = parseFloat(speed);
-                        speedBadge.textContent = !isNaN(sNum)
-                            ? sNum + (sNum > 10 ? ' / 100' : ' ثانية')
-                            : speed;
-                        speedBadge.className =
-                            !isNaN(sNum) && (sNum < 3 || sNum > 80)
-                                ? 'si-badge badge-ok'
-                                : 'si-badge badge-warn';
+                        speedBadge.textContent = loadSec.toFixed(2) + ' ثانية';
+                        speedBadge.className = loadSec < 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                    }
+                }
+
+                // ── Mobile compatibility ───────────────────────────────
+                // From PageSpeed: `is_mobile_friendly` boolean.
+                const mobileBadge = document.getElementById('badge-mobile');
+                if (mobileBadge) {
+                    const ps2 = sr.pagespeed;
+                    let mob;
+                    if (ps2 && typeof ps2 === 'object' && 'is_mobile_friendly' in ps2) mob = !!ps2.is_mobile_friendly;
+                    else if (typeof sr.is_mobile_friendly === 'boolean') mob = sr.is_mobile_friendly;
+                    else if (typeof ws.is_mobile_friendly === 'boolean') mob = ws.is_mobile_friendly;
+
+                    if (mob === undefined) {
+                        mobileBadge.textContent = 'غير متوفر';
+                        mobileBadge.className = 'si-badge badge-warn data-missing';
+                    } else {
+                        mobileBadge.textContent = mob ? 'متوافق' : 'غير متوافق';
+                        mobileBadge.className = mob ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                    }
+                }
+
+                // ── Core Web Vitals ────────────────────────────────────
+                // CWV passes if all three pass: LCP < 2.5s, CLS < 0.1, TBT < 200ms
+                // (We use TBT instead of FID because Lighthouse exposes TBT.)
+                const cwvBadge = document.getElementById('badge-cwv');
+                if (cwvBadge) {
+                    const ps3 = sr.pagespeed;
+                    if (ps3 && typeof ps3 === 'object' && (ps3.lcp_ms !== undefined || ps3.cls !== undefined)) {
+                        const lcp = Number(ps3.lcp_ms || 0);
+                        const cls = Number(ps3.cls || 0);
+                        const tbt = Number(ps3.tbt_ms || 0);
+                        const lcpOk = lcp > 0 && lcp < 2500;
+                        const clsOk = cls < 0.1;
+                        const tbtOk = tbt < 200;
+                        const passed = [lcpOk, clsOk, tbtOk].filter(Boolean).length;
+                        if (passed === 3) {
+                            cwvBadge.textContent = 'ممتاز (3/3)';
+                            cwvBadge.className = 'si-badge badge-ok';
+                        } else if (passed >= 1) {
+                            cwvBadge.textContent = `يحتاج تحسين (${passed}/3)`;
+                            cwvBadge.className = 'si-badge badge-warn';
+                        } else {
+                            cwvBadge.textContent = 'ضعيف (0/3)';
+                            cwvBadge.className = 'si-badge badge-warn';
+                        }
+                    } else {
+                        cwvBadge.textContent = 'غير متوفر';
+                        cwvBadge.className = 'si-badge badge-warn data-missing';
                     }
                 }
 
@@ -1693,14 +1781,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.textContent = twData.is_verified ? 'موثق ✅' : 'غير موثق';
                 el.className = twData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
-            // Media & Link Pct
+            // Media & Link Pct (computed client-side from content_types + top_urls)
+            // The API doesn't expose media_percent / link_percent directly,
+            // so we derive them from content_types (counts of photo/video/text/...)
+            // and top_urls.length. Falls back to '--' if we can't compute.
             if (document.getElementById('twMediaPct')) {
-                const mp = twData.media_percent || 0;
-                document.getElementById('twMediaPct').textContent = mp > 0 ? mp + '%' : '--';
+                const el = document.getElementById('twMediaPct');
+                const ct = twData.content_types || {};
+                const totalCT =
+                    (ct.text || 0) + (ct.photo || 0) + (ct.video || 0) +
+                    (ct.reply || 0) + (ct.retweet || 0) + (ct.quote || 0);
+                if (twData.media_percent !== undefined && twData.media_percent !== null) {
+                    const mp = Number(twData.media_percent);
+                    el.textContent = mp >= 0 ? mp + '%' : '--';
+                } else if (totalCT > 0) {
+                    const media = (ct.photo || 0) + (ct.video || 0);
+                    el.textContent = Math.round((media / totalCT) * 100) + '%';
+                } else {
+                    el.textContent = '--';
+                }
             }
             if (document.getElementById('twLinkPct')) {
-                const lp = twData.link_percent || 0;
-                document.getElementById('twLinkPct').textContent = lp > 0 ? lp + '%' : '--';
+                const el = document.getElementById('twLinkPct');
+                const tweetsAnalyzed = twData.tweets_analyzed || 0;
+                const urlsCount = Array.isArray(twData.top_urls) ? twData.top_urls.length : 0;
+                if (twData.link_percent !== undefined && twData.link_percent !== null) {
+                    const lp = Number(twData.link_percent);
+                    el.textContent = lp >= 0 ? lp + '%' : '--';
+                } else if (tweetsAnalyzed > 0 && urlsCount > 0) {
+                    // top_urls is a deduped list, so this is a lower bound; still
+                    // a useful signal that the account does/doesn't share links.
+                    el.textContent = Math.min(100, Math.round((urlsCount / tweetsAnalyzed) * 100)) + '%';
+                } else {
+                    el.textContent = '--';
+                }
             }
             // Twitter Score
             if (document.getElementById('tw-score')) {
@@ -1870,7 +1984,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 vpEl.className = vp >= 30 ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
             if (document.getElementById('igHighlights')) {
-                const hl = igData.highlights_count || 0;
+                // The Apify scraper exposes this as `highlight_reel_count`,
+                // not `highlights_count`. The old code used the wrong key
+                // and always rendered '--'. We accept both for safety.
+                const hl = igData.highlight_reel_count ?? igData.highlights_count ?? igData.highlights ?? 0;
                 document.getElementById('igHighlights').textContent = hl > 0 ? hl : '--';
             }
 
@@ -1942,6 +2059,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fbvEl = document.getElementById('fbVerified');
                 fbvEl.textContent = fbData.is_verified ? 'موثق ✅' : 'غير موثق';
                 fbvEl.className = fbData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
+            }
+            // FB Page Age — computed from Apify's `creation_date` (already
+            // surfaced as a string by apify-scraper.php, e.g. "2018-03-21").
+            // Renders "X سنة" or "Y شهر" in Arabic; '--' if missing.
+            if (document.getElementById('fbAge')) {
+                const ageEl = document.getElementById('fbAge');
+                const created = fbData.creation_date || fbData.created_at || fbData.foundedDate || '';
+                let years = null, months = null;
+                if (created) {
+                    const t = Date.parse(created);
+                    if (!isNaN(t)) {
+                        const diffMs = Date.now() - t;
+                        if (diffMs > 0) {
+                            const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+                            years  = Math.floor(totalMonths / 12);
+                            months = totalMonths % 12;
+                        }
+                    }
+                }
+                if (years === null) {
+                    ageEl.textContent = '--';
+                    ageEl.className = 'si-badge badge-warn data-missing';
+                } else if (years >= 1) {
+                    ageEl.textContent = years + ' سنة' + (months > 0 ? ` و${months} شهر` : '');
+                    ageEl.className = years >= 2 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                } else {
+                    ageEl.textContent = (months || 0) + ' شهر';
+                    ageEl.className = 'si-badge badge-warn';
+                }
             }
             if (document.getElementById('fbRating')) {
                 const rating = fbData.rating || 0;
