@@ -728,6 +728,80 @@ document.addEventListener('DOMContentLoaded', () => {
                     problemDesc.textContent = ai.main_problem_desc;
             }
 
+            // ── 2.5 صندوق "ماذا تخسر الآن بسبب هذا النزيف؟" ──
+            // البيانات تأتي من Agent 5 → page_15_weaknesses (كل عنصر فيه
+            // title + cost_of_inaction + root_cause + icon).
+            // لو page_15 فاضي، نستخدم page_1_report.top_3_threats كـ fallback،
+            // ولو الكل فاضي نعرض رسالة "غير متوفر" بدلاً من البقاء على "جاري التحميل".
+            const loseList = document.getElementById('resultLoseList');
+            if (loseList) {
+                const escapeHtml = s => String(s == null ? '' : s)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+                const page15 = Array.isArray(ai.page_15_weaknesses) ? ai.page_15_weaknesses : [];
+                const page1  = ai.page_1_report || {};
+                const topThreats = Array.isArray(page1.top_3_threats) ? page1.top_3_threats : [];
+
+                let loseItems = [];
+
+                if (page15.length > 0) {
+                    // أولوية: نقاط الضعف الحقيقية مع cost_of_inaction (تكلفة عدم الإصلاح)
+                    loseItems = page15
+                        .filter(w => w && (w.title || w.description))
+                        .slice(0, 4)
+                        .map(w => {
+                            const icon = w.icon || '📉';
+                            const title = w.title || 'نقطة ضعف';
+                            const cost = w.cost_of_inaction || w.business_impact || w.expected_improvement || '';
+                            const root = w.root_cause || w.description || '';
+                            // النص: cost_of_inaction أولاً (لأنه يجيب على "كم تخسر")، ثم root_cause
+                            const desc = cost
+                                ? `${escapeHtml(cost)}${root ? ' — ' + escapeHtml(root).substring(0, 80) : ''}`
+                                : escapeHtml(String(root).substring(0, 140));
+                            const sev = (w.severity || '').toLowerCase();
+                            const color = sev === 'high' ? 'var(--red)'
+                                        : sev === 'medium' ? 'var(--yellow)'
+                                        : 'var(--red)';
+                            return `<div class="lose-item">
+                                <div class="lose-icon" style="color:${color};">${escapeHtml(icon)}</div>
+                                <div class="lose-text">
+                                    <h4>${escapeHtml(title)}</h4>
+                                    <p>${desc || 'يحتاج معالجة عاجلة'}</p>
+                                </div>
+                            </div>`;
+                        });
+                } else if (topThreats.length > 0) {
+                    // Fallback: التهديدات الثلاثة الكبرى من page_1_report
+                    loseItems = topThreats
+                        .filter(t => t && String(t).trim() && String(t).trim() !== '—')
+                        .slice(0, 3)
+                        .map((t, i) => {
+                            const icons = ['💸', '⚠️', '🚨'];
+                            return `<div class="lose-item">
+                                <div class="lose-icon" style="color: var(--red);">${icons[i] || '📉'}</div>
+                                <div class="lose-text">
+                                    <h4>تهديد ${i + 1}</h4>
+                                    <p>${escapeHtml(String(t).substring(0, 160))}</p>
+                                </div>
+                            </div>`;
+                        });
+                }
+
+                if (loseItems.length > 0) {
+                    loseList.innerHTML = loseItems.join('');
+                } else {
+                    // لا بيانات نهائياً — رسالة واضحة بدلاً من "جاري التحميل" الأبدي
+                    loseList.innerHTML = `<div class="lose-item">
+                        <div class="lose-icon" style="color: var(--text-gray);">ℹ️</div>
+                        <div class="lose-text">
+                            <h4>تحليل النزيف غير متوفر</h4>
+                            <p>لم يُرجع التحليل بيانات كافية لحساب الخسائر. أعد التحليل للحصول على النتائج التفصيلية.</p>
+                        </div>
+                    </div>`;
+                }
+            }
+
             // ── 3. قمع التحويل (Funnel) من customer_journey أو fallback ──
             const fStageData =
                 cj && cj.stages
@@ -1162,6 +1236,31 @@ document.addEventListener('DOMContentLoaded', () => {
                         })
                         .join('') +
                     `<div style="text-align:center;margin-top:4px;"><a href="recommendations.html?id=${curId}" style="font-size:13px;font-weight:800;color:var(--primary);text-decoration:none;">← عرض كل التوصيات التفصيلية (${recs.length} إجراء)</a></div>`;
+            }
+
+            // ── 9. صندوق "فرصة النمو الهائلة 📈" ──
+            // العنصران #growthOldVal و #growthNewVal لم يكن لهما أي ربط في JS
+            // فيعرضان صفر دائماً. نربطهما الآن:
+            //   - growthOldVal = الدرجة الحالية (data.score)
+            //   - growthNewVal = هدف واقعي بناءً على الفجوة:
+            //       منخفض جداً (<30) → +40 نقطة (الأكثر فرصةً للقفز)
+            //       متوسط (30-60)    → +30 نقطة
+            //       جيد (60+)        → +20 نقطة (لأن النمو يصبح أصعب)
+            //     مع حد أقصى 95 (نتجنب وعد الـ 100/100).
+            const growthOldEl = document.getElementById('growthOldVal');
+            const growthNewEl = document.getElementById('growthNewVal');
+            if (growthOldEl) {
+                growthOldEl.textContent = score;
+            }
+            if (growthNewEl) {
+                let bonus;
+                if (score < 30)      bonus = 40;
+                else if (score < 60) bonus = 30;
+                else                 bonus = 20;
+                const target = Math.min(95, score + bonus);
+                growthNewEl.setAttribute('data-val', target);
+                growthNewEl.textContent = target;
+                // animateCounters يلتقط .score-num[data-val] تلقائياً عند الاستدعاء التالي
             }
         }
         } catch (__pageErr) {

@@ -8,6 +8,48 @@
 
 document.addEventListener("DOMContentLoaded", () => {
 
+  // ── Inline SVG placeholder for posts with missing/broken images ──
+  // Returns a data: URI so it never makes a network request. The two
+  // platform-specific helpers below pick a colored variant + emoji so the
+  // empty card still feels like the right network rather than a white box.
+  // (We keep this as data-URI on background-image because most callers
+  //  use CSS background-image, which can't trigger an onerror handler.)
+  const POST_PLACEHOLDER_FB = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">' +
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#1e3a8a"/><stop offset="1" stop-color="#1e1b4b"/>' +
+    '</linearGradient></defs>' +
+    '<rect width="200" height="200" fill="url(#g)"/>' +
+    '<text x="100" y="115" font-size="64" text-anchor="middle" font-family="sans-serif">📘</text>' +
+    '</svg>'
+  );
+  const POST_PLACEHOLDER_IG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">' +
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#7c2d92"/><stop offset="0.5" stop-color="#db2777"/><stop offset="1" stop-color="#f59e0b"/>' +
+    '</linearGradient></defs>' +
+    '<rect width="200" height="200" fill="url(#g)"/>' +
+    '<text x="100" y="115" font-size="64" text-anchor="middle" font-family="sans-serif">📷</text>' +
+    '</svg>'
+  );
+
+  // pickPostImage: returns a usable image URL or the platform placeholder.
+  // It treats empty strings, '#', whitespace, and obviously-broken values
+  // (e.g. 'undefined') as missing — so users never see white squares.
+  function pickPostImage(post, platform) {
+    const candidates = platform === 'ig'
+      ? [post.displayUrl, post.image_url, post.thumbnail, post.image, post.media_url]
+      : [post.image_url, post.displayUrl, post.full_picture, post.picture, post.imageUrl, post.image];
+    for (const c of candidates) {
+      if (typeof c !== 'string') continue;
+      const v = c.trim();
+      if (!v || v === '#' || v === 'undefined' || v === 'null') continue;
+      // basic URL sanity (http/https/data)
+      if (/^(https?:|data:)/i.test(v)) return v;
+    }
+    return platform === 'ig' ? POST_PLACEHOLDER_IG : POST_PLACEHOLDER_FB;
+  }
+
   // ── Helper functions (same as report-connect.js extractText) ──
   const __extractText = (item, fallback) => {
     if (item == null) return fallback;
@@ -311,7 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
       fbPostsContainer.innerHTML = '';
       fbPosts.slice(0, 4).forEach(post => {
         const text = post.text || post.caption || post.message || 'بدون نص';
-        const img = post.image_url || post.displayUrl || post.full_picture || post.picture || 'https://via.placeholder.com/200?text=Post';
+        const img = pickPostImage(post, 'fb');
         const likes = post.likes || post.likesCount || 0;
         const comments = post.comments || post.commentsCount || 0;
         const url = post.url || post.permalink_url || '#';
@@ -350,7 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
       igPostsContainer.innerHTML = '';
       igPosts.slice(0, 4).forEach(post => {
         const text = post.caption || post.text || 'بدون نص';
-        const img = post.displayUrl || post.image_url || post.thumbnail || 'https://via.placeholder.com/200?text=IG';
+        const img = pickPostImage(post, 'ig');
         const likes = post.likesCount || post.likes || 0;
         const comments = post.commentsCount || post.comments || 0;
         const url = post.url || '#';
