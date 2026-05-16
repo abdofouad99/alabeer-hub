@@ -1781,14 +1781,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.textContent = twData.is_verified ? 'موثق ✅' : 'غير موثق';
                 el.className = twData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
-            // Media & Link Pct
+            // Media & Link Pct (computed client-side from content_types + top_urls)
+            // The API doesn't expose media_percent / link_percent directly,
+            // so we derive them from content_types (counts of photo/video/text/...)
+            // and top_urls.length. Falls back to '--' if we can't compute.
             if (document.getElementById('twMediaPct')) {
-                const mp = twData.media_percent || 0;
-                document.getElementById('twMediaPct').textContent = mp > 0 ? mp + '%' : '--';
+                const el = document.getElementById('twMediaPct');
+                const ct = twData.content_types || {};
+                const totalCT =
+                    (ct.text || 0) + (ct.photo || 0) + (ct.video || 0) +
+                    (ct.reply || 0) + (ct.retweet || 0) + (ct.quote || 0);
+                if (twData.media_percent !== undefined && twData.media_percent !== null) {
+                    const mp = Number(twData.media_percent);
+                    el.textContent = mp >= 0 ? mp + '%' : '--';
+                } else if (totalCT > 0) {
+                    const media = (ct.photo || 0) + (ct.video || 0);
+                    el.textContent = Math.round((media / totalCT) * 100) + '%';
+                } else {
+                    el.textContent = '--';
+                }
             }
             if (document.getElementById('twLinkPct')) {
-                const lp = twData.link_percent || 0;
-                document.getElementById('twLinkPct').textContent = lp > 0 ? lp + '%' : '--';
+                const el = document.getElementById('twLinkPct');
+                const tweetsAnalyzed = twData.tweets_analyzed || 0;
+                const urlsCount = Array.isArray(twData.top_urls) ? twData.top_urls.length : 0;
+                if (twData.link_percent !== undefined && twData.link_percent !== null) {
+                    const lp = Number(twData.link_percent);
+                    el.textContent = lp >= 0 ? lp + '%' : '--';
+                } else if (tweetsAnalyzed > 0 && urlsCount > 0) {
+                    // top_urls is a deduped list, so this is a lower bound; still
+                    // a useful signal that the account does/doesn't share links.
+                    el.textContent = Math.min(100, Math.round((urlsCount / tweetsAnalyzed) * 100)) + '%';
+                } else {
+                    el.textContent = '--';
+                }
             }
             // Twitter Score
             if (document.getElementById('tw-score')) {
@@ -1958,7 +1984,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 vpEl.className = vp >= 30 ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
             if (document.getElementById('igHighlights')) {
-                const hl = igData.highlights_count || 0;
+                // The Apify scraper exposes this as `highlight_reel_count`,
+                // not `highlights_count`. The old code used the wrong key
+                // and always rendered '--'. We accept both for safety.
+                const hl = igData.highlight_reel_count ?? igData.highlights_count ?? igData.highlights ?? 0;
                 document.getElementById('igHighlights').textContent = hl > 0 ? hl : '--';
             }
 
@@ -2030,6 +2059,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fbvEl = document.getElementById('fbVerified');
                 fbvEl.textContent = fbData.is_verified ? 'موثق ✅' : 'غير موثق';
                 fbvEl.className = fbData.is_verified ? 'si-badge badge-ok' : 'si-badge badge-warn';
+            }
+            // FB Page Age — computed from Apify's `creation_date` (already
+            // surfaced as a string by apify-scraper.php, e.g. "2018-03-21").
+            // Renders "X سنة" or "Y شهر" in Arabic; '--' if missing.
+            if (document.getElementById('fbAge')) {
+                const ageEl = document.getElementById('fbAge');
+                const created = fbData.creation_date || fbData.created_at || fbData.foundedDate || '';
+                let years = null, months = null;
+                if (created) {
+                    const t = Date.parse(created);
+                    if (!isNaN(t)) {
+                        const diffMs = Date.now() - t;
+                        if (diffMs > 0) {
+                            const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+                            years  = Math.floor(totalMonths / 12);
+                            months = totalMonths % 12;
+                        }
+                    }
+                }
+                if (years === null) {
+                    ageEl.textContent = '--';
+                    ageEl.className = 'si-badge badge-warn data-missing';
+                } else if (years >= 1) {
+                    ageEl.textContent = years + ' سنة' + (months > 0 ? ` و${months} شهر` : '');
+                    ageEl.className = years >= 2 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                } else {
+                    ageEl.textContent = (months || 0) + ' شهر';
+                    ageEl.className = 'si-badge badge-warn';
+                }
             }
             if (document.getElementById('fbRating')) {
                 const rating = fbData.rating || 0;
