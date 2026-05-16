@@ -193,7 +193,29 @@
   }
 
   function postCard(p) {
-    const img = p.displayUrl || p.image || (p.images && p.images[0]) || '';
+    // pick image with fallback so empty/broken URLs don't render white squares
+    const candidates = [p.displayUrl, p.image, p.thumbnail, p.media_url, (p.images && p.images[0])];
+    let img = '';
+    for (const c of candidates) {
+      if (typeof c === 'string') {
+        const v = c.trim();
+        if (v && v !== '#' && v !== 'undefined' && v !== 'null' && /^(https?:|data:)/i.test(v)) {
+          img = v;
+          break;
+        }
+      }
+    }
+    if (!img) {
+      img = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">' +
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+        '<stop offset="0" stop-color="#7c2d92"/><stop offset="0.5" stop-color="#db2777"/><stop offset="1" stop-color="#f59e0b"/>' +
+        '</linearGradient></defs>' +
+        '<rect width="200" height="200" fill="url(#g)"/>' +
+        '<text x="100" y="115" font-size="64" text-anchor="middle" font-family="sans-serif">📷</text>' +
+        '</svg>'
+      );
+    }
     const url = p.url || (p.shortCode ? `https://www.instagram.com/p/${p.shortCode}/` : '#');
     const text = (p.caption || p.text || '').replace(/\s+/g, ' ').slice(0, 80);
     const type = p.isReel ? 'Reel' : (p.type || '').toLowerCase().includes('sidecar') ? 'Carousel'
