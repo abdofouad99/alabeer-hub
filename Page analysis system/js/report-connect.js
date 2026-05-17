@@ -3684,29 +3684,177 @@ document.addEventListener('DOMContentLoaded', () => {
                         descRow.appendChild(descValue);
 
                         body.appendChild(descRow);
-                        body.appendChild(
-                            makeRow(
-                                'evidence',
-                                '📊 الدليل',
-                                w.evidence || w.metric || 'بناءً على البيانات الفعلية'
-                            )
-                        );
-                        body.appendChild(
-                            makeRow(
-                                'impact',
-                                '💥 التأثير',
-                                w.impact || 'تأثير سلبي على الأداء العام'
-                            )
-                        );
-                        body.appendChild(
-                            makeRow(
-                                'cause',
-                                '🔍 السبب',
-                                w.root_cause || w.cause || 'يحتاج تحديد السبب الجذري'
-                            )
+
+                        // ─────────────────────────────────────────────────────────
+                        // إصلاح Schema Mismatch لبطاقة نقاط الضعف (PR #51)
+                        // ─────────────────────────────────────────────────────────
+                        // schema الوكيل الفعلي (Agent 5 — gemini-agents.php:656-662):
+                        //   {
+                        //     title, description, metric,
+                        //     root_cause, cost_of_inaction,
+                        //     fix, fix_time, expected_improvement,
+                        //     severity (high|medium|low), icon
+                        //   }
+                        //
+                        // الكود السابق كان يقرأ مفاتيح غير موجودة في schema الضعف:
+                        //   - w.evidence ← مفقود في schema (نُبقيه fallback ثاني للتقارير القديمة)
+                        //   - w.impact   ← مفقود (الـ schema يستخدم severity بالإنجليزية)
+                        //   - w.cause    ← مفقود (الـ schema يستخدم root_cause)
+                        //   - w.action   ← مفقود (الـ schema يستخدم fix)
+                        // النتيجة: 4 hardcoded fallbacks مضلِّلة كانت تتكرر في كل البطاقات.
+                        //
+                        // كذلك حقول مهمة في schema كانت مُهمَلة تماماً قبل هذا الإصلاح:
+                        //   - cost_of_inaction (تكلفة عدم الإصلاح — التأثير الحقيقي)
+                        //   - fix_time (الوقت اللازم للإصلاح)
+                        //   - expected_improvement (التحسن المتوقع بعد الإصلاح)
+                        //
+                        // ⚠️ ملاحظة مهمة: ادعى تقرير المراجعة أن الـ schema يستخدم
+                        // "how_to_fix" لكن قراءة gemini-agents.php سطراً سطراً تؤكد
+                        // أن الاسم الفعلي هو "fix" (احتراماً للقاعدة #2: لا أفترض
+                        // نية الـ AI، أقرأ schema الوكيل أولاً).
+                        //
+                        // الإصلاح: قراءة الحقول الفعلية لـ schema الضعف، مع تقاعس آمن
+                        // إلى رسالة "البيانات غير متوفرة" (نمط competitors.html — PR #48
+                        // و opportunities.html — PR #49 و strengths — PR #50)
+                        // بدل hardcoded fallbacks مضلِّلة.
+
+                        // hasValueStr: يحدّد إن كانت القيمة نصاً معبّأ فعلاً
+                        const hasValueStr = (v) => {
+                            if (v === null || v === undefined) return false;
+                            if (typeof v === 'string') return v.trim() !== '' && v.trim() !== '—';
+                            if (typeof v === 'number') return Number.isFinite(v);
+                            return false;
+                        };
+
+                        // translateSeverity: يحوّل high/medium/low إلى عربي
+                        // (schema الوكيل يفرض الإنجليزية: "severity": "high|medium|low")
+                        // لو الوكيل أرجع نصاً عربياً مفصّلاً، نتركه كما هو.
+                        const translateSeverity = (v) => {
+                            if (!hasValueStr(v)) return null;
+                            const k = String(v).trim().toLowerCase();
+                            const map = {
+                                'high':     'حرجة',
+                                'medium':   'متوسطة',
+                                'low':      'منخفضة',
+                                'critical': 'حرجة',
+                                'حرجة':     'حرجة',
+                                'عالية':    'حرجة',
+                                'متوسطة':   'متوسطة',
+                                'منخفضة':   'منخفضة',
+                            };
+                            return map[k] || String(v).trim();
+                        };
+
+                        // formatMetric: schema يقول metric: "" (نص حر).
+                        // لكن الوكيل قد يرسله كرقم خام (5.5 أو 0.042) بدون وحدة.
+                        // قاعدة "لا اختراع منطق": لا نضرب × 100 لرقم 0-1 (لا نعرف
+                        // إن كان نسبة مئوية أم قيمة أخرى). نعرض كما هو + علامة
+                        // توضيحية إن غابت الوحدة.
+                        const formatMetric = (v) => {
+                            if (!hasValueStr(v)) return null;
+                            if (typeof v === 'number') {
+                                return v + ' (لم تُحدَّد الوحدة في التحليل)';
+                            }
+                            const txt = String(v).trim();
+                            // إن كان النص مجرد digits/decimal بدون أي وحدة (لا %، لا حرف، لا كلمة)
+                            if (/^-?\d+(\.\d+)?$/.test(txt)) {
+                                return txt + ' (لم تُحدَّد الوحدة في التحليل)';
+                            }
+                            return txt;
+                        };
+
+                        // appendRowOrMissing: يبني صف عادي إن كانت القيمة موجودة،
+                        // وإلا يبني صفاً برسالة "غير متوفرة" بنص رمادي مائل (نمط
+                        // competitors.html — PR #48 و opportunities.html — PR #49
+                        // و strengths — PR #50).
+                        const appendRowOrMissing = (labelClass, labelText, value, missingText) => {
+                            const row = document.createElement('div');
+                            row.className = 'deep-row';
+                            const label = document.createElement('div');
+                            label.className = 'deep-label ' + labelClass;
+                            label.textContent = labelText;
+                            const valueDiv = document.createElement('div');
+                            valueDiv.className = 'deep-value';
+                            if (hasValueStr(value)) {
+                                valueDiv.textContent = String(value).trim();
+                            } else {
+                                valueDiv.textContent = missingText;
+                                valueDiv.style.cssText = 'color:#94a3b8;font-style:italic;opacity:0.85;';
+                            }
+                            row.appendChild(label);
+                            row.appendChild(valueDiv);
+                            body.appendChild(row);
+                        };
+
+                        // 📊 الدليل (metric): الحقل الرئيسي في schema. evidence
+                        // كـ fallback ثاني لتقارير قديمة قد تحوي الاسم القديم.
+                        appendRowOrMissing(
+                            'evidence',
+                            '📊 الدليل',
+                            formatMetric(w.metric) || formatMetric(w.evidence),
+                            'لم يُقدِّم التحليل دليلاً قياسياً لهذه النقطة'
                         );
 
-                        // صندوق الإجراء
+                        // 💥 التأثير: schema يستخدم cost_of_inaction (تكلفة عدم
+                        // الإصلاح) كقيمة كمّية للتأثير. impact كـ fallback ثاني
+                        // للتقارير القديمة (legacy) إن وُجد.
+                        appendRowOrMissing(
+                            'impact',
+                            '💥 التأثير (تكلفة عدم الإصلاح)',
+                            w.cost_of_inaction || w.impact,
+                            'لم يُحدِّد التحليل تكلفة عدم الإصلاح'
+                        );
+
+                        // 🔍 السبب الجذري: حقل root_cause من schema. cause
+                        // كـ fallback ثاني للتقارير القديمة إن وُجدت.
+                        appendRowOrMissing(
+                            'cause',
+                            '🔍 السبب الجذري',
+                            w.root_cause || w.cause,
+                            'لم يُحدِّد التحليل سبباً جذرياً مباشراً'
+                        );
+
+                        // 🚨 درجة الخطورة: من schema "severity" مع ترجمة عربية.
+                        // (priorityText أعلاه يُحسب من w.score، أما severity هي
+                        // قيمة الوكيل المباشرة، فنعرضها صراحة.)
+                        const severityArabic = translateSeverity(w.severity);
+                        if (severityArabic) {
+                            appendRowOrMissing(
+                                'impact',
+                                '🚨 درجة الخطورة',
+                                severityArabic,
+                                'لم يُحدِّد التحليل درجة خطورة'
+                            );
+                        }
+
+                        // ⏱️ وقت الإصلاح + 📈 التحسن المتوقع — حقلان من schema
+                        // كانا مُهمَلَين تماماً. نعرضهما فقط إن قدّمهما الوكيل
+                        // (لا نعرض رسالة "غير متوفر" لكل منهما لتجنّب ازدحام
+                        // البطاقة، كما أن السطرين تكميليان وليسا أساسيين).
+                        if (hasValueStr(w.fix_time)) {
+                            appendRowOrMissing(
+                                'evidence',
+                                '⏱️ وقت الإصلاح',
+                                w.fix_time,
+                                ''
+                            );
+                        }
+                        if (hasValueStr(w.expected_improvement)) {
+                            appendRowOrMissing(
+                                'cause',
+                                '📈 التحسن المتوقع بعد الإصلاح',
+                                w.expected_improvement,
+                                ''
+                            );
+                        }
+
+                        // 🔧 الإصلاح: حقل fix من schema (الإجراء الحقيقي للضعف).
+                        // كان مُهمَلاً تماماً قبل هذا الإصلاح، وكان يُستبدل بنص
+                        // hardcoded "اتخذ إجراءً فورياً لمعالجة هذه النقطة" يتكرر
+                        // في كل البطاقات.
+                        // ⚠️ ملاحظة: schema الوكيل يستخدم اسم "fix" — وليس
+                        // "how_to_fix" (تأكدت بقراءة gemini-agents.php:660 سطراً
+                        // سطراً، رغم ادعاء تقرير المراجعة الخاطئ).
                         const actionBox = document.createElement('div');
                         actionBox.className = 'deep-action-box';
                         const actionIcon = document.createElement('div');
@@ -3714,8 +3862,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         actionIcon.textContent = '🔧';
                         const actionText = document.createElement('div');
                         actionText.className = 'action-text';
-                        actionText.textContent =
-                            w.action || 'اتخذ إجراءً فورياً لمعالجة هذه النقطة';
+                        if (hasValueStr(w.fix)) {
+                            actionText.textContent = String(w.fix).trim();
+                        } else if (hasValueStr(w.action)) {
+                            // fallback لتقارير قديمة قد تحوي action (legacy)
+                            actionText.textContent = String(w.action).trim();
+                        } else {
+                            actionText.textContent = 'لم يُقترح التحليل إجراءً مباشراً لمعالجة هذه النقطة';
+                            actionText.style.cssText = 'color:#94a3b8;font-style:italic;opacity:0.85;';
+                        }
                         actionBox.appendChild(actionIcon);
                         actionBox.appendChild(actionText);
                         body.appendChild(actionBox);
