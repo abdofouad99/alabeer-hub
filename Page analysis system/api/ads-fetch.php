@@ -281,10 +281,29 @@ function apifyFetchAdsEnhanced(string $token, array $cfg, string $searchParam, s
 
 /**
  * المصدر الثالث: Public Scraping
+ *
+ * ── إصلاح حرج (PR fix/ads-fetch-include-inactive) ────────────────────
+ * كانت الدالة تستخدم `active_status=active` في URL مكتبة الإعلانات،
+ * مما يعني أن الإعلانات المتوقفة/القديمة تُستبعد تماماً عند الاعتماد
+ * على هذا المصدر (fallback نهائي عندما يفشل Meta API و Apify).
+ *
+ * النتيجة الميدانية: عملاء لديهم إعلانات قديمة فعلاً كانت تظهر لهم
+ * "0 إعلانات" في التقرير لأن النظام وقع على هذا الـ fallback ولم يجد
+ * إعلاناً نشطاً واحداً، فأرجع قائمة فارغة بدلاً من القديمة.
+ *
+ * المرجع: Meta API (المصدر #1) و Apify (المصدر #2) كلاهما يستخدم
+ * `ad_active_status: 'ALL'` لذا يجب أن يتطابق المصدر #3 معهما لضمان
+ * الاتساق عبر المصادر الثلاثة.
+ *
+ * كذلك صُحِّحت قراءة `is_active` من البيانات الفعلية بدلاً من تثبيتها
+ * على `true` لكل إعلان — كان ذلك يجعل كل ما يخرج من Public Scraping
+ * يُحسب كإعلان نشط حتى لو كان متوقفاً منذ أشهر.
  */
 function fetchAdsPublicScraping(string $fbUrl): array {
     // محاولة جلب من صفحة الإعلانات العامة
-    $adsUrl = "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=SA&q=" . urlencode(basename($fbUrl)) . "&search_type=keyword_unordered";
+    // active_status=all → يجلب النشط + المتوقف (مطابق لـ Meta API و Apify).
+    // ad_type=all → كل أنواع الإعلانات (issue/political/social/regular).
+    $adsUrl = "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=SA&q=" . urlencode(basename($fbUrl)) . "&search_type=keyword_unordered";
 
     $html = fetchHtmlContent($adsUrl, 20);
     if (!$html) {
@@ -298,11 +317,33 @@ function fetchAdsPublicScraping(string $fbUrl): array {
         $decoded = json_decode($m[1], true);
         if (is_array($decoded)) {
             foreach ($decoded as $ad) {
+                if (!is_array($ad)) continue;
+                // قراءة حالة الإعلان من الحقول الفعلية بدلاً من تثبيتها كـ true.
+                // الأسماء المحتملة لحقل الحالة في JSON المضمن قد تختلف بين
+                // إصدارات Facebook، لذلك نبحث في عدة مفاتيح ثم نسقط على
+                // false (محافظ — لا نفترض النشاط بدون دليل) إذا غابت كلها.
+                $isActive = null;
+                foreach (['isActive', 'is_active', 'active', 'currentlyActive'] as $key) {
+                    if (array_key_exists($key, $ad)) {
+                        $isActive = (bool) $ad[$key];
+                        break;
+                    }
+                }
+                // بعض الـ payloads تستخدم enum string مثل "ACTIVE"/"INACTIVE"
+                if ($isActive === null && isset($ad['adArchiveStatus']) && is_string($ad['adArchiveStatus'])) {
+                    $isActive = strtoupper($ad['adArchiveStatus']) === 'ACTIVE';
+                }
+                if ($isActive === null) {
+                    $isActive = false; // محافظ: لا نفترض النشاط بدون دليل
+                }
+
                 $ads[] = [
-                    'id' => $ad['adArchiveID'] ?? $ad['id'] ?? null,
-                    'page_name' => $ad['pageName'] ?? '',
-                    'text' => $ad['adBody'] ?? '',
-                    'is_active' => true,
+                    'id'         => $ad['adArchiveID'] ?? $ad['id'] ?? null,
+                    'page_name'  => $ad['pageName'] ?? '',
+                    'text'       => $ad['adBody'] ?? '',
+                    'start_date' => $ad['startDate'] ?? $ad['ad_creation_time'] ?? null,
+                    'end_date'   => $ad['endDate']   ?? null,
+                    'is_active'  => $isActive,
                 ];
             }
         }

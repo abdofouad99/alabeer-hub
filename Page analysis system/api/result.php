@@ -433,6 +433,115 @@ if (is_array($page9)) {
     $aiReport['page_9_conversion'] = $page9;
 }
 
+// ── طبقة تطبيع page_11_consistency ───────────────────────────────
+// schema الوكيل (gemini-agents.php:450-475):
+//   consistency_score: int 0-100
+//   posting_analysis: { current_frequency, recommended_frequency, best_times[],
+//                       gap_days, verdict }
+//   growth_trajectory: { current_monthly_growth_pct: number, industry_avg_growth,
+//                        projection_if_consistent: { month1_followers, month3_followers,
+//                                                    month6_followers } (كلها أرقام) }
+//   algorithm_health: { instagram_score, tiktok_score, facebook_score (كلها 0-100),
+//                       algorithm_tips: [strings] }
+//   consistency_system: { content_batching_strategy, tools_recommended: [strings],
+//                         weekly_routine: [{day, task}] }
+//
+// ما نعالجه (آمن، يحترم schema بحرفيّته):
+//   1. الـ scores: لو وصلت كـ "45" (string رقمي) → int. منع Falsy-Zero في JS
+//      ويضمن أن العرض موحّد (لا "45"/"45.0").
+//   2. projection_if_consistent.* (3 أرقام): لو string رقمي → int. يدعم
+//      "+ 930" RTL formatting في الواجهة (formatPlusNumber).
+//   3. current_monthly_growth_pct: لو string رقمي → float (للاتساق).
+//   4. algorithm_tips, tools_recommended: ضمان array + إزالة العناصر الفارغة
+//      أو غير النصية (تمنع <li></li> فارغة في الواجهة).
+//   5. weekly_routine: ضمان array + إزالة العناصر التي ليس لها day ولا task
+//      (تمنع timeline-item فارغة لو الوكيل أرجع schema الافتراضي
+//       [{"day":"","task":""}] دون تعبئة).
+//
+// ما لا نلمسه:
+//   - posting_analysis.* النصية (current_frequency, gap_days, verdict): قد
+//     تكون "1 منشور/أسبوع" أو "يومي الجمعة والسبت". لا اختراع منطق هنا.
+//   - منطق "هل projection معقول؟" (مثلاً month6 > month3): الـ prompt
+//     يضع قاعدة "≤10% نمو شهرياً بدون إعلانات"، لكن تحققها مسؤولية الوكيل
+//     لا طبقة العرض. أي تصحيح هنا يخفي مشكلة جودة الوكيل.
+//   - أسماء الأدوات (Hootsuite/Buffer): محتوى الوكيل يُعرض كما هو.
+$page11 = safeGet($aiReport, 'page_11_consistency', null);
+if (is_array($page11)) {
+    // 1) consistency_score → int
+    if (isset($page11['consistency_score']) && is_numeric($page11['consistency_score'])) {
+        $page11['consistency_score'] = (int) $page11['consistency_score'];
+    }
+
+    // 2) algorithm_health: scores → int، tips → array نظيفة
+    if (!empty($page11['algorithm_health']) && is_array($page11['algorithm_health'])) {
+        $ah = $page11['algorithm_health'];
+        foreach (['instagram_score', 'tiktok_score', 'facebook_score'] as $scoreKey) {
+            if (isset($ah[$scoreKey]) && is_numeric($ah[$scoreKey])) {
+                $ah[$scoreKey] = (int) $ah[$scoreKey];
+            }
+        }
+        // algorithm_tips: ضمان array من نصوص فقط
+        $tips = isset($ah['algorithm_tips']) && is_array($ah['algorithm_tips'])
+            ? $ah['algorithm_tips']
+            : [];
+        $ah['algorithm_tips'] = array_values(array_filter(array_map(static function($t) {
+            if (!is_string($t)) return null;
+            $t = trim($t);
+            return $t !== '' ? $t : null;
+        }, $tips)));
+        $page11['algorithm_health'] = $ah;
+    }
+
+    // 3) growth_trajectory: المئوية → float، projections → int
+    if (!empty($page11['growth_trajectory']) && is_array($page11['growth_trajectory'])) {
+        $gt = $page11['growth_trajectory'];
+        if (isset($gt['current_monthly_growth_pct']) && is_numeric($gt['current_monthly_growth_pct'])) {
+            $gt['current_monthly_growth_pct'] = (float) $gt['current_monthly_growth_pct'];
+        }
+        if (!empty($gt['projection_if_consistent']) && is_array($gt['projection_if_consistent'])) {
+            $proj = $gt['projection_if_consistent'];
+            foreach (['month1_followers', 'month3_followers', 'month6_followers'] as $monthKey) {
+                if (isset($proj[$monthKey]) && is_numeric($proj[$monthKey])) {
+                    $proj[$monthKey] = (int) $proj[$monthKey];
+                }
+            }
+            $gt['projection_if_consistent'] = $proj;
+        }
+        $page11['growth_trajectory'] = $gt;
+    }
+
+    // 4 + 5) consistency_system: tools نظيف، weekly_routine بدون عناصر فارغة
+    if (!empty($page11['consistency_system']) && is_array($page11['consistency_system'])) {
+        $cs = $page11['consistency_system'];
+
+        // tools_recommended: array من نصوص غير فارغة فقط
+        $tools = isset($cs['tools_recommended']) && is_array($cs['tools_recommended'])
+            ? $cs['tools_recommended']
+            : [];
+        $cs['tools_recommended'] = array_values(array_filter(array_map(static function($t) {
+            if (!is_string($t)) return null;
+            $t = trim($t);
+            return $t !== '' ? $t : null;
+        }, $tools)));
+
+        // weekly_routine: تصفية العناصر التي ليس لها day ولا task
+        $routine = isset($cs['weekly_routine']) && is_array($cs['weekly_routine'])
+            ? $cs['weekly_routine']
+            : [];
+        $cs['weekly_routine'] = array_values(array_filter(array_map(static function($r) {
+            if (!is_array($r)) return null;
+            $day  = isset($r['day'])  && is_string($r['day'])  ? trim($r['day'])  : '';
+            $task = isset($r['task']) && is_string($r['task']) ? trim($r['task']) : '';
+            if ($day === '' && $task === '') return null;
+            return ['day' => $day, 'task' => $task];
+        }, $routine)));
+
+        $page11['consistency_system'] = $cs;
+    }
+
+    $aiReport['page_11_consistency'] = $page11;
+}
+
 // ── طبقة تطبيع + جسر page_12_ads → ads_analysis ─────────────────
 //
 // السياق المعماري:
@@ -638,6 +747,115 @@ if (is_array($page12)) {
             '_source' => 'page_12_ads_bridge', // علامة تشخيصية
         ];
     }
+}
+
+$row['ai_report'] = $aiReport;
+// schema الوكيل (gemini-agents.php:450-475):
+//   consistency_score: int 0-100
+//   posting_analysis: { current_frequency, recommended_frequency, best_times[],
+//                       gap_days, verdict }
+//   growth_trajectory: { current_monthly_growth_pct: number, industry_avg_growth,
+//                        projection_if_consistent: { month1_followers, month3_followers,
+//                                                    month6_followers } (كلها أرقام) }
+//   algorithm_health: { instagram_score, tiktok_score, facebook_score (كلها 0-100),
+//                       algorithm_tips: [strings] }
+//   consistency_system: { content_batching_strategy, tools_recommended: [strings],
+//                         weekly_routine: [{day, task}] }
+//
+// ما نعالجه (آمن، يحترم schema بحرفيّته):
+//   1. الـ scores: لو وصلت كـ "45" (string رقمي) → int. منع Falsy-Zero في JS
+//      ويضمن أن العرض موحّد (لا "45"/"45.0").
+//   2. projection_if_consistent.* (3 أرقام): لو string رقمي → int. يدعم
+//      "+ 930" RTL formatting في الواجهة (formatPlusNumber).
+//   3. current_monthly_growth_pct: لو string رقمي → float (للاتساق).
+//   4. algorithm_tips, tools_recommended: ضمان array + إزالة العناصر الفارغة
+//      أو غير النصية (تمنع <li></li> فارغة في الواجهة).
+//   5. weekly_routine: ضمان array + إزالة العناصر التي ليس لها day ولا task
+//      (تمنع timeline-item فارغة لو الوكيل أرجع schema الافتراضي
+//       [{"day":"","task":""}] دون تعبئة).
+//
+// ما لا نلمسه:
+//   - posting_analysis.* النصية (current_frequency, gap_days, verdict): قد
+//     تكون "1 منشور/أسبوع" أو "يومي الجمعة والسبت". لا اختراع منطق هنا.
+//   - منطق "هل projection معقول؟" (مثلاً month6 > month3): الـ prompt
+//     يضع قاعدة "≤10% نمو شهرياً بدون إعلانات"، لكن تحققها مسؤولية الوكيل
+//     لا طبقة العرض. أي تصحيح هنا يخفي مشكلة جودة الوكيل.
+//   - أسماء الأدوات (Hootsuite/Buffer): محتوى الوكيل يُعرض كما هو.
+$page11 = safeGet($aiReport, 'page_11_consistency', null);
+if (is_array($page11)) {
+    // 1) consistency_score → int
+    if (isset($page11['consistency_score']) && is_numeric($page11['consistency_score'])) {
+        $page11['consistency_score'] = (int) $page11['consistency_score'];
+    }
+
+    // 2) algorithm_health: scores → int، tips → array نظيفة
+    if (!empty($page11['algorithm_health']) && is_array($page11['algorithm_health'])) {
+        $ah = $page11['algorithm_health'];
+        foreach (['instagram_score', 'tiktok_score', 'facebook_score'] as $scoreKey) {
+            if (isset($ah[$scoreKey]) && is_numeric($ah[$scoreKey])) {
+                $ah[$scoreKey] = (int) $ah[$scoreKey];
+            }
+        }
+        // algorithm_tips: ضمان array من نصوص فقط
+        $tips = isset($ah['algorithm_tips']) && is_array($ah['algorithm_tips'])
+            ? $ah['algorithm_tips']
+            : [];
+        $ah['algorithm_tips'] = array_values(array_filter(array_map(static function($t) {
+            if (!is_string($t)) return null;
+            $t = trim($t);
+            return $t !== '' ? $t : null;
+        }, $tips)));
+        $page11['algorithm_health'] = $ah;
+    }
+
+    // 3) growth_trajectory: المئوية → float، projections → int
+    if (!empty($page11['growth_trajectory']) && is_array($page11['growth_trajectory'])) {
+        $gt = $page11['growth_trajectory'];
+        if (isset($gt['current_monthly_growth_pct']) && is_numeric($gt['current_monthly_growth_pct'])) {
+            $gt['current_monthly_growth_pct'] = (float) $gt['current_monthly_growth_pct'];
+        }
+        if (!empty($gt['projection_if_consistent']) && is_array($gt['projection_if_consistent'])) {
+            $proj = $gt['projection_if_consistent'];
+            foreach (['month1_followers', 'month3_followers', 'month6_followers'] as $monthKey) {
+                if (isset($proj[$monthKey]) && is_numeric($proj[$monthKey])) {
+                    $proj[$monthKey] = (int) $proj[$monthKey];
+                }
+            }
+            $gt['projection_if_consistent'] = $proj;
+        }
+        $page11['growth_trajectory'] = $gt;
+    }
+
+    // 4 + 5) consistency_system: tools نظيف، weekly_routine بدون عناصر فارغة
+    if (!empty($page11['consistency_system']) && is_array($page11['consistency_system'])) {
+        $cs = $page11['consistency_system'];
+
+        // tools_recommended: array من نصوص غير فارغة فقط
+        $tools = isset($cs['tools_recommended']) && is_array($cs['tools_recommended'])
+            ? $cs['tools_recommended']
+            : [];
+        $cs['tools_recommended'] = array_values(array_filter(array_map(static function($t) {
+            if (!is_string($t)) return null;
+            $t = trim($t);
+            return $t !== '' ? $t : null;
+        }, $tools)));
+
+        // weekly_routine: تصفية العناصر التي ليس لها day ولا task
+        $routine = isset($cs['weekly_routine']) && is_array($cs['weekly_routine'])
+            ? $cs['weekly_routine']
+            : [];
+        $cs['weekly_routine'] = array_values(array_filter(array_map(static function($r) {
+            if (!is_array($r)) return null;
+            $day  = isset($r['day'])  && is_string($r['day'])  ? trim($r['day'])  : '';
+            $task = isset($r['task']) && is_string($r['task']) ? trim($r['task']) : '';
+            if ($day === '' && $task === '') return null;
+            return ['day' => $day, 'task' => $task];
+        }, $routine)));
+
+        $page11['consistency_system'] = $cs;
+    }
+
+    $aiReport['page_11_consistency'] = $page11;
 }
 
 $row['ai_report'] = $aiReport;
