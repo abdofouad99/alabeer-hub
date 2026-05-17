@@ -317,6 +317,74 @@ if (empty($aiReport['action_month'])) {
     }
 }
 
+// ── طبقة تطبيع page_9_conversion ─────────────────────────────────
+// قبل هذا الإصلاح كان page_9_conversion يمر للواجهة بدون أي تحقق:
+//   - revenue_analysis.gap قد تأتي كـ string "0" → تكسر الفحص JS
+//   - revenue_analysis.unlock_potential قد تكون أقل من estimated (مستحيل منطقياً)
+//   - sales_funnel_recommendations[].expected_close_rate قد تأتي كرقم عاري (10) بدل "10%"
+//   - conversion_killers[].expected_conversion_lift نفس المشكلة
+// نُطبّع هذه الحقول جميعاً قبل الإرسال للواجهة.
+$page9 = safeGet($aiReport, 'page_9_conversion', null);
+if (is_array($page9)) {
+    // 1) revenue_analysis: تحويل القيم النصية لأرقام + إصلاح المنطق
+    if (!empty($page9['revenue_analysis']) && is_array($page9['revenue_analysis'])) {
+        $ra = $page9['revenue_analysis'];
+
+        // gap قد تأتي كـ "0" (string) → نحوّلها لرقم لمنع Falsy-Zero Bug في JS
+        if (isset($ra['gap']) && is_string($ra['gap']) && is_numeric($ra['gap'])) {
+            $ra['gap'] = (float) $ra['gap'];
+        }
+
+        // التحقق المنطقي: unlock_potential يجب أن يكون >= estimated_monthly_revenue
+        // ولو كان أقل (Bug في الوكيل) نُعيد حساب gap = unlock - estimated بقيمة موجبة فقط
+        $est    = is_numeric($ra['estimated_monthly_revenue'] ?? null)
+                ? (float) $ra['estimated_monthly_revenue'] : 0;
+        $unlock = is_numeric($ra['unlock_potential'] ?? null)
+                ? (float) $ra['unlock_potential'] : 0;
+
+        // لو unlock < estimated فهذا هراء من الوكيل — نُصحّحه بقيمة منطقية
+        // (نضمن أن unlock >= estimated، وأن gap = الفجوة الفعلية)
+        if ($est > 0 && $unlock > 0 && $unlock < $est) {
+            // بدل استبدال الأرقام نحتفظ بـ unlock الأصلي للشفافية لكن نُصلح gap
+            $ra['gap'] = 0;
+            $ra['_data_warning'] = 'unlock_potential أقل من estimated_monthly_revenue — قد يحتاج إعادة تشغيل التحليل';
+        } elseif ($est > 0 && $unlock > 0) {
+            // الحالة الطبيعية: gap = unlock - estimated (لو لم يحسبها الوكيل)
+            $computedGap = max(0, $unlock - $est);
+            // لو gap موجودة ومتطابقة مع الحساب نتركها، وإلا نستخدم المحسوبة
+            if (!isset($ra['gap']) || (float) $ra['gap'] !== $computedGap) {
+                $ra['gap'] = $computedGap;
+            }
+        }
+
+        $page9['revenue_analysis'] = $ra;
+    }
+
+    // 2) conversion_killers[].expected_conversion_lift: إضافة % إذا أتى رقماً عارياً
+    if (!empty($page9['conversion_killers']) && is_array($page9['conversion_killers'])) {
+        foreach ($page9['conversion_killers'] as &$killer) {
+            if (!is_array($killer)) continue;
+            if (isset($killer['expected_conversion_lift']) && is_numeric($killer['expected_conversion_lift'])) {
+                $killer['expected_conversion_lift'] = $killer['expected_conversion_lift'] . '%';
+            }
+        }
+        unset($killer);
+    }
+
+    // 3) sales_funnel_recommendations[].expected_close_rate: نفس المعالجة
+    if (!empty($page9['sales_funnel_recommendations']) && is_array($page9['sales_funnel_recommendations'])) {
+        foreach ($page9['sales_funnel_recommendations'] as &$step) {
+            if (!is_array($step)) continue;
+            if (isset($step['expected_close_rate']) && is_numeric($step['expected_close_rate'])) {
+                $step['expected_close_rate'] = $step['expected_close_rate'] . '%';
+            }
+        }
+        unset($step);
+    }
+
+    $aiReport['page_9_conversion'] = $page9;
+}
+
 $row['ai_report'] = $aiReport;
 
 if (!$__hasRenderableValue(safeGet($aiReport, 'summary', null)) && $__hasRenderableValue(safeGet($aiReport, 'final_report', null))) {
