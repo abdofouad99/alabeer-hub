@@ -2272,22 +2272,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ranks = ['1st', '2nd', '3rd', '4th', '5th'];
 
                 data.competitor_radar.slice(0, 5).forEach((comp, i) => {
-                    const st1 =
-                        comp.strengths && comp.strengths[0]
-                            ? comp.strengths[0]
-                            : 'وجود قوي في السوق';
-                    const st2 =
-                        comp.strengths && comp.strengths[1]
-                            ? comp.strengths[1]
-                            : 'قاعدة عملاء مستقرة';
-                    const wk1 =
-                        comp.weaknesses && comp.weaknesses[0]
-                            ? comp.weaknesses[0]
-                            : 'خدمة عملاء بطيئة';
-                    const wk2 =
-                        comp.weaknesses && comp.weaknesses[1]
-                            ? comp.weaknesses[1]
-                            : 'محتوى غير متجدد';
+                    // ── إصلاح: لا hardcoded fallbacks للنقاط ──
+                    // قبل الإصلاح كان يُحقن "وجود قوي في السوق" / "خدمة عملاء بطيئة" لكل
+                    // منافس بدون بيانات فعلية، مما يعرض على العميل تحليلاً مزيفاً متطابقاً.
+                    // الآن: نعرض فقط النقاط المؤكدة من الـ AI، ونُخفي الأخرى.
+                    const strengthsArr = Array.isArray(comp.strengths)
+                        ? comp.strengths.filter(s => typeof s === 'string' && s.trim() !== '')
+                        : [];
+                    const weaknessesArr = Array.isArray(comp.weaknesses)
+                        ? comp.weaknesses.filter(w => typeof w === 'string' && w.trim() !== '')
+                        : [];
+
+                    const strengthsHtml = strengthsArr.length > 0
+                        ? strengthsArr.slice(0, 3).map(s =>
+                            `<div class="trait-item trait-strength">${sanitize(s)}</div>`
+                          ).join('')
+                        : `<div class="trait-item trait-strength" style="color:var(--text-gray);font-style:italic;">— لم يحدد الوكيل نقاط قوة محددة —</div>`;
+                    const weaknessesHtml = weaknessesArr.length > 0
+                        ? weaknessesArr.slice(0, 3).map(w =>
+                            `<div class="trait-item trait-weakness">${sanitize(w)}</div>`
+                          ).join('')
+                        : `<div class="trait-item trait-weakness" style="color:var(--text-gray);font-style:italic;">— لم يحدد الوكيل نقاط ضعف محددة —</div>`;
+
+                    // attack_plan: لو ما عندنا خطة هجوم، نقولها صراحة بدلاً من نص عام
+                    const attackPlanText = (typeof comp.attack_plan === 'string' && comp.attack_plan.trim() !== '')
+                        ? comp.attack_plan
+                        : 'لم يُرجع الوكيل خطة هجوم محددة لهذا المنافس.';
 
                     html += `
               <div class="comp-card">
@@ -2304,32 +2314,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="traits-list">
                   <div class="trait-group">
                     <span class="trait-title">نقاط تفوقه (Strengths)</span>
-                    <div class="trait-item trait-strength">${sanitize(st1)}</div>
-                    <div class="trait-item trait-strength">${sanitize(st2)}</div>
+                    ${strengthsHtml}
                   </div>
                   <div class="trait-group" style="margin-top:8px;">
                     <span class="trait-title">نقاط ضعفه (Vulnerabilities)</span>
-                    <div class="trait-item trait-weakness">${sanitize(wk1)}</div>
-                    <div class="trait-item trait-weakness">${sanitize(wk2)}</div>
+                    ${weaknessesHtml}
                   </div>
                 </div>
 
                 <div class="attack-plan">
                   <div class="ap-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> خطة الهجوم</div>
-                  <div class="ap-desc">${sanitize(
-                      comp.attack_plan || 'استغل نقاط ضعفه أعلاه للسيطرة على عملائه.'
-                  )}</div>
+                  <div class="ap-desc">${sanitize(attackPlanText)}</div>
                 </div>
               </div>
             `;
                 });
                 grid.innerHTML = html;
             } else if (grid) {
-                grid.innerHTML = `<div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--text-gray); font-size:18px;">لم يتمكن محرك Apify من استخراج بيانات منافسين كافية لهذا المجال، أو أن البيانات قيد المعالجة.</div>`;
+                // ── إصلاح: استخدام missingDataHtml بدل رسالة الـ Apify ──
+                grid.innerHTML = missingDataHtml(
+                    'بيانات المنافسين غير متوفرة',
+                    'لم يُرجع تحليل الذكاء الاصطناعي بيانات منافسين كافية لهذا التقرير. أعد تشغيل التحليل أو راجع لوحة الإدارة.'
+                );
             }
 
             const arsenalGrid = document.getElementById('arsenalGrid');
-            if (arsenalGrid && data.execution_arsenal) {
+            if (arsenalGrid && data.execution_arsenal && data.execution_arsenal.length > 0) {
                 let arsenalHtml = '';
                 data.execution_arsenal.forEach(item => {
                     arsenalHtml += `
@@ -2341,15 +2351,27 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
                 });
                 arsenalGrid.innerHTML = arsenalHtml;
+            } else if (arsenalGrid) {
+                // ── إصلاح: إضافة else لمنع ترسانة فارغة بدون رسالة ──
+                arsenalGrid.innerHTML = missingDataHtml(
+                    'ترسانة التفوق غير متوفرة',
+                    'لم يُرجع الوكيل تكتيكات تفوق محددة لهذا التقرير. تظهر هذه الترسانة عندما يرصد التحليل فجوات سوقية صريحة (market_gaps).'
+                );
             }
 
             const summaryText = document.getElementById('marketSummaryText');
             if (summaryText && data.market_summary) {
-                // Highlight text between span highlight
-                summaryText.innerHTML = sanitize(data.market_summary);
+                // sanitizeRelaxed يسمح بـ <strong> الذي يضيفه الجسر في result.php،
+                // ويزيل أي script/iframe وغيرها (أي محتوى خطر من الـ AI).
+                summaryText.innerHTML = sanitizeRelaxed(data.market_summary);
             } else if (summaryText) {
-                summaryText.innerHTML =
-                    'استراتيجية (المحيط الأزرق) تكمن في استغلال الثغرات في خدمة عملاء المنافسين. ركز على تجربة شراء لا تُنسى وسيبدأ ولاء العملاء بالتحول إليك تدريجياً.';
+                // ── إصلاح: حذف النص الـ hardcoded ("استراتيجية المحيط الأزرق...") ──
+                // كان يُعرض دائماً حتى لو AI لم يُرجع market_summary، مما يُضلل العميل
+                // بأنه تحليل حقيقي. الآن نقول الحقيقة: البيانات غير متوفرة.
+                summaryText.textContent =
+                    'لم يُرجع تحليل الذكاء الاصطناعي تشخيصاً صريحاً للفجوة السوقية لهذا التقرير. تظهر هذه الاستراتيجية عندما يرصد الوكيل blue_ocean_opportunity أو positioning_statement.';
+                summaryText.style.color = 'var(--text-gray)';
+                summaryText.style.fontStyle = 'italic';
             }
         }
         } catch (__pageErr) {
