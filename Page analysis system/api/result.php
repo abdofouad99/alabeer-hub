@@ -939,6 +939,129 @@ if (is_array($page12)) {
     }
 }
 
+// ── طبقة تطبيع page_13_missed_opportunities ──────────────────────
+//
+// السياق المعماري:
+//   - Single-prompt fallback (api/ai-analyze.php) لا ينتج هذا الحقل
+//     بنفس الـ schema — صفحة opportunities.html تعمل فقط مع تقارير
+//     Multi-Agent.
+//   - Multi-Agent path (Agent 4 الاستراتيجي في api/gemini-agents.php:578)
+//     ينتج `page_13_missed_opportunities` بـ schema تستهلكه الواجهة
+//     مباشرةً (لا حاجة لجسر — أسماء الحقول مطابقة).
+//
+// schema الوكيل (gemini-agents.php:578-595):
+//   total_missed_revenue_monthly: string (نص حر — قد يكون "930000" أو
+//                                  "930,000 ر.س/شهر")
+//   missed_opportunities: [
+//     { opportunity, category, why_missed, potential_monthly_value,
+//       how_to_capture, time_to_implement, difficulty, priority: int }
+//   ]
+//   untapped_platforms:        [{ platform, why_relevant, audience_size, entry_strategy }]
+//   untapped_content_formats:  [strings]
+//   untapped_audiences:        [{ segment, size, how_to_reach }]
+//
+// ما نعالجه (آمن، يحترم schema بحرفيّته):
+//   1. ضمان أن المصفوفات الأربع موجودة كـ array (تمنع JS errors في
+//      الواجهة لو الوكيل أرجع null أو حقل مفقود).
+//   2. priority: لو "1" (string رقمي) → int. تطبيع نوع فقط.
+//   3. missed_opportunities: تصفية العناصر التي ليس لها opportunity
+//      ولا potential_monthly_value (تمنع بطاقات فارغة لو الوكيل أرجع
+//      schema الافتراضي [{opportunity:"", potential_monthly_value:""}]).
+//   4. untapped_platforms: تصفية العناصر التي ليس لها platform ولا
+//      why_relevant ولا entry_strategy ولا audience_size.
+//   5. untapped_audiences: تصفية العناصر التي ليس لها segment ولا
+//      size ولا how_to_reach.
+//   6. untapped_content_formats: array من نصوص غير فارغة فقط (يحذف ""
+//      و "—" و "N/A" التي قد يضعها الوكيل كـ placeholder).
+//
+// ما لا نلمسه (التزاماً بـ "لا اختراع منطق ولا hardcoded fallbacks"):
+//   - total_missed_revenue_monthly: نُبقيه كنص خام. تنسيق العملة
+//     (فاصلة آلاف + "ر.س/شهر") من اختصاص الواجهة (formatCurrency في
+//     opportunities.html) لأن الوكيل قد يُرسل صيغاً متعدّدة وقرار
+//     التنسيق مرتبط بسياق العرض (Hero font-size: 56px).
+//   - الترتيب حسب priority: schema يقول الوكيل يرتّب بنفسه ("الفرص
+//     مرتبة حسب: قيمة × سهولة تنفيذ" — gemini-agents.php:658). إعادة
+//     ترتيبها هنا تخفي مشكلة جودة الوكيل.
+//   - category, difficulty, time_to_implement: نصوص حرة من الوكيل،
+//     تُعرض كما هي (sanitize في الواجهة).
+//
+// ملاحظة موضع البلوك: نضعه قبل `$row['ai_report'] = $aiReport;`
+// لأنه نقطة المزامنة الفعلية الوحيدة (PHP arrays by-value — أي تعديل
+// لـ $aiReport بعدها يبقى في الذاكرة المحلية ولا يصل للواجهة).
+//
+$page13 = safeGet($aiReport, 'page_13_missed_opportunities', null);
+if (is_array($page13)) {
+    // 1) missed_opportunities: ضمان array + تطبيع priority + تصفية الفارغة
+    $missed = isset($page13['missed_opportunities']) && is_array($page13['missed_opportunities'])
+        ? $page13['missed_opportunities']
+        : [];
+    $page13['missed_opportunities'] = array_values(array_filter(array_map(static function($mo) {
+        if (!is_array($mo)) return null;
+
+        // priority → int (لو وصلت كـ "1" string رقمي)
+        if (isset($mo['priority']) && is_numeric($mo['priority'])) {
+            $mo['priority'] = (int) $mo['priority'];
+        }
+
+        // تصفية: نحتفظ بالعنصر فقط إن كان فيه opportunity أو
+        // potential_monthly_value (الحقلان الرئيسيان للعرض).
+        $opp   = isset($mo['opportunity']) && is_string($mo['opportunity']) ? trim($mo['opportunity']) : '';
+        $value = isset($mo['potential_monthly_value']) && is_string($mo['potential_monthly_value']) ? trim($mo['potential_monthly_value']) : '';
+        // لو potential_monthly_value رقم (نادر لكن ممكن)، اعتبره معبّأ
+        if ($value === '' && isset($mo['potential_monthly_value']) && is_numeric($mo['potential_monthly_value'])) {
+            $value = (string) $mo['potential_monthly_value'];
+        }
+        if ($opp === '' && $value === '') return null;
+
+        return $mo;
+    }, $missed)));
+
+    // 2) untapped_platforms: ضمان array + تصفية الفارغة
+    $platforms = isset($page13['untapped_platforms']) && is_array($page13['untapped_platforms'])
+        ? $page13['untapped_platforms']
+        : [];
+    $page13['untapped_platforms'] = array_values(array_filter(array_map(static function($p) {
+        if (!is_array($p)) return null;
+        $hasAny = false;
+        foreach (['platform', 'why_relevant', 'entry_strategy', 'audience_size'] as $k) {
+            if (isset($p[$k]) && is_string($p[$k]) && trim($p[$k]) !== '') {
+                $hasAny = true;
+                break;
+            }
+        }
+        return $hasAny ? $p : null;
+    }, $platforms)));
+
+    // 3) untapped_audiences: ضمان array + تصفية الفارغة
+    $audiences = isset($page13['untapped_audiences']) && is_array($page13['untapped_audiences'])
+        ? $page13['untapped_audiences']
+        : [];
+    $page13['untapped_audiences'] = array_values(array_filter(array_map(static function($a) {
+        if (!is_array($a)) return null;
+        $hasAny = false;
+        foreach (['segment', 'size', 'how_to_reach'] as $k) {
+            if (isset($a[$k]) && is_string($a[$k]) && trim($a[$k]) !== '') {
+                $hasAny = true;
+                break;
+            }
+        }
+        return $hasAny ? $a : null;
+    }, $audiences)));
+
+    // 4) untapped_content_formats: array من نصوص غير فارغة فقط
+    $formats = isset($page13['untapped_content_formats']) && is_array($page13['untapped_content_formats'])
+        ? $page13['untapped_content_formats']
+        : [];
+    $page13['untapped_content_formats'] = array_values(array_filter(array_map(static function($f) {
+        if (!is_string($f)) return null;
+        $f = trim($f);
+        if ($f === '' || $f === '—' || strtoupper($f) === 'N/A') return null;
+        return $f;
+    }, $formats)));
+
+    $aiReport['page_13_missed_opportunities'] = $page13;
+}
+
 $row['ai_report'] = $aiReport;
 // schema الوكيل (gemini-agents.php:450-475):
 //   consistency_score: int 0-100

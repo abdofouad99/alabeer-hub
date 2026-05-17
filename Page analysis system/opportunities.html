@@ -249,74 +249,258 @@
   <script src="js/animations.js?v=1.0"></script>
   <script src="js/report-connect.js?v=6.0"></script>
   <script>
-    document.addEventListener('reportDataReady', (e) => {
-      const data = e.detail;
-      const opp = data.page_13_missed_opportunities;
-      
-      if (!opp) return;
+    // ── Helpers محلية (نمط consistency.html — PR #45 / conversion.html — PR #44) ──
+    // helpers في report-connect.js (sanitize/escapeHtml/missingDataHtml) ليست
+    // exported على window، لذا نُكرّرها محلياً للاستقلال — تماماً كنمط
+    // باقي الصفحات (consistency.html / conversion.html / competitors.html).
 
-      document.getElementById('oppTotalRevenue').textContent = opp.total_missed_revenue_monthly || '0';
+    // hasValue: يميّز "فارغ حقيقي" (null/undefined/'') عن قيمة معبّأة (0/'0').
+    // يحلّ Falsy-Zero Bug في عرض total_missed_revenue_monthly و
+    // potential_monthly_value الذي قد يأتي من الوكيل كـ "0" حرفياً.
+    function hasValue(v) {
+      if (v === null || v === undefined) return false;
+      if (typeof v === 'string' && v.trim() === '') return false;
+      return true;
+    }
+
+    // sanitizeText: تهرّب HTML قبل الحقن في innerHTML — XSS guard.
+    // Agent 4 (Master Strategist في gemini-agents.php:503) يولّد جميع حقول
+    // page_13_missed_opportunities كنصوص حرة (opportunity, why_missed,
+    // how_to_capture, platform, why_relevant, entry_strategy, segment,
+    // how_to_reach, untapped_content_formats[]). أي محتوى فيه <script>
+    // أو <img onerror=...> سيتنفّذ في 13 موقع innerHTML.
+    function sanitizeText(str) {
+      if (str === null || str === undefined) return '';
+      const tmp = document.createElement('div');
+      tmp.textContent = String(str);
+      return tmp.innerHTML;
+    }
+
+    // formatCurrency: ينسّق قيم الإيراد المالي القادمة من الوكيل.
+    // مدخلات محتملة من Agent 4: "930000" / "930,000" / "930000 ر.س" /
+    // "930K" / "930 ألف" / 930000 (number). الوكيل غير مُلزم بصيغة موحّدة.
+    // قاعدة "لا اختراع منطق": لا نضرب × 1000 لـ "K" أو "ألف" — إن وردت
+    // الكلمة، نُبقيها كما هي ونضيف فاصلة الآلاف للأرقام الخالصة فقط.
+    // إذا كانت القيمة فارغة (placeholder الوكيل: "") → نُرجع '—'.
+    function formatCurrency(v) {
+      if (!hasValue(v)) return '—';
+      const raw = String(v).trim();
+      // إن كانت القيمة عبارة عن digits خالصة (مع فواصل اختيارية): نعيد
+      // التنسيق بفواصل آلاف ثابتة + إضافة "ر.س/شهر" إن لم تكن مذكورة.
+      const digitsOnly = raw.replace(/[\s,]/g, '');
+      if (/^-?\d+(\.\d+)?$/.test(digitsOnly)) {
+        const num = Number(digitsOnly);
+        if (!Number.isFinite(num)) return sanitizeText(raw);
+        const formatted = num.toLocaleString('en-US');
+        return sanitizeText(formatted) + ' ر.س/شهر';
+      }
+      // نص حر من الوكيل (يحوي "ر.س" أو "ألف" أو "K"): نعرضه كما هو بعد sanitize.
+      return sanitizeText(raw);
+    }
+
+    // formatPlusValue: يُغلّف قيمة بعلامة "+" داخل span LTR-isolated.
+    // المشكلة: الـ "+" حرف neutral في خوارزمية bidi، فيلتصق بالنص العربي
+    // المجاور ("+ 15,000 ر.س/شهر" يظهر كـ "ر.س/شهر 15,000 +"). نفس بَق
+    // consistency.html الذي عُولج في PR #45.
+    function formatPlusValue(formattedHtml) {
+      if (formattedHtml === '—' || formattedHtml === '' ) return '—';
+      return '<span dir="ltr" style="unicode-bidi:isolate;">+ ' + formattedHtml + '</span>';
+    }
+
+    // missingDataHtml: HTML موحّد لرسالة "البيانات غير متوفرة" — نفس
+    // النصّ والتنسيق المستخدم في competitors.html (PR #48) لاتساق UX.
+    function missingDataHtml(reason) {
+      const msg = sanitizeText(reason || 'لم تتوفر بيانات هذا القسم. يرجى إعادة تشغيل التحليل أو مراجعة الإدارة.');
+      return '<div style="text-align:center;padding:24px;color:#94a3b8;font-weight:600;">⚠️ ' + msg + '</div>';
+    }
+
+    // showMissingDataState: يستبدل placeholder "⏳ جاري التحليل..." الأبدي
+    // في oppList ويملأ الأقسام الفارغة برسالة موحّدة عند فشل Agent 4
+    // أو غياب page_13_missed_opportunities تماماً.
+    function showMissingDataState() {
+      const totalEl = document.getElementById('oppTotalRevenue');
+      if (totalEl) totalEl.textContent = '—';
 
       const oppList = document.getElementById('oppList');
-      if(opp.missed_opportunities && opp.missed_opportunities.length > 0) {
-        oppList.innerHTML = '';
-        opp.missed_opportunities.forEach((item, index) => {
-          oppList.innerHTML += `
-            <div class="opp-item">
-              <div class="opp-num">#${index + 1}</div>
-              <div class="opp-content">
-                <div class="opp-head">
-                  <div class="opp-name">${item.opportunity}</div>
-                  <div class="opp-val">+${item.potential_monthly_value}</div>
-                </div>
-                <div class="badges">
-                  <span class="badge badge-diff">الصعوبة: ${item.difficulty}</span>
-                  <span class="badge badge-time">الوقت: ${item.time_to_implement}</span>
-                </div>
-                <div class="opp-desc"><strong>لماذا تضيع منك؟</strong> ${item.why_missed}</div>
-                <div class="action-box">
-                  <h5>كيف تقتنصها الآن:</h5>
-                  <p>${item.how_to_capture}</p>
-                </div>
-              </div>
-            </div>
-          `;
-        });
-      }
+      if (oppList) oppList.innerHTML = missingDataHtml();
 
       const platformsBox = document.getElementById('oppPlatforms');
-      if(opp.untapped_platforms && opp.untapped_platforms.length > 0) {
-        platformsBox.innerHTML = '';
-        opp.untapped_platforms.forEach(p => {
-          platformsBox.innerHTML += `
-            <div class="untapped-box">
-              <div class="untapped-title"><span>🎯</span> ${p.platform}</div>
-              <div style="font-size:14px; color:var(--text-gray); margin-bottom:8px;"><strong>لماذا؟</strong> ${p.why_relevant}</div>
-              <div style="font-size:14px; color:var(--text-dark);"><strong>دخول المنصة:</strong> ${p.entry_strategy}</div>
-            </div>
-          `;
-        });
-      }
+      if (platformsBox) platformsBox.innerHTML = missingDataHtml('لم يُحدِّد التحليل منصات غير مستغلة.');
 
       const audBox = document.getElementById('oppAudiences');
-      if(opp.untapped_audiences && opp.untapped_audiences.length > 0) {
-        audBox.innerHTML = '';
-        opp.untapped_audiences.forEach(a => {
-          audBox.innerHTML += `
-            <div class="untapped-box">
-              <div class="untapped-title"><span>👥</span> ${a.segment} (حجم الشريحة: ${a.size})</div>
-              <div style="font-size:14px; color:var(--text-gray);"><strong>كيف تصلهم:</strong> ${a.how_to_reach}</div>
-            </div>
-          `;
-        });
-      }
+      if (audBox) audBox.innerHTML = missingDataHtml('لم يُحدِّد التحليل شرائح جمهور غير مستغلة.');
 
       const formatsBox = document.getElementById('oppFormats');
-      if(opp.untapped_content_formats && opp.untapped_content_formats.length > 0) {
-        formatsBox.innerHTML = '';
-        opp.untapped_content_formats.forEach(f => {
-          formatsBox.innerHTML += `<span style="background:rgba(255,255,255,0.1); padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700;">${f}</span>`;
-        });
+      if (formatsBox) formatsBox.innerHTML = missingDataHtml('لم يُحدِّد التحليل صيغ محتوى مهملة.');
+    }
+
+    document.addEventListener('reportDataReady', (e) => {
+      const data = e.detail || {};
+      const opp = data.page_13_missed_opportunities;
+
+      // Bug #3 fix: بدل return الصامت، نعرض حالة "بيانات غير متوفرة"
+      // في كل قسم. report-connect.js يكتشف meta._agent_failed تلقائياً
+      // ويعرض بانر أحمر فوق الصفحة (سطر 455-470)، لكن البطاقات نفسها
+      // تحتاج تنظيف placeholders.
+      if (!opp || typeof opp !== 'object') {
+        showMissingDataState();
+        return;
+      }
+
+      // ── Hero: إجمالي الإيراد المفقود ──
+      // Bug #5 fix: تنسيق العملة (فاصلة آلاف + "ر.س/شهر").
+      // Bug #6 fix: hasValue يميّز بين placeholder "" والصفر الحقيقي "0".
+      const totalEl = document.getElementById('oppTotalRevenue');
+      if (totalEl) {
+        totalEl.textContent = hasValue(opp.total_missed_revenue_monthly)
+          ? formatCurrency(opp.total_missed_revenue_monthly).replace(/<[^>]+>/g, '')
+          : '—';
+        // ملاحظة: نستخدم textContent (آمن) ونزيل أي tags من formatCurrency
+        // لأن الـ Hero plain text. التنسيق العربي/الإنجليزي للعدد يعمل
+        // بدون عزل bidi لأن الصفحة dir="rtl" والقيمة تبدأ برقم.
+      }
+
+      // ── قائمة الفرص الضائعة ──
+      // Bug #2 fix: sanitizeText على كل interpolation (6 حقول × 5-8 فرص).
+      // Bug #4 fix: else يعرض missingDataHtml بدل ترك oppList على placeholder.
+      // Bug #5 + #6 fix: formatCurrency + formatPlusValue + hasValue.
+      // Bug #7 fix: عرض category كـ badge ثالث (حقل موجود في schema، يُهمل حالياً).
+      const oppList = document.getElementById('oppList');
+      if (oppList) {
+        const items = Array.isArray(opp.missed_opportunities)
+          ? opp.missed_opportunities.filter(it => it && typeof it === 'object')
+          : [];
+
+        if (items.length > 0) {
+          oppList.innerHTML = items.map((item, index) => {
+            const opportunity     = sanitizeText(item.opportunity || '—');
+            const valueRaw        = item.potential_monthly_value;
+            const valueFormatted  = hasValue(valueRaw)
+              ? formatPlusValue(formatCurrency(valueRaw))
+              : '<span style="opacity:0.6;">—</span>';
+            const difficulty      = sanitizeText(item.difficulty || '—');
+            const timeToImpl      = sanitizeText(item.time_to_implement || '—');
+            const whyMissed       = hasValue(item.why_missed)
+              ? sanitizeText(item.why_missed)
+              : '<em style="opacity:0.7;">لم يُحدَّد السبب في التحليل.</em>';
+            const howToCapture    = hasValue(item.how_to_capture)
+              ? sanitizeText(item.how_to_capture)
+              : '<em style="opacity:0.7;">لم يُحدَّد إجراء الاقتناص في التحليل.</em>';
+
+            // Bug #7: category badge (اختياري — يظهر فقط إن قدّمه الوكيل).
+            const categoryBadge = hasValue(item.category)
+              ? '<span class="badge badge-diff" style="background:rgba(6,182,212,0.15);color:var(--cyan);">' + sanitizeText(item.category) + '</span>'
+              : '';
+
+            return (
+              '<div class="opp-item">' +
+                '<div class="opp-num">#' + (index + 1) + '</div>' +
+                '<div class="opp-content">' +
+                  '<div class="opp-head">' +
+                    '<div class="opp-name">' + opportunity + '</div>' +
+                    '<div class="opp-val">' + valueFormatted + '</div>' +
+                  '</div>' +
+                  '<div class="badges">' +
+                    categoryBadge +
+                    '<span class="badge badge-diff">الصعوبة: ' + difficulty + '</span>' +
+                    '<span class="badge badge-time">الوقت: ' + timeToImpl + '</span>' +
+                  '</div>' +
+                  '<div class="opp-desc"><strong>لماذا تضيع منك؟</strong> ' + whyMissed + '</div>' +
+                  '<div class="action-box">' +
+                    '<h5>كيف تقتنصها الآن:</h5>' +
+                    '<p>' + howToCapture + '</p>' +
+                  '</div>' +
+                '</div>' +
+              '</div>'
+            );
+          }).join('');
+        } else {
+          oppList.innerHTML = missingDataHtml('لم يُحدِّد التحليل فرصاً ضائعة محدّدة.');
+        }
+      }
+
+      // ── منصات غير مستغلة ──
+      // Bug #2 + #4 + #6 fix: sanitize + else + audience_size المُهمَل.
+      const platformsBox = document.getElementById('oppPlatforms');
+      if (platformsBox) {
+        const platforms = Array.isArray(opp.untapped_platforms)
+          ? opp.untapped_platforms.filter(p => p && typeof p === 'object' &&
+              (hasValue(p.platform) || hasValue(p.why_relevant) || hasValue(p.entry_strategy)))
+          : [];
+
+        if (platforms.length > 0) {
+          platformsBox.innerHTML = platforms.map(p => {
+            const platform     = sanitizeText(p.platform || '—');
+            const whyRelevant  = hasValue(p.why_relevant) ? sanitizeText(p.why_relevant) : '—';
+            const entry        = hasValue(p.entry_strategy) ? sanitizeText(p.entry_strategy) : '—';
+            // Bug #6: audience_size كان يضيع — الآن نعرضه إن وُجد.
+            const sizeBadge    = hasValue(p.audience_size)
+              ? '<div style="font-size:12px;color:var(--text-gray);margin-top:4px;font-weight:600;">حجم الجمهور: ' + sanitizeText(p.audience_size) + '</div>'
+              : '';
+
+            return (
+              '<div class="untapped-box">' +
+                '<div class="untapped-title"><span>🎯</span> ' + platform + '</div>' +
+                sizeBadge +
+                '<div style="font-size:14px;color:var(--text-gray);margin:8px 0;"><strong>لماذا؟</strong> ' + whyRelevant + '</div>' +
+                '<div style="font-size:14px;color:var(--text-dark);"><strong>دخول المنصة:</strong> ' + entry + '</div>' +
+              '</div>'
+            );
+          }).join('');
+        } else {
+          platformsBox.innerHTML = missingDataHtml('لم يُحدِّد التحليل منصات غير مستغلة.');
+        }
+      }
+
+      // ── شرائح جمهور غير مستغلة ──
+      const audBox = document.getElementById('oppAudiences');
+      if (audBox) {
+        const audiences = Array.isArray(opp.untapped_audiences)
+          ? opp.untapped_audiences.filter(a => a && typeof a === 'object' &&
+              (hasValue(a.segment) || hasValue(a.how_to_reach)))
+          : [];
+
+        if (audiences.length > 0) {
+          audBox.innerHTML = audiences.map(a => {
+            const segment    = sanitizeText(a.segment || '—');
+            const sizeText   = hasValue(a.size) ? ' (حجم الشريحة: ' + sanitizeText(a.size) + ')' : '';
+            const howToReach = hasValue(a.how_to_reach) ? sanitizeText(a.how_to_reach) : '—';
+
+            return (
+              '<div class="untapped-box">' +
+                '<div class="untapped-title"><span>👥</span> ' + segment + sizeText + '</div>' +
+                '<div style="font-size:14px;color:var(--text-gray);"><strong>كيف تصلهم:</strong> ' + howToReach + '</div>' +
+              '</div>'
+            );
+          }).join('');
+        } else {
+          audBox.innerHTML = missingDataHtml('لم يُحدِّد التحليل شرائح جمهور غير مستغلة.');
+        }
+      }
+
+      // ── صيغ محتوى مهملة ──
+      // Bug #2 + #4 fix: sanitize + else.
+      const formatsBox = document.getElementById('oppFormats');
+      if (formatsBox) {
+        const formats = Array.isArray(opp.untapped_content_formats)
+          ? opp.untapped_content_formats.filter(f => hasValue(f) && String(f).trim() !== '')
+          : [];
+
+        if (formats.length > 0) {
+          // إعادة ضبط الـ flex display الذي كسرناه في missingDataHtml أعلاه
+          formatsBox.style.display = 'flex';
+          formatsBox.style.gap = '8px';
+          formatsBox.style.flexWrap = 'wrap';
+          formatsBox.innerHTML = formats.map(f =>
+            '<span style="background:rgba(255,255,255,0.1);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;">' +
+              sanitizeText(f) +
+            '</span>'
+          ).join('');
+        } else {
+          // عند فقدان البيانات نُلغي flex لاحتواء رسالة missingDataHtml بشكل مركزي
+          formatsBox.style.display = 'block';
+          formatsBox.innerHTML = missingDataHtml('لم يُحدِّد التحليل صيغ محتوى مهملة.');
+        }
       }
     });
   </script>
