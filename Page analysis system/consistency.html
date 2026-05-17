@@ -301,56 +301,188 @@
   <script src="js/animations.js?v=1.0"></script>
   <script src="js/report-connect.js?v=6.0"></script>
   <script>
+    // ── Helpers (CSP-safe, متوافقة مع نمط conversion.html — PR #44) ──
+    // hasValue: يميّز بين null/undefined/'' (فارغ حقيقي) و 0/'0' (قيمة معبّأة).
+    // يحلّ Falsy-Zero Bug الذي كان يجعل `score || 0` و `gap_days || '-'`
+    // يخلطان بين "الصفر الحقيقي" و"البيانات الناقصة".
+    function hasValue(v) {
+      return v !== null && v !== undefined && v !== '';
+    }
+
+    // sanitizeText: تهرّب HTML قبل الحقن في innerHTML لمنع XSS.
+    // Agent 11 يولّد algorithm_tips و weekly_routine كنصوص حرة، فإذا رجع
+    // الوكيل (أو نتيجة محقونة في قاعدة البيانات) بـ <script> سيتنفّذ.
+    // نستخدم textContent عبر عقدة مؤقتة — تماماً كما تفعل sanitize() في
+    // js/report-connect.js (متوفرة عالمياً، لكن نُكرّرها محلياً للاستقلال).
+    function sanitizeText(str) {
+      if (str === null || str === undefined) return '';
+      const tmp = document.createElement('div');
+      tmp.textContent = String(str);
+      return tmp.innerHTML;
+    }
+
+    // formatPlusNumber: يُرجع HTML آمناً يعرض "+ 930" بشكل صحيح في سياق RTL.
+    // المشكلة: الـ "+" حرف neutral في خوارزمية bidi، فيلتصق بالنص العربي
+    // المجاور ويُعرض كـ "930 +". الحل: عزل الجزء داخل span مع
+    // dir="ltr" و unicode-bidi:isolate لضمان السلوك في كل المتصفحات.
+    function formatPlusNumber(v) {
+      if (!hasValue(v)) return '—';
+      const num = sanitizeText(v);
+      return '<span dir="ltr" style="unicode-bidi:isolate;">+ ' + num + '</span>';
+    }
+
+    // showMissingDataState: ينظّف placeholders ويعرض رسالة واضحة بدل
+    // "⏳ جاري التحليل..." الأبدية عند غياب page_11_consistency.
+    function showMissingDataState() {
+      const noData = '<div style="text-align:center;padding:24px;color:#94a3b8;font-weight:600;">⚠️ لم تتوفر بيانات هذا القسم. يرجى إعادة تشغيل التحليل أو مراجعة الإدارة.</div>';
+
+      // Score
+      const scoreEl = document.getElementById('csScore');
+      if (scoreEl) scoreEl.textContent = '—';
+
+      // Posting Analysis (3 stat-boxes)
+      ['csFreqCur', 'csFreqRec', 'csGapDays'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
+
+      // Algorithm pills
+      ['algoInsta', 'algoTiktok', 'algoFb'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
+
+      // Algorithm tips list
+      const tipsEl = document.getElementById('algoTips');
+      if (tipsEl) tipsEl.innerHTML = '';
+
+      // Batching + tools
+      const batchingEl = document.getElementById('csBatching');
+      if (batchingEl) batchingEl.textContent = '—';
+      const toolsEl = document.getElementById('csTools');
+      if (toolsEl) toolsEl.textContent = '';
+
+      // Weekly routine — نستبدل placeholder "⏳ جاري التحليل..."
+      const routineEl = document.getElementById('csRoutine');
+      if (routineEl) routineEl.innerHTML = noData;
+
+      // Growth projections (Bug #4)
+      ['projM1', 'projM3', 'projM6'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
+    }
+
     document.addEventListener('reportDataReady', (e) => {
       const data = e.detail;
       const cons = data.page_11_consistency;
-      
-      if (!cons) return;
 
-      document.getElementById('csScore').textContent = cons.consistency_score || 0;
-
-      if(cons.posting_analysis) {
-        document.getElementById('csFreqCur').textContent = cons.posting_analysis.current_frequency || '-';
-        document.getElementById('csFreqRec').textContent = cons.posting_analysis.recommended_frequency || '-';
-        document.getElementById('csGapDays').textContent = cons.posting_analysis.gap_days || '-';
+      // Bug #1 fix: بدل return الصامت، نعرض حالة "بيانات غير متوفرة"
+      // لتنظيف placeholder "⏳ جاري التحليل..." الأبدي في csRoutine
+      // و"0" الافتراضي في 11 عنصراً آخر.
+      if (!cons) {
+        showMissingDataState();
+        return;
       }
 
-      if(cons.algorithm_health) {
-        document.getElementById('algoInsta').textContent = (cons.algorithm_health.instagram_score || 0) + '/100';
-        document.getElementById('algoTiktok').textContent = (cons.algorithm_health.tiktok_score || 0) + '/100';
-        document.getElementById('algoFb').textContent = (cons.algorithm_health.facebook_score || 0) + '/100';
-        
-        const tips = cons.algorithm_health.algorithm_tips || [];
+      // Score — Bug #2 fix: hasValue بدل ||
+      const scoreEl = document.getElementById('csScore');
+      if (scoreEl) {
+        scoreEl.textContent = hasValue(cons.consistency_score) ? cons.consistency_score : '—';
+      }
+
+      // Posting Analysis — Bug #2 fix
+      if (cons.posting_analysis) {
+        const pa = cons.posting_analysis;
+        const setText = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = hasValue(val) ? val : '—';
+        };
+        setText('csFreqCur', pa.current_frequency);
+        setText('csFreqRec', pa.recommended_frequency);
+        setText('csGapDays', pa.gap_days);
+      }
+
+      // Algorithm Health — Bug #2 fix
+      if (cons.algorithm_health) {
+        const ah = cons.algorithm_health;
+        const setScore = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = hasValue(val) ? (val + '/100') : '—';
+        };
+        setScore('algoInsta',  ah.instagram_score);
+        setScore('algoTiktok', ah.tiktok_score);
+        setScore('algoFb',     ah.facebook_score);
+
+        // Bug #3 fix: sanitizeText على كل tip قادم من الوكيل (XSS guard)
+        const tips = Array.isArray(ah.algorithm_tips)
+          ? ah.algorithm_tips.filter(t => hasValue(t) && String(t).trim() !== '')
+          : [];
         const tipsEl = document.getElementById('algoTips');
-        tipsEl.innerHTML = tips.map(t => `<li style="margin-bottom:8px;">${t}</li>`).join('');
+        if (tipsEl) {
+          tipsEl.innerHTML = tips
+            .map(t => '<li style="margin-bottom:8px;">' + sanitizeText(t) + '</li>')
+            .join('');
+        }
       }
 
-      if(cons.consistency_system) {
-        document.getElementById('csBatching').textContent = cons.consistency_system.content_batching_strategy || '-';
-        const tools = cons.consistency_system.tools_recommended || [];
-        if(tools.length > 0) {
-          document.getElementById('csTools').textContent = 'الأدوات المقترحة: ' + tools.join('، ');
+      // Consistency System
+      if (cons.consistency_system) {
+        const cs = cons.consistency_system;
+
+        const batchingEl = document.getElementById('csBatching');
+        if (batchingEl) {
+          batchingEl.textContent = hasValue(cs.content_batching_strategy)
+            ? cs.content_batching_strategy
+            : '—';
         }
 
+        // Tools — تنظيف العناصر الفارغة + sanitize عند العرض ضمن نص
+        const tools = Array.isArray(cs.tools_recommended)
+          ? cs.tools_recommended.filter(t => hasValue(t) && String(t).trim() !== '')
+          : [];
+        const toolsEl = document.getElementById('csTools');
+        if (toolsEl) {
+          // textContent يتعامل مع النص كـ plain text — لا حاجة لـ sanitize إضافي
+          toolsEl.textContent = tools.length > 0
+            ? 'الأدوات المقترحة: ' + tools.join('، ')
+            : '';
+        }
+
+        // Weekly Routine — Bug #3 fix: sanitizeText على day/task (XSS guard)
         const routineEl = document.getElementById('csRoutine');
-        const routine = cons.consistency_system.weekly_routine || [];
-        if(routine.length > 0) {
-          routineEl.innerHTML = '';
-          routine.forEach(r => {
-            routineEl.innerHTML += `
-              <div class="timeline-item">
-                <div class="t-day">${r.day}</div>
-                <div class="t-task">${r.task}</div>
-              </div>
-            `;
-          });
+        const routine = Array.isArray(cs.weekly_routine) ? cs.weekly_routine : [];
+        // تصفية العناصر الفارغة من schema الافتراضي [{day:"", task:""}]
+        const validRoutine = routine.filter(r =>
+          r && (hasValue(r.day) || hasValue(r.task))
+        );
+
+        if (routineEl) {
+          if (validRoutine.length > 0) {
+            routineEl.innerHTML = validRoutine.map(r => (
+              '<div class="timeline-item">' +
+                '<div class="t-day">'  + sanitizeText(r.day  || '—') + '</div>' +
+                '<div class="t-task">' + sanitizeText(r.task || '—') + '</div>' +
+              '</div>'
+            )).join('');
+          } else {
+            routineEl.innerHTML = '<div style="text-align:center;color:#94a3b8;font-weight:600;padding:16px;">— لا يوجد جدول أسبوعي مفصّل —</div>';
+          }
         }
       }
 
-      if(cons.growth_trajectory && cons.growth_trajectory.projection_if_consistent) {
-        document.getElementById('projM1').textContent = '+ ' + (cons.growth_trajectory.projection_if_consistent.month1_followers || 0);
-        document.getElementById('projM3').textContent = '+ ' + (cons.growth_trajectory.projection_if_consistent.month3_followers || 0);
-        document.getElementById('projM6').textContent = '+ ' + (cons.growth_trajectory.projection_if_consistent.month6_followers || 0);
+      // Growth Projections — Bug #2 + Bug #4 fix:
+      // hasValue يمنع Falsy-Zero، formatPlusNumber يحل عرض RTL "930 +".
+      if (cons.growth_trajectory && cons.growth_trajectory.projection_if_consistent) {
+        const proj = cons.growth_trajectory.projection_if_consistent;
+        const setProj = (id, val) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.innerHTML = formatPlusNumber(val);
+        };
+        setProj('projM1', proj.month1_followers);
+        setProj('projM3', proj.month3_followers);
+        setProj('projM6', proj.month6_followers);
       }
     });
   </script>
