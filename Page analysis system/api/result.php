@@ -244,10 +244,74 @@ if (empty($aiReport['customer_journey'])) {
             'loyalty'    => 'loyalty',
         ];
         $stages = [];
+        // ── بناء نص analysis لكل مرحلة من الحقول المتاحة في schema الوكيل ──
+        // schema Agent 3 يختلف لكل مرحلة (لا يوجد حقل analysis موحّد):
+        //   awareness  → current_channels, gaps, monthly_reach
+        //   interest   → what_hooks_them, what_loses_them
+        //   decision   → trust_signals_present, trust_signals_missing, objections
+        //   action     → conversion_rate_estimate, friction_points, cta_quality
+        //   loyalty    → retention_tactics_used, missing_tactics
+        // كل مرحلة تبني وصفها التشخيصي من حقولها الخاصة.
+        $buildStageAnalysis = static function (string $src, array $stage): string {
+            // 1) لو الـ AI أرجع حقل وصفي صريح، استخدمه مباشرة
+            foreach (['analysis', 'description', 'reason', 'summary', 'verdict'] as $k) {
+                if (!empty($stage[$k]) && is_string($stage[$k]) && trim($stage[$k]) !== '') {
+                    return trim($stage[$k]);
+                }
+            }
+            // 2) وإلا: اصنع نصاً تشخيصياً من الحقول الخاصة بالمرحلة
+            $parts = [];
+            switch ($src) {
+                case 'awareness':
+                    $reach    = (int) ($stage['monthly_reach'] ?? 0);
+                    $channels = is_array($stage['current_channels'] ?? null) ? $stage['current_channels'] : [];
+                    $gaps     = is_array($stage['gaps'] ?? null)             ? $stage['gaps']             : [];
+                    if ($reach > 0)               $parts[] = 'الوصول الشهري: ' . number_format($reach);
+                    if (!empty($channels))        $parts[] = 'القنوات الحالية: ' . implode('، ', array_slice($channels, 0, 3));
+                    if (!empty($gaps))            $parts[] = 'فجوات في: ' . implode('، ', array_slice($gaps, 0, 2));
+                    break;
+                case 'interest':
+                    $hooks  = is_array($stage['what_hooks_them'] ?? null)  ? $stage['what_hooks_them']  : [];
+                    $loses  = is_array($stage['what_loses_them'] ?? null)  ? $stage['what_loses_them']  : [];
+                    if (!empty($hooks)) $parts[] = 'ما يجذبهم: ' . implode('، ', array_slice($hooks, 0, 2));
+                    if (!empty($loses)) $parts[] = 'ما يفقدهم: ' . implode('، ', array_slice($loses, 0, 2));
+                    break;
+                case 'decision':
+                    $present = is_array($stage['trust_signals_present'] ?? null) ? $stage['trust_signals_present'] : [];
+                    $missing = is_array($stage['trust_signals_missing'] ?? null) ? $stage['trust_signals_missing'] : [];
+                    $objs    = is_array($stage['objections'] ?? null)            ? $stage['objections']            : [];
+                    if (!empty($present)) $parts[] = 'إشارات الثقة الموجودة: ' . implode('، ', array_slice($present, 0, 2));
+                    if (!empty($missing)) $parts[] = 'الناقصة: ' . implode('، ', array_slice($missing, 0, 2));
+                    if (!empty($objs))    $parts[] = 'اعتراضات الجمهور: ' . implode('، ', array_slice($objs, 0, 2));
+                    break;
+                case 'action':
+                    $rate     = $stage['conversion_rate_estimate'] ?? '';
+                    $friction = is_array($stage['friction_points'] ?? null) ? $stage['friction_points'] : [];
+                    $ctaQ     = (int) ($stage['cta_quality'] ?? 0);
+                    if (!empty($rate))             $parts[] = 'معدل التحويل المقدّر: ' . $rate;
+                    if (!empty($friction))         $parts[] = 'نقاط احتكاك: ' . implode('، ', array_slice($friction, 0, 2));
+                    if ($ctaQ > 0)                 $parts[] = 'جودة CTA: ' . $ctaQ . '/100';
+                    break;
+                case 'loyalty':
+                    $used    = is_array($stage['retention_tactics_used'] ?? null) ? $stage['retention_tactics_used'] : [];
+                    $missing = is_array($stage['missing_tactics'] ?? null)        ? $stage['missing_tactics']        : [];
+                    if (!empty($used))    $parts[] = 'تكتيكات الاحتفاظ المستخدمة: ' . implode('، ', array_slice($used, 0, 2));
+                    if (!empty($missing)) $parts[] = 'الناقصة: ' . implode('، ', array_slice($missing, 0, 2));
+                    break;
+            }
+            // 3) أضف أول توصية كنص "الحل"
+            $recs = is_array($stage['recommendations'] ?? null) ? $stage['recommendations'] : [];
+            if (!empty($recs) && is_string($recs[0]) && trim($recs[0]) !== '') {
+                $parts[] = 'الحل المقترح: ' . trim($recs[0]);
+            }
+            return $parts ? implode(' • ', $parts) : '';
+        };
+
         foreach ($stageMap as $src => $dst) {
             $stage = $fa[$src] ?? [];
             $stages[$dst] = [
                 'score'        => (int) safeGetNumber($stage, 'score', 0),
+                'analysis'     => $buildStageAnalysis($src, $stage),
                 'fix_steps'    => safeGetArray($stage, 'recommendations'),
                 'gaps'         => safeGetArray($stage, 'gaps'),
                 'channels'     => safeGetArray($stage, 'current_channels'),
