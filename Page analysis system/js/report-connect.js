@@ -4829,28 +4829,74 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (adsAnalysis) {
+            // ── Cross-validation: لا نعرض score "صحيح" بدون إعلانات حقيقية ──
+            // المشكلة قبل الإصلاح: الـ AI fallback أحياناً يُرجع score مرتفعاً
+            // (مثلاً 55) حتى لو لا توجد إعلانات في sr.ads_library فعلاً.
+            // هذا يخلط على العميل (يرى "مؤشر الإعلانات: 55" مع "0 إعلان").
+            // الحل: لو ما عندنا إعلانات حقيقية ولا أرقام Meta Ads Manager
+            // مربوطة، نُحوِّل العرض إلى علامة تنبيه واضحة.
+            const adsLib = (sr && sr.ads_library) ? sr.ads_library : {};
+            const realAdsCount =
+                (Array.isArray(adsLib.ads) ? adsLib.ads.length : 0) +
+                (Array.isArray(adsLib.raw_items) ? adsLib.raw_items.length : 0);
+            const hasMetaConnected = !!(
+                adsLib.real_metrics &&
+                (adsLib.real_metrics.connected || adsLib.real_metrics.spend || adsLib.real_metrics.roas)
+            );
+            // adsAnalysis._source === 'page_12_ads_bridge' يعني تحليل Multi-Agent
+            // يعتمد على schema الوكيل (counts من الوكيل، لا من sr) — في هذه الحالة
+            // نثق بـ score الوكيل لأن الوكيل يعرف أرقامه الخاصة.
+            const isFromAgentBridge = adsAnalysis._source === 'page_12_ads_bridge';
+            const scoreIsMisleading =
+                !isFromAgentBridge &&
+                !hasMetaConnected &&
+                realAdsCount === 0 &&
+                Number(adsAnalysis.score) > 0;
+
             // ── Score Mini Card ──
             const scoreRing = document.getElementById('adScoreRing');
             const scoreNum = document.getElementById('adScoreNum');
             const scoreTitle = document.getElementById('adScoreTitle');
             const scoreDesc = document.getElementById('adScoreDesc');
-            const scoreColor =
-                adsAnalysis.score >= 70
-                    ? 'var(--green)'
-                    : adsAnalysis.score >= 40
-                    ? 'var(--yellow)'
-                    : 'var(--red)';
 
-            if (scoreRing) {
-                scoreRing.setAttribute('data-percent', adsAnalysis.score);
-                scoreRing.setAttribute('data-color', scoreColor);
+            if (scoreIsMisleading) {
+                // عرض حالة "بيانات غير كافية" بدلاً من رقم مضلل
+                if (scoreRing) {
+                    scoreRing.setAttribute('data-percent', 0);
+                    scoreRing.setAttribute('data-color', 'var(--text-gray)');
+                }
+                if (scoreNum) {
+                    scoreNum.removeAttribute('data-val');
+                    scoreNum.textContent = '—';
+                }
+                if (scoreTitle) {
+                    scoreTitle.textContent = 'لا يوجد نشاط إعلاني مؤكد';
+                    scoreTitle.style.color = 'var(--yellow)';
+                }
+                if (scoreDesc) {
+                    scoreDesc.textContent =
+                        'لم نرصد إعلانات نشطة أو متوقفة في مكتبة Meta لهذا الحساب، ولم يُربط Meta Ads Manager. ' +
+                        'الدرجة المعروضة في الـ AI fallback عامة وغير مدعومة بأداء حقيقي، لذا نعرضها كـ "—" لتجنّب التضليل.';
+                }
+            } else {
+                const scoreColor =
+                    adsAnalysis.score >= 70
+                        ? 'var(--green)'
+                        : adsAnalysis.score >= 40
+                        ? 'var(--yellow)'
+                        : 'var(--red)';
+
+                if (scoreRing) {
+                    scoreRing.setAttribute('data-percent', adsAnalysis.score);
+                    scoreRing.setAttribute('data-color', scoreColor);
+                }
+                if (scoreNum) {
+                    scoreNum.setAttribute('data-val', adsAnalysis.score);
+                    scoreNum.textContent = adsAnalysis.score;
+                }
+                if (scoreTitle) scoreTitle.innerHTML = sanitize(adsAnalysis.status);
+                if (scoreDesc) scoreDesc.innerHTML = sanitize(adsAnalysis.desc);
             }
-            if (scoreNum) {
-                scoreNum.setAttribute('data-val', adsAnalysis.score);
-                scoreNum.textContent = adsAnalysis.score;
-            }
-            if (scoreTitle) scoreTitle.innerHTML = sanitize(adsAnalysis.status);
-            if (scoreDesc) scoreDesc.innerHTML = sanitize(adsAnalysis.desc);
 
             // ── Metrics Grid ──
             const metricsGrid = document.getElementById('adMetricsGrid');

@@ -433,6 +433,213 @@ if (is_array($page9)) {
     $aiReport['page_9_conversion'] = $page9;
 }
 
+// ── طبقة تطبيع + جسر page_12_ads → ads_analysis ─────────────────
+//
+// السياق المعماري:
+//   - Single-prompt fallback (api/ai-analyze.php) ينتج حقل `ads_analysis`
+//     مباشرة بـ schema تستهلكه الواجهة.
+//   - Multi-Agent path (Agent 4 الاستراتيجي في api/gemini-agents.php:544)
+//     ينتج `page_12_ads` بـ schema جديد مختلف تماماً.
+//   - الواجهة (js/report-connect.js → renderAdsSection) تقرأ فقط
+//     `data.ads_analysis`، ولا تعرف عن `page_12_ads`.
+//
+// النتيجة قبل الإصلاح: عند Multi-Agent path، صفحة ads.html تعرض
+// "بيانات الإعلانات غير متوفرة" حتى لو الوكيل أنتج تحليلاً كاملاً.
+//
+// الحل: جسر يحوّل `page_12_ads` (schema الوكيل) إلى `ads_analysis`
+// (schema الواجهة) — تماماً كما يفعل الجسر المماثل لـ page_8_journey →
+// customer_journey أعلاه. لا اختراع منطق: كل حقل يأتي من حقل موجود
+// في schema الوكيل.
+//
+// schema المرجع (gemini-agents.php:544-578):
+//   page_12_ads.ads_score                                     → ads_analysis.score
+//   page_12_ads.current_ads_audit.ad_quality_verdict          → ads_analysis.status
+//   (مشتق من active_ads_count + inactive_ads_count + waste)   → ads_analysis.desc
+//   page_12_ads.current_ads_audit.* (counts + waste)          → ads_analysis.metrics[]
+//   page_12_ads.current_ads_audit.what_works[]                → creative_pointers (green)
+//   page_12_ads.current_ads_audit.what_fails[]                → creative_pointers (red)
+//   page_12_ads.recommended_campaigns[].{name,hook,objective} → strategy.steps[]
+//
+// ما لا نلمسه:
+//   - لو ads_analysis موجود مسبقاً (Single-prompt path) → لا نطغى عليه.
+//   - لو ads_score == 0 و active+inactive == 0 و لا verdict ولا
+//     recommended_campaigns → لا نُنشئ ads_analysis (نترك JS يعرض
+//     missing-data state بشكل طبيعي).
+//   - أرقام recommended_campaigns (CPM, CTR, ROAS): لا تُحقن في metrics
+//     الواجهة لأنها metrics تنبؤية للحملات المقترحة، لا أداء حالي.
+$page12 = safeGet($aiReport, 'page_12_ads', null);
+if (is_array($page12)) {
+    // ── 1) Normalization: تطبيع أنواع البيانات ──
+    if (isset($page12['ads_score']) && is_numeric($page12['ads_score'])) {
+        $page12['ads_score'] = (int) $page12['ads_score'];
+    }
+    if (!empty($page12['current_ads_audit']) && is_array($page12['current_ads_audit'])) {
+        $caa = $page12['current_ads_audit'];
+        foreach (['active_ads_count', 'inactive_ads_count'] as $k) {
+            if (isset($caa[$k]) && is_numeric($caa[$k])) {
+                $caa[$k] = (int) $caa[$k];
+            }
+        }
+        // what_works / what_fails: arrays نظيفة من النصوص فقط
+        foreach (['what_works', 'what_fails'] as $listKey) {
+            $list = isset($caa[$listKey]) && is_array($caa[$listKey]) ? $caa[$listKey] : [];
+            $caa[$listKey] = array_values(array_filter(array_map(static function($t) {
+                if (!is_string($t)) return null;
+                $t = trim($t);
+                return $t !== '' ? $t : null;
+            }, $list)));
+        }
+        $page12['current_ads_audit'] = $caa;
+    }
+    // recommended_campaigns: تنظيف العناصر الفارغة الافتراضية من schema
+    if (!empty($page12['recommended_campaigns']) && is_array($page12['recommended_campaigns'])) {
+        $page12['recommended_campaigns'] = array_values(array_filter(
+            $page12['recommended_campaigns'],
+            static function($c) {
+                if (!is_array($c)) return false;
+                $hasContent =
+                    (!empty($c['campaign_name']) && is_string($c['campaign_name']) && trim($c['campaign_name']) !== '') ||
+                    (!empty($c['hook_for_ad']) && is_string($c['hook_for_ad']) && trim($c['hook_for_ad']) !== '') ||
+                    (!empty($c['ad_copy']) && is_string($c['ad_copy']) && trim($c['ad_copy']) !== '');
+                return $hasContent;
+            }
+        ));
+    }
+
+    $aiReport['page_12_ads'] = $page12;
+
+    // ── 2) جسر إلى ads_analysis (schema الواجهة) ──
+    $hasExistingAdsAnalysis = !empty($aiReport['ads_analysis']) && is_array($aiReport['ads_analysis']);
+    $caa     = is_array($page12['current_ads_audit'] ?? null) ? $page12['current_ads_audit'] : [];
+    $active  = (int) ($caa['active_ads_count'] ?? 0);
+    $inactive= (int) ($caa['inactive_ads_count'] ?? 0);
+    $score12 = (int) ($page12['ads_score'] ?? 0);
+    $hasMeaningfulData = ($score12 > 0) || ($active + $inactive > 0)
+                       || !empty($caa['ad_quality_verdict'])
+                       || !empty($caa['what_works']) || !empty($caa['what_fails'])
+                       || !empty($page12['recommended_campaigns']);
+
+    if (!$hasExistingAdsAnalysis && $hasMeaningfulData) {
+        $verdict   = is_string($caa['ad_quality_verdict'] ?? null) ? trim($caa['ad_quality_verdict']) : '';
+        $waste     = is_string($caa['wasted_budget_estimate'] ?? null) ? trim($caa['wasted_budget_estimate']) : '';
+        $totalAds  = $active + $inactive;
+
+        // status: لو الوكيل أعطى verdict نصياً واضحاً نستخدمه، وإلا نشتقّ من score
+        $status = $verdict !== ''
+            ? $verdict
+            : ($score12 >= 70 ? '✅ أداء جيد'
+                : ($score12 >= 40 ? '⚠️ يحتاج تحسين'
+                    : ($score12 > 0 ? '❌ يحتاج تدخل عاجل' : '— لا توجد بيانات إعلانية كافية')));
+
+        // desc: نص وصفي مبني من حقول schema الوكيل (لا اختراع)
+        $descParts = [];
+        if ($totalAds > 0) {
+            $descParts[] = "تم رصد {$totalAds} إعلان (نشط: {$active}، متوقف: {$inactive})";
+        } elseif ($score12 > 0 && $verdict !== '') {
+            $descParts[] = $verdict;
+        }
+        if ($waste !== '') {
+            $descParts[] = "هدر تقديري للميزانية: {$waste}";
+        }
+        $desc = $descParts ? implode(' • ', $descParts) : 'تحليل من Multi-Agent استراتيجي.';
+
+        // metrics[]: 3 خانات من حقول current_ads_audit
+        $metrics = [];
+        $metrics[] = [
+            'title'        => 'إجمالي الإعلانات',
+            'val'          => (string) $totalAds,
+            'status'       => $totalAds > 0 ? '▲ تم الرصد' : '▼ لا يوجد',
+            'status_class' => $totalAds > 0 ? 'status-green' : 'status-red',
+            'val_class'    => $totalAds > 0 ? 'val-green'   : 'val-red',
+            'desc'         => "نشط: {$active} | متوقف: {$inactive}",
+        ];
+        $metrics[] = [
+            'title'        => 'تقييم الجودة',
+            'val'          => $verdict !== '' ? mb_substr($verdict, 0, 30) : '—',
+            'status'       => '▶ Multi-Agent',
+            'status_class' => 'status-yellow',
+            'val_class'    => 'val-yellow',
+            'desc'         => $verdict !== '' ? $verdict : 'لم يصدر الوكيل حكماً نصياً.',
+        ];
+        $metrics[] = [
+            'title'        => 'هدر الميزانية',
+            'val'          => $waste !== '' ? $waste : '—',
+            'status'       => $waste !== '' ? '▼ هدر مرصود' : '▶ غير محدد',
+            'status_class' => $waste !== '' ? 'status-red' : 'status-yellow',
+            'val_class'    => $waste !== '' ? 'val-red'    : 'val-yellow',
+            'desc'         => $waste !== '' ? "تقدير الوكيل: {$waste}" : 'لم يقدّر الوكيل هدراً صريحاً.',
+        ];
+
+        // creative_pointers: what_works (أخضر) + what_fails (أحمر)
+        $pointers = [];
+        $works = is_array($caa['what_works'] ?? null) ? $caa['what_works'] : [];
+        $fails = is_array($caa['what_fails'] ?? null) ? $caa['what_fails'] : [];
+        foreach (array_slice($fails, 0, 3) as $f) {
+            $pointers[] = [
+                'type'  => 'red',
+                'icon'  => '❌',
+                'title' => 'نقطة ضعف رصدها الوكيل',
+                'desc'  => $f,
+            ];
+        }
+        foreach (array_slice($works, 0, 2) as $w) {
+            $pointers[] = [
+                'type'  => 'green',
+                'icon'  => '✅',
+                'title' => 'نقطة قوة رصدها الوكيل',
+                'desc'  => $w,
+            ];
+        }
+        if (empty($pointers)) {
+            $pointers[] = [
+                'type'  => 'yellow',
+                'icon'  => '⚠️',
+                'title' => 'تحليل تفصيلي غير متوفر',
+                'desc'  => 'الوكيل لم يُرجع نقاط قوة/ضعف مفصّلة لهذه الحملة.',
+            ];
+        }
+
+        // strategy.steps: من recommended_campaigns[].{campaign_name, hook_for_ad, objective}
+        $steps = [];
+        $recommended = is_array($page12['recommended_campaigns'] ?? null)
+            ? $page12['recommended_campaigns']
+            : [];
+        foreach (array_slice($recommended, 0, 5) as $camp) {
+            if (!is_array($camp)) continue;
+            $name = is_string($camp['campaign_name'] ?? null) ? trim($camp['campaign_name']) : '';
+            $hook = is_string($camp['hook_for_ad'] ?? null)   ? trim($camp['hook_for_ad'])   : '';
+            $obj  = is_string($camp['objective'] ?? null)     ? trim($camp['objective'])     : '';
+            $line = '';
+            if ($name !== '' && $hook !== '') {
+                $line = "{$name}: {$hook}";
+            } elseif ($name !== '' && $obj !== '') {
+                $line = "{$name} ({$obj})";
+            } elseif ($name !== '') {
+                $line = $name;
+            } elseif ($hook !== '') {
+                $line = $hook;
+            }
+            if ($line !== '') $steps[] = $line;
+        }
+        if (empty($steps)) {
+            $steps = ['راجع التقرير الكامل أدناه للحصول على التوصيات التفصيلية.'];
+        }
+
+        $aiReport['ads_analysis'] = [
+            'score'              => $score12,
+            'status'             => $status,
+            'desc'               => $desc,
+            'metrics'            => $metrics,
+            'creative_pointers'  => $pointers,
+            'strategy'           => [
+                'desc'  => 'التعديلات العاجلة المقترحة من Multi-Agent:',
+                'steps' => array_slice($steps, 0, 5),
+            ],
+            '_source' => 'page_12_ads_bridge', // علامة تشخيصية
+        ];
+    }
+}
+
 $row['ai_report'] = $aiReport;
 
 if (!$__hasRenderableValue(safeGet($aiReport, 'summary', null)) && $__hasRenderableValue(safeGet($aiReport, 'final_report', null))) {
