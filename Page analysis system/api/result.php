@@ -381,6 +381,58 @@ if (empty($aiReport['action_month'])) {
     }
 }
 
+// ── طبقة تطبيع page_9_conversion ─────────────────────────────────
+// نقوم فقط بتطبيع نوع البيانات ووحدات القياس — بدون افتراض أي معادلة
+// قد لا توجد في prompt الوكيل (مثل gap = unlock - estimated).
+//
+// ما نعالجه (آمن، متوافق مع schema الوكيل في gemini-agents.php:403):
+//   1. revenue_analysis.gap: لو وصلت كـ "0" (string رقمي) → نحوّلها لـ float
+//      لمنع Falsy-Zero Bug في JS (gap=0 قد يُعرض كـ "-" مع || ).
+//   2. conversion_killers[].expected_conversion_lift: لو رقم عاري (10) →
+//      نضيف % لأن schema يسميه "lift" (نسبة مئوية صريحة).
+//   3. sales_funnel_recommendations[].expected_close_rate: لو رقم عاري →
+//      نضيف % لأن schema يسميه "close_rate" (معدل إغلاق = نسبة).
+//
+// ما لا نلمسه:
+//   - estimated_monthly_revenue, revenue_per_follower, industry_benchmark,
+//     unlock_potential, gap (كقيمة): الـ prompt لا يُعرّف معادلات صريحة
+//     لـ gap و unlock، فنحترم ما أرجعه الوكيل ولا نخترع منطقاً.
+$page9 = safeGet($aiReport, 'page_9_conversion', null);
+if (is_array($page9)) {
+    // 1) revenue_analysis.gap: تطبيع نوع فقط (string رقمي → float)
+    if (!empty($page9['revenue_analysis']) && is_array($page9['revenue_analysis'])) {
+        $ra = $page9['revenue_analysis'];
+        if (isset($ra['gap']) && is_string($ra['gap']) && is_numeric($ra['gap'])) {
+            $ra['gap'] = (float) $ra['gap'];
+        }
+        $page9['revenue_analysis'] = $ra;
+    }
+
+    // 2) conversion_killers[].expected_conversion_lift: إضافة % لرقم عاري
+    if (!empty($page9['conversion_killers']) && is_array($page9['conversion_killers'])) {
+        foreach ($page9['conversion_killers'] as &$killer) {
+            if (!is_array($killer)) continue;
+            if (isset($killer['expected_conversion_lift']) && is_numeric($killer['expected_conversion_lift'])) {
+                $killer['expected_conversion_lift'] = $killer['expected_conversion_lift'] . '%';
+            }
+        }
+        unset($killer);
+    }
+
+    // 3) sales_funnel_recommendations[].expected_close_rate: نفس المعالجة
+    if (!empty($page9['sales_funnel_recommendations']) && is_array($page9['sales_funnel_recommendations'])) {
+        foreach ($page9['sales_funnel_recommendations'] as &$step) {
+            if (!is_array($step)) continue;
+            if (isset($step['expected_close_rate']) && is_numeric($step['expected_close_rate'])) {
+                $step['expected_close_rate'] = $step['expected_close_rate'] . '%';
+            }
+        }
+        unset($step);
+    }
+
+    $aiReport['page_9_conversion'] = $page9;
+}
+
 $row['ai_report'] = $aiReport;
 
 if (!$__hasRenderableValue(safeGet($aiReport, 'summary', null)) && $__hasRenderableValue(safeGet($aiReport, 'final_report', null))) {

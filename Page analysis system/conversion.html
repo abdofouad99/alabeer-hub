@@ -282,48 +282,111 @@
   <script src="js/animations.js?v=1.0"></script>
   <script src="js/report-connect.js?v=6.0"></script>
   <script>
+    // ── Helpers (CSP-safe) ─────────────────────────────────────────
+    // hasValue: يميز بين null/undefined/'' (فارغ حقيقي) و 0/'0' (قيمة معبّأة).
+    // يحلّ Falsy-Zero Bug الذي كان يجعل `gap || '-'` يعرض '-' عندما gap=0
+    // وفي نفس الوقت يعرض '0' عندما gap="0" (string من الوكيل).
+    function hasValue(v) {
+      return v !== null && v !== undefined && v !== '';
+    }
+
+    // formatPercent: يضيف % لأي رقم عاري قادم من الوكيل.
+    // الوكيل أحياناً يرجع 10 (number) أو "10" (string) أو "10%" أو نص وصفي.
+    // نضيف % فقط للأرقام النقية، ونترك النصوص كما هي.
+    function formatPercent(v) {
+      if (!hasValue(v)) return '';
+      const s = String(v).trim();
+      if (s === '') return '';
+      // لو فيها % أو حروف عربية/إنجليزية (نص وصفي) → اتركها
+      if (/[%A-Za-z\u0600-\u06FF]/.test(s)) return s;
+      // رقم نقي → أضف %
+      return /^-?\d+(\.\d+)?$/.test(s) ? s + '%' : s;
+    }
+
+    // showMissingDataState: ينظف الـ placeholders ويعرض رسالة واضحة
+    // بدل "جاري التحليل..." الأبدي عند غياب page_9_conversion.
+    function showMissingDataState() {
+      const noData = '<div style="text-align:center;padding:24px;color:#94a3b8;font-weight:600;">⚠️ لم تتوفر بيانات هذا القسم. يرجى إعادة تشغيل التحليل أو مراجعة الإدارة.</div>';
+      const killers = document.getElementById('cvKillersBox');
+      const funnel  = document.getElementById('cvFunnelBox');
+      if (killers) killers.innerHTML = noData;
+      if (funnel)  funnel.innerHTML  = noData;
+      // تفريغ Revenue Widget
+      ['cvEstRev', 'cvRevPerFollower', 'cvIndBench', 'cvGap', 'cvUnlock'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
+      // تفريغ Pricing
+      ['cvPriceCur', 'cvPriceRec'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+      });
+      const tips = document.getElementById('cvPriceTips');
+      if (tips) tips.innerHTML = '';
+      const upsellBox = document.getElementById('cvUpsellBox');
+      if (upsellBox) {
+        upsellBox.innerHTML = '<h4 style="color: var(--text-gray); margin-bottom: 12px; font-size: 15px;">الفرص البيعية غير المستغلة</h4>' + noData;
+      }
+    }
+
     document.addEventListener('reportDataReady', (e) => {
       const data = e.detail;
       const conv = data.page_9_conversion;
-      
-      if (!conv) return;
 
-      // Revenue Analysis
-      if(conv.revenue_analysis) {
-        document.getElementById('cvEstRev').textContent = conv.revenue_analysis.estimated_monthly_revenue || '0';
-        document.getElementById('cvRevPerFollower').textContent = conv.revenue_analysis.revenue_per_follower || '-';
-        document.getElementById('cvIndBench').textContent = conv.revenue_analysis.industry_benchmark || '-';
-        document.getElementById('cvGap').textContent = conv.revenue_analysis.gap || '-';
-        document.getElementById('cvUnlock').textContent = conv.revenue_analysis.unlock_potential || '-';
+      // Bug #2 fix: بدل الخروج الصامت، نعرض حالة "بيانات غير متوفرة"
+      // لتنظيف placeholders "⏳ جاري التحليل..." التي تظل أبدية.
+      if (!conv) {
+        showMissingDataState();
+        return;
       }
 
-      // Conversion Killers
+      // Revenue Analysis — Bug #1 fix: استخدام hasValue بدل ||
+      // لمنع Falsy-Zero Bug عند gap=0 أو revenue=0.
+      if (conv.revenue_analysis) {
+        const ra = conv.revenue_analysis;
+        const set = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = hasValue(val) ? val : '—';
+        };
+        set('cvEstRev',         ra.estimated_monthly_revenue);
+        set('cvRevPerFollower', ra.revenue_per_follower);
+        set('cvIndBench',       ra.industry_benchmark);
+        set('cvGap',            ra.gap);
+        set('cvUnlock',         ra.unlock_potential);
+      }
+
+      // Conversion Killers — Bug #4 fix: formatPercent على expected_conversion_lift
       const killersBox = document.getElementById('cvKillersBox');
-      if(conv.conversion_killers && conv.conversion_killers.length > 0) {
+      if (killersBox && conv.conversion_killers && conv.conversion_killers.length > 0) {
         killersBox.innerHTML = '';
         conv.conversion_killers.forEach(k => {
+          const liftRaw = k.expected_conversion_lift;
+          const liftHtml = hasValue(liftRaw)
+            ? ` <span style="color:var(--green); font-weight:700;">(${formatPercent(liftRaw)})</span>`
+            : '';
           killersBox.innerHTML += `
             <div class="killer-box">
-              <div class="k-title">${k.killer}</div>
-              <div style="font-size:14px; color:var(--text-gray); margin-bottom:8px;"><strong>أين يحدث؟</strong> ${k.where_it_happens}</div>
-              <div class="k-loss">خسارة يومية مقدرة: ${k.estimated_daily_loss}</div>
-              <div style="font-size:14px; color:var(--text-dark);"><strong>الحل:</strong> ${k.fix} <span style="color:var(--green); font-weight:700;">(${k.expected_conversion_lift})</span></div>
+              <div class="k-title">${k.killer || '—'}</div>
+              <div style="font-size:14px; color:var(--text-gray); margin-bottom:8px;"><strong>أين يحدث؟</strong> ${k.where_it_happens || '—'}</div>
+              <div class="k-loss">خسارة يومية مقدرة: ${hasValue(k.estimated_daily_loss) ? k.estimated_daily_loss : '—'}</div>
+              <div style="font-size:14px; color:var(--text-dark);"><strong>الحل:</strong> ${k.fix || '—'}${liftHtml}</div>
             </div>
           `;
         });
       }
 
-      // Sales Funnel
+      // Sales Funnel — Bug #4 fix: formatPercent على expected_close_rate
       const funnelBox = document.getElementById('cvFunnelBox');
-      if(conv.sales_funnel_recommendations && conv.sales_funnel_recommendations.length > 0) {
+      if (funnelBox && conv.sales_funnel_recommendations && conv.sales_funnel_recommendations.length > 0) {
         funnelBox.innerHTML = '';
         conv.sales_funnel_recommendations.forEach(f => {
+          const rateText = formatPercent(f.expected_close_rate);
           funnelBox.innerHTML += `
             <div class="sales-step">
-              <div class="step-num">${f.step}</div>
+              <div class="step-num">${hasValue(f.step) ? f.step : ''}</div>
               <div>
-                <div style="font-size:16px; font-weight:800; color:var(--text-dark); margin-bottom:4px;">${f.action}</div>
-                <div style="font-size:13px; color:var(--text-gray);"><strong>الأداة:</strong> ${f.tool} | <strong style="color:var(--green);">متوقع: ${f.expected_close_rate}</strong></div>
+                <div style="font-size:16px; font-weight:800; color:var(--text-dark); margin-bottom:4px;">${f.action || '—'}</div>
+                <div style="font-size:13px; color:var(--text-gray);"><strong>الأداة:</strong> ${f.tool || '—'} | <strong style="color:var(--green);">متوقع: ${rateText || '—'}</strong></div>
                 ${f.script ? `<div class="script-box">${f.script}</div>` : ''}
               </div>
             </div>
@@ -331,30 +394,39 @@
         });
       }
 
-      // Pricing
-      if(conv.pricing_intelligence) {
-        document.getElementById('cvPriceCur').textContent = conv.pricing_intelligence.current_positioning || '-';
-        document.getElementById('cvPriceRec').textContent = conv.pricing_intelligence.recommendation || '-';
-        const tips = conv.pricing_intelligence.psychological_pricing_tips || [];
-        if(tips.length > 0) {
-          document.getElementById('cvPriceTips').innerHTML = "<strong>نصائح التسعير النفسي:</strong><ul>" + tips.map(t => `<li>${t}</li>`).join('') + "</ul>";
+      // Pricing — استخدام hasValue للاتساق
+      if (conv.pricing_intelligence) {
+        const pi = conv.pricing_intelligence;
+        const setText = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = hasValue(val) ? val : '—';
+        };
+        setText('cvPriceCur', pi.current_positioning);
+        setText('cvPriceRec', pi.recommendation);
+        const tipsEl = document.getElementById('cvPriceTips');
+        if (tipsEl) {
+          const tips = Array.isArray(pi.psychological_pricing_tips)
+            ? pi.psychological_pricing_tips.filter(t => hasValue(t) && String(t).trim() !== '')
+            : [];
+          tipsEl.innerHTML = tips.length > 0
+            ? '<strong>نصائح التسعير النفسي:</strong><ul>' + tips.map(t => `<li>${t}</li>`).join('') + '</ul>'
+            : '';
         }
       }
 
       // Upsells
       const upsellBox = document.getElementById('cvUpsellBox');
-      if(conv.upsell_opportunities && conv.upsell_opportunities.length > 0) {
+      if (upsellBox && conv.upsell_opportunities && conv.upsell_opportunities.length > 0) {
         let upHtml = '';
         conv.upsell_opportunities.forEach(u => {
           upHtml += `
             <div class="upsell-box">
-              <div class="upsell-title">${u.opportunity}</div>
-              <div style="font-size:14px; color:var(--text-dark); margin-bottom:4px;">${u.how}</div>
-              <div style="font-size:13px; color:var(--green); font-weight:700;">القيمة المحتملة: ${u.potential_revenue}</div>
+              <div class="upsell-title">${u.opportunity || '—'}</div>
+              <div style="font-size:14px; color:var(--text-dark); margin-bottom:4px;">${u.how || '—'}</div>
+              <div style="font-size:13px; color:var(--green); font-weight:700;">القيمة المحتملة: ${hasValue(u.potential_revenue) ? u.potential_revenue : '—'}</div>
             </div>
           `;
         });
-        // Remove H4 added before since we keep it inside the div directly in HTML, just append
         upsellBox.innerHTML = '<h4 style="color: var(--text-gray); margin-bottom: 12px; font-size: 15px;">الفرص البيعية غير المستغلة</h4>' + upHtml;
       }
     });
