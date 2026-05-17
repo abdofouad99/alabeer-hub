@@ -359,6 +359,196 @@ if (empty($aiReport['competitor_analysis'])) {
     }
 }
 
+// ── طبقة تطبيع + جسر page_10_competitors → competitor_radar / execution_arsenal / market_summary ──
+//
+// السياق المعماري (نفس نمط page_12_ads → ads_analysis):
+//   - Single-prompt fallback (api/ai-analyze.php) ينتج: competitor_radar مباشرة.
+//   - Multi-Agent (Agent 3 Market Intel — gemini-agents.php:429) ينتج: page_10_competitors
+//     بـ schema جديد مختلف.
+//   - الواجهة (js/report-connect.js → competitors.html block:2269-2354) تقرأ فقط:
+//       data.competitor_radar (للبطاقات)
+//       data.execution_arsenal (لترسانة التفوق)
+//       data.market_summary (لملخص الفجوة السوقية)
+//
+// النتيجة قبل الإصلاح: عند Multi-Agent path، صفحة competitors.html تعرض:
+//   - رسالة "لم يتمكن محرك Apify من استخراج بيانات منافسين كافية..."
+//   - ترسانة فارغة تماماً (لا يوجد else للـ arsenalGrid)
+//   - نص hardcoded للـ market_summary ("استراتيجية المحيط الأزرق...")
+// بينما الوكيل أنتج تحليلاً كاملاً في page_10_competitors.
+//
+// schema المرجع (gemini-agents.php:429-449):
+//   page_10_competitors.competitors[]:
+//     name, followers, engagement_rate, content_strategy,
+//     what_they_do_better[], their_weakness, their_winning_hook,
+//     threat_level (high|medium|low), steal_this
+//   page_10_competitors.market_gaps[]:
+//     gap, size (high|medium|low), how_to_exploit, content_angle, time_to_capture
+//   page_10_competitors.blue_ocean_opportunity (string)
+//   page_10_competitors.battle_plan: { short_term, medium_term, positioning_statement }
+//
+// التحويل (لا اختراع — كل حقل من حقل موجود):
+//   competitors[].name              → competitor_radar[].name
+//   competitors[].what_they_do_better[] → competitor_radar[].strengths[]
+//   competitors[].their_weakness    → competitor_radar[].weaknesses[0]
+//   competitors[].their_winning_hook → competitor_radar[].weaknesses[1] (هوكهم الفائز نتعلم منه)
+//   competitors[].steal_this        → competitor_radar[].attack_plan
+//   market_gaps[]                   → execution_arsenal[]
+//   blue_ocean_opportunity + battle_plan.positioning_statement → market_summary
+//
+// ما لا نلمسه:
+//   - لو الحقول موجودة مسبقاً (Single-prompt path) → لا نطغى عليها.
+//   - لو page_10_competitors فارغ تماماً → لا نُنشئ شيئاً (الواجهة تعرض missing-data).
+//   - لا نضع weaknesses عامة كـ "خدمة عملاء بطيئة" أو "محتوى غير متجدد" (هي
+//     hardcoded fallbacks في JS سنُنظفها أيضاً).
+$page10 = safeGet($aiReport, 'page_10_competitors', null);
+if (is_array($page10)) {
+    // ── 1) Normalization: تطبيع أنواع البيانات في schema الوكيل ──
+    $rawCompetitors = isset($page10['competitors']) && is_array($page10['competitors'])
+        ? $page10['competitors']
+        : [];
+    // تنظيف العناصر الفارغة (schema الافتراضي يحوي عنصراً فارغاً واحداً)
+    $rawCompetitors = array_values(array_filter($rawCompetitors, static function($c) {
+        if (!is_array($c)) return false;
+        return (!empty($c['name']) && is_string($c['name']) && trim($c['name']) !== '')
+            || !empty($c['what_they_do_better'])
+            || !empty($c['steal_this'])
+            || (int) ($c['followers'] ?? 0) > 0;
+    }));
+    // تطبيع كل منافس
+    $rawCompetitors = array_map(static function($c) {
+        if (!is_array($c)) return $c;
+        // followers, engagement_rate → numeric
+        if (isset($c['followers']) && is_numeric($c['followers'])) {
+            $c['followers'] = (int) $c['followers'];
+        }
+        if (isset($c['engagement_rate']) && is_numeric($c['engagement_rate'])) {
+            $c['engagement_rate'] = (float) $c['engagement_rate'];
+        }
+        // what_they_do_better → array من نصوص فقط
+        $wtdb = isset($c['what_they_do_better']) && is_array($c['what_they_do_better'])
+            ? $c['what_they_do_better']
+            : [];
+        $c['what_they_do_better'] = array_values(array_filter(array_map(static function($t) {
+            if (!is_string($t)) return null;
+            $t = trim($t);
+            return $t !== '' ? $t : null;
+        }, $wtdb)));
+        return $c;
+    }, $rawCompetitors);
+    $page10['competitors'] = $rawCompetitors;
+
+    // market_gaps: تنظيف العناصر الفارغة
+    $rawGaps = isset($page10['market_gaps']) && is_array($page10['market_gaps'])
+        ? $page10['market_gaps']
+        : [];
+    $rawGaps = array_values(array_filter($rawGaps, static function($g) {
+        if (!is_array($g)) return false;
+        return (!empty($g['gap']) && is_string($g['gap']) && trim($g['gap']) !== '')
+            || (!empty($g['how_to_exploit']) && is_string($g['how_to_exploit']) && trim($g['how_to_exploit']) !== '');
+    }));
+    $page10['market_gaps'] = $rawGaps;
+
+    $aiReport['page_10_competitors'] = $page10;
+
+    // ── 2) جسر إلى competitor_radar ──
+    if (empty($aiReport['competitor_radar']) && !empty($rawCompetitors)) {
+        $aiReport['competitor_radar'] = array_map(static function($c) {
+            // weaknesses: نبدأ بـ their_weakness، ثم نضيف their_winning_hook كـ
+            // "هوكهم الفائز" — هذا ليس "ضعفاً" حرفياً لكن الواجهة تعرضه تحت
+            // عنوان "نقاط الضعف (Vulnerabilities)" والمنطق التسويقي: عندما تعرف
+            // هوك المنافس الفائز، تعرف الزاوية التي عليك التفوق فيها.
+            $weakness1 = is_string($c['their_weakness'] ?? null) && trim($c['their_weakness']) !== ''
+                ? trim($c['their_weakness'])
+                : '';
+            $weakness2 = is_string($c['their_winning_hook'] ?? null) && trim($c['their_winning_hook']) !== ''
+                ? 'هوكهم الفائز: ' . trim($c['their_winning_hook'])
+                : '';
+            $weaknesses = array_values(array_filter([$weakness1, $weakness2]));
+
+            $strengths = is_array($c['what_they_do_better'] ?? null)
+                ? $c['what_they_do_better']
+                : [];
+
+            // attack_plan: نولّد نصاً موحّداً من steal_this + their_weakness
+            $stealThis = is_string($c['steal_this'] ?? null) ? trim($c['steal_this']) : '';
+            $attackPlan = $stealThis !== ''
+                ? $stealThis
+                : ($weakness1 !== '' ? "استغل: {$weakness1}" : '');
+
+            return [
+                'name'         => is_string($c['name'] ?? null) ? trim($c['name']) : '',
+                'url'          => '', // الـ schema لا يُعطي url للمنافس
+                'strengths'    => $strengths,
+                'weaknesses'   => $weaknesses,
+                'attack_plan'  => $attackPlan,
+                'followers'    => (int) ($c['followers'] ?? 0),
+                'engagement_rate' => (float) ($c['engagement_rate'] ?? 0),
+                'threat_level' => is_string($c['threat_level'] ?? null) ? $c['threat_level'] : '',
+                '_source'      => 'page_10_competitors_bridge',
+            ];
+        }, $rawCompetitors);
+    }
+
+    // ── 3) جسر إلى execution_arsenal ──
+    // market_gaps[].gap → arsenal title، how_to_exploit + time_to_capture → desc،
+    // size (high/medium/low) → emoji.
+    // ملاحظة: schema يسمي الحقل "size" (حجم الفجوة)، نُترجمها لأيقونة بديهية.
+    if (empty($aiReport['execution_arsenal']) && !empty($rawGaps)) {
+        $sizeIcon = static function(string $size): string {
+            $s = strtolower(trim($size));
+            if (in_array($s, ['high', 'large', 'كبير', 'كبيرة'], true))   return '🚀';
+            if (in_array($s, ['medium', 'متوسط', 'متوسطة'], true))         return '⚡';
+            if (in_array($s, ['low', 'small', 'صغير', 'صغيرة'], true))     return '💡';
+            return '🎯';
+        };
+        $aiReport['execution_arsenal'] = array_map(static function($g) use ($sizeIcon) {
+            $gap         = is_string($g['gap'] ?? null) ? trim($g['gap']) : '';
+            $howToExp    = is_string($g['how_to_exploit'] ?? null) ? trim($g['how_to_exploit']) : '';
+            $timeCapture = is_string($g['time_to_capture'] ?? null) ? trim($g['time_to_capture']) : '';
+            $size        = is_string($g['size'] ?? null) ? trim($g['size']) : '';
+
+            // desc: ادمج how_to_exploit + time_to_capture (لو متاحين)
+            $descParts = [];
+            if ($howToExp !== '')    $descParts[] = $howToExp;
+            if ($timeCapture !== '') $descParts[] = "⏱️ {$timeCapture}";
+            $desc = $descParts ? implode(' • ', $descParts) : '';
+
+            return [
+                'icon'  => $sizeIcon($size),
+                'title' => $gap !== '' ? $gap : 'فرصة سوقية',
+                'desc'  => $desc !== '' ? $desc : 'فرصة رصدها الوكيل في تحليل المنافسين.',
+            ];
+        }, $rawGaps);
+    }
+
+    // ── 4) جسر إلى market_summary ──
+    // blue_ocean_opportunity = الفجوة الكبرى، positioning_statement = البيان
+    // الاستراتيجي. ندمجهما لتشكيل ملخص واحد.
+    if (empty($aiReport['market_summary'])) {
+        $blueOcean = is_string($page10['blue_ocean_opportunity'] ?? null)
+            ? trim($page10['blue_ocean_opportunity'])
+            : '';
+        $positioning = is_string(safeGet($page10, 'battle_plan.positioning_statement', null))
+            ? trim(safeGet($page10, 'battle_plan.positioning_statement', ''))
+            : '';
+        $shortTerm = is_string(safeGet($page10, 'battle_plan.short_term', null))
+            ? trim(safeGet($page10, 'battle_plan.short_term', ''))
+            : '';
+
+        $summaryParts = [];
+        if ($blueOcean !== '' && $blueOcean !== '—')       $summaryParts[] = $blueOcean;
+        if ($positioning !== '' && $positioning !== '—')   $summaryParts[] = "<strong>التموضع المقترح:</strong> {$positioning}";
+        if ($shortTerm !== '' && $shortTerm !== '—' && empty($positioning)) {
+            // لو ما عندنا positioning، نضع short_term كبديل تكتيكي
+            $summaryParts[] = "<strong>أول خطوة:</strong> {$shortTerm}";
+        }
+
+        if (!empty($summaryParts)) {
+            $aiReport['market_summary'] = implode(' • ', $summaryParts);
+        }
+    }
+}
+
 if (empty($aiReport['action_month'])) {
     $r = safeGet($aiReport, 'page_18_roadmap', null);
     if ($r) {
