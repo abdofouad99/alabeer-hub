@@ -3366,29 +3366,118 @@ document.addEventListener('DOMContentLoaded', () => {
                         descRow.appendChild(descValue);
 
                         body.appendChild(descRow);
-                        body.appendChild(
-                            makeRow(
-                                'evidence',
-                                '📊 الدليل',
-                                s.evidence || s.metric || 'بناءً على البيانات الفعلية'
-                            )
-                        );
-                        body.appendChild(
-                            makeRow(
-                                'impact',
-                                '💥 التأثير',
-                                s.impact || 'تأثير إيجابي على الأداء العام'
-                            )
-                        );
-                        body.appendChild(
-                            makeRow(
-                                'cause',
-                                '🔍 السبب',
-                                s.root_cause || s.cause || 'نتيجة الجهود التسويقية الحالية'
-                            )
+
+                        // ─────────────────────────────────────────────────────────
+                        // إصلاح Schema Mismatch لبطاقة نقاط القوة (PR #50)
+                        // ─────────────────────────────────────────────────────────
+                        // schema الوكيل الفعلي (Agent 5 — gemini-agents.php:649-654):
+                        //   { title, description, metric, how_to_amplify,
+                        //     revenue_potential, impact, icon }
+                        //
+                        // الكود السابق كان يقرأ مفاتيح غير موجودة في schema القوة:
+                        //   - s.evidence ← مفقود (نُبقيه كـ fallback أول لتقارير قديمة قد تحوي)
+                        //   - s.action  ← مفقود (الـ schema يستخدم how_to_amplify)
+                        //   - s.root_cause / s.cause ← مفقودان (هذه حقول الضعف لا القوة)
+                        //
+                        // الإصلاح: قراءة الحقول الفعلية لـ schema القوة، مع تقاعس آمن
+                        // إلى رسالة "البيانات غير متوفرة" (نمط competitors.html — PR #48)
+                        // بدل hardcoded fallbacks مضلّلة كانت تتكرر في كل البطاقات.
+
+                        // hasValueStr: يحدّد إن كانت القيمة نصاً معبّأ فعلاً
+                        const hasValueStr = (v) => {
+                            if (v === null || v === undefined) return false;
+                            if (typeof v === 'string') return v.trim() !== '' && v.trim() !== '—';
+                            if (typeof v === 'number') return Number.isFinite(v);
+                            return false;
+                        };
+
+                        // translateImpact: يحوّل high/medium/low إلى عربي
+                        // (schema الوكيل يفرض الإنجليزية: "impact": "high|medium|low")
+                        // لو الوكيل أرجع نصاً عربياً مفصّلاً، نتركه كما هو.
+                        const translateImpact = (v) => {
+                            if (!hasValueStr(v)) return null;
+                            const k = String(v).trim().toLowerCase();
+                            const map = {
+                                'high':   'عالي',
+                                'medium': 'متوسط',
+                                'low':    'منخفض',
+                                'عالي':   'عالي',
+                                'متوسط':  'متوسط',
+                                'منخفض':  'منخفض',
+                            };
+                            return map[k] || String(v).trim();
+                        };
+
+                        // formatMetric: schema يقول metric: "" (نص حر).
+                        // لكن الوكيل قد يرسله كرقم خام (5.5 أو 0.042) بدون وحدة.
+                        // قاعدة "لا اختراع منطق": لا نضرب × 100 لرقم 0-1 (لا نعرف
+                        // إن كان نسبة مئوية أم قيمة أخرى). نعرض كما هو + علامة
+                        // توضيحية إن غابت الوحدة.
+                        const formatMetric = (v) => {
+                            if (!hasValueStr(v)) return null;
+                            if (typeof v === 'number') {
+                                return v + ' (لم تُحدَّد الوحدة في التحليل)';
+                            }
+                            const txt = String(v).trim();
+                            // إن كان النص مجرد digits/decimal بدون أي وحدة (لا %، لا حرف، لا كلمة)
+                            if (/^-?\d+(\.\d+)?$/.test(txt)) {
+                                return txt + ' (لم تُحدَّد الوحدة في التحليل)';
+                            }
+                            return txt;
+                        };
+
+                        // appendRowOrMissing: يبني صف عادي إن كانت القيمة موجودة،
+                        // وإلا يبني صفاً برسالة "غير متوفرة" بنص رمادي مائل (نمط
+                        // competitors.html — PR #48 و opportunities.html — PR #49).
+                        const appendRowOrMissing = (labelClass, labelText, value, missingText) => {
+                            const row = document.createElement('div');
+                            row.className = 'deep-row';
+                            const label = document.createElement('div');
+                            label.className = 'deep-label ' + labelClass;
+                            label.textContent = labelText;
+                            const valueDiv = document.createElement('div');
+                            valueDiv.className = 'deep-value';
+                            if (hasValueStr(value)) {
+                                valueDiv.textContent = String(value).trim();
+                            } else {
+                                valueDiv.textContent = missingText;
+                                valueDiv.style.cssText = 'color:#94a3b8;font-style:italic;opacity:0.85;';
+                            }
+                            row.appendChild(label);
+                            row.appendChild(valueDiv);
+                            body.appendChild(row);
+                        };
+
+                        // 📊 الدليل (metric): الحقل الرئيسي في schema. evidence
+                        // كـ fallback لتقارير قديمة قد تحوي الاسم القديم.
+                        appendRowOrMissing(
+                            'evidence',
+                            '📊 الدليل',
+                            formatMetric(s.metric) || formatMetric(s.evidence),
+                            'لم يُقدّم التحليل دليلاً قياسياً لهذه النقطة'
                         );
 
-                        // صندوق الإجراء
+                        // 💥 التأثير: من schema الـ "impact" مع ترجمة عربية
+                        appendRowOrMissing(
+                            'impact',
+                            '💥 التأثير',
+                            translateImpact(s.impact),
+                            'لم يُحدّد التحليل مستوى التأثير'
+                        );
+
+                        // 💰 العائد المتوقّع: حقل revenue_potential من schema —
+                        // كان مُهمَلاً تماماً قبل هذا الإصلاح.
+                        appendRowOrMissing(
+                            'cause',
+                            '💰 العائد المتوقّع',
+                            s.revenue_potential,
+                            'لم يُقدّر التحليل عائداً متوقعاً لهذه النقطة'
+                        );
+
+                        // ✅ كيف نوسّعها: حقل how_to_amplify من schema (الإجراء
+                        // الحقيقي للقوة). كان مُهمَلاً تماماً قبل هذا الإصلاح،
+                        // وكان يُستبدل بنص hardcoded "استمر في تعزيز هذه النقطة..."
+                        // يتكرر في كل البطاقات.
                         const actionBox = document.createElement('div');
                         actionBox.className = 'deep-action-box';
                         const actionIcon = document.createElement('div');
@@ -3396,7 +3485,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         actionIcon.textContent = '✅';
                         const actionText = document.createElement('div');
                         actionText.className = 'action-text';
-                        actionText.textContent = s.action || 'استمر في تعزيز هذه النقطة واستثمارها';
+                        if (hasValueStr(s.how_to_amplify)) {
+                            actionText.textContent = String(s.how_to_amplify).trim();
+                        } else if (hasValueStr(s.action)) {
+                            // fallback لتقارير قديمة قد تحوي action (legacy)
+                            actionText.textContent = String(s.action).trim();
+                        } else {
+                            actionText.textContent = 'لم يُقترح التحليل خطة لتوسيع هذه النقطة';
+                            actionText.style.cssText = 'color:#94a3b8;font-style:italic;opacity:0.85;';
+                        }
                         actionBox.appendChild(actionIcon);
                         actionBox.appendChild(actionText);
                         body.appendChild(actionBox);
