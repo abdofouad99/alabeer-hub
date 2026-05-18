@@ -129,15 +129,28 @@ function scrapeAdsLibrary(
         return ['success' => false, 'error' => 'لا يوجد Ads Actor مُعرَّف', 'ads' => []];
     }
 
-    $cleanUrl = str_starts_with($pageIdentifier, 'http')
-        ? $pageIdentifier
-        : 'https://www.facebook.com/' . ltrim($pageIdentifier, '/');
+    // ── ADS-A2 FIX: التقاط Page ID الرقمي إذا جاء بصيغة "ID:12345"
+    // المسار الأدق لمكتبة Meta: view_all_page_id بدل q (بحث نصي حرفي يفشل)
+    $pageIdNumeric = '';
+    if (preg_match('/^ID:(\d+)$/i', $pageIdentifier, $idM)) {
+        $pageIdNumeric = $idM[1];
+    }
 
-    preg_match('/facebook\.com\/([^\/\?#]+)/i', $cleanUrl, $m);
-    $pageSlug  = $m[1] ?? '';
-    $adsLibUrl = $pageSlug
-        ? "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&search_type=page&q=" . urlencode($pageSlug)
-        : '';
+    if ($pageIdNumeric !== '') {
+        $cleanUrl  = "https://www.facebook.com/{$pageIdNumeric}";
+        $pageSlug  = $pageIdNumeric;
+        $adsLibUrl = "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&view_all_page_id={$pageIdNumeric}";
+    } else {
+        $cleanUrl = str_starts_with($pageIdentifier, 'http')
+            ? $pageIdentifier
+            : 'https://www.facebook.com/' . ltrim($pageIdentifier, '/');
+
+        preg_match('/facebook\.com\/([^\/\?#]+)/i', $cleanUrl, $m);
+        $pageSlug  = $m[1] ?? '';
+        $adsLibUrl = $pageSlug
+            ? "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&search_type=page&q=" . urlencode($pageSlug)
+            : '';
+    }
 
     $fallbackReturn = [
         'success'        => true,
