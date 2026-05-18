@@ -231,11 +231,16 @@ function scrapeAdsLibrary(
 
         // schema mismatch detection: لو dataset غير فارغ لكن لا توجد حقول معروفة
         if (count($items ?: []) > 0 && count($ads) === 0) {
-            $sampleKeys = is_array($items[0] ?? null) ? array_slice(array_keys($items[0]), 0, 10) : [];
+            $firstItem = is_array($items[0] ?? null) ? $items[0] : [];
+            $sampleKeys = array_slice(array_keys($firstItem), 0, 15);
+            $snapshotKeys = (isset($firstItem['snapshot']) && is_array($firstItem['snapshot']))
+                ? array_slice(array_keys($firstItem['snapshot']), 0, 15)
+                : [];
             logError('Ads actor schema mismatch — no recognizable ad fields', [
                 'actor' => $actorId,
                 'items_count' => count($items),
                 'sample_keys' => $sampleKeys,
+                'snapshot_keys' => $snapshotKeys,
             ]);
             continue;
         }
