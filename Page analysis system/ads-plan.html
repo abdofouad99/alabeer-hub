@@ -213,10 +213,10 @@
         <div class="budget-val" id="apBudget">0</div>
         <p style="color: var(--text-gray); font-size: 15px; font-weight: 600; line-height: 1.6;" id="apOverview">جاري بناء الاستراتيجية...</p>
       </div>
-      <div style="flex-shrink: 0; background: rgba(0,0,0,0.3); padding: 24px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
-        <div style="font-size: 40px; margin-bottom: 8px;">🎯</div>
+      <div style="flex-shrink: 0; background: rgba(0,0,0,0.3); padding: 24px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); text-align: center;" id="apReadinessBox">
+        <div style="font-size: 40px; margin-bottom: 8px;" id="apReadinessIcon">🎯</div>
         <div style="font-size: 14px; color: var(--text-gray); font-weight: 700;">جاهزية الحملة</div>
-        <div style="color: var(--green); font-size: 20px; font-weight: 900;">مكتملة الأركان</div>
+        <div style="color: var(--text-gray); font-size: 20px; font-weight: 900;" id="apReadinessText">—</div>
       </div>
     </div>
 
@@ -227,26 +227,26 @@
         
         <div class="phase-card">
           <div class="phase-num">الشهر 1</div>
-          <div class="phase-title" id="p1Goal">الاختبار والتعلم</div>
-          <div class="phase-budget" id="p1Budget">الميزانية: 0</div>
-          <p class="phase-p"><strong>الحملات:</strong> <span id="p1Camps">-</span></p>
-          <p class="phase-p"><strong>النتيجة المتوقعة:</strong> <span id="p1Res" style="color:var(--text-dark);">-</span></p>
+          <div class="phase-title" id="p1Goal">—</div>
+          <div class="phase-budget" id="p1Budget">الميزانية: —</div>
+          <p class="phase-p"><strong>الحملات:</strong> <span id="p1Camps">—</span></p>
+          <p class="phase-p"><strong>النتيجة المتوقعة:</strong> <span id="p1Res" style="color:var(--text-dark);">—</span></p>
         </div>
 
         <div class="phase-card" style="border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.05);">
           <div class="phase-num">الشهر 2</div>
-          <div class="phase-title" id="p2Goal">التوسع والتحسين</div>
-          <div class="phase-budget" id="p2Budget">الميزانية: 0</div>
-          <p class="phase-p"><strong>الحملات:</strong> <span id="p2Camps">-</span></p>
-          <p class="phase-p"><strong>النتيجة المتوقعة:</strong> <span id="p2Res" style="color:var(--text-dark);">-</span></p>
+          <div class="phase-title" id="p2Goal">—</div>
+          <div class="phase-budget" id="p2Budget">الميزانية: —</div>
+          <p class="phase-p"><strong>الحملات:</strong> <span id="p2Camps">—</span></p>
+          <p class="phase-p"><strong>النتيجة المتوقعة:</strong> <span id="p2Res" style="color:var(--text-dark);">—</span></p>
         </div>
 
         <div class="phase-card" style="border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.05);">
           <div class="phase-num" style="background: var(--green);">الشهر 3</div>
-          <div class="phase-title" id="p3Goal">السيطرة والأرباح</div>
-          <div class="phase-budget" id="p3Budget">الميزانية: 0</div>
-          <p class="phase-p"><strong>الحملات:</strong> <span id="p3Camps">-</span></p>
-          <p class="phase-p"><strong>النتيجة المتوقعة:</strong> <span id="p3Res" style="color:var(--text-dark);">-</span></p>
+          <div class="phase-title" id="p3Goal">—</div>
+          <div class="phase-budget" id="p3Budget">الميزانية: —</div>
+          <p class="phase-p"><strong>الحملات:</strong> <span id="p3Camps">—</span></p>
+          <p class="phase-p"><strong>النتيجة المتوقعة:</strong> <span id="p3Res" style="color:var(--text-dark);">—</span></p>
         </div>
 
       </div>
@@ -283,79 +283,11 @@
   </main>
 
   <script src="js/animations.js?v=1.0"></script>
-  <script src="js/report-connect.js?v=6.0"></script>
-  <script>
-    document.addEventListener('reportDataReady', (e) => {
-      const data = e.detail;
-      const ads = data.page_17_ads_plan;
-      
-      if (!ads) return;
-
-      document.getElementById('apBudget').textContent = ads.total_monthly_budget || '0';
-      document.getElementById('apOverview').textContent = ads.strategy_overview || '';
-
-      if(ads.phase1_30_days) {
-        document.getElementById('p1Goal').textContent = ads.phase1_30_days.goal || '-';
-        document.getElementById('p1Budget').textContent = 'الميزانية: ' + (ads.phase1_30_days.budget || 0);
-        document.getElementById('p1Camps').textContent = (ads.phase1_30_days.campaigns || []).join('، ');
-        document.getElementById('p1Res').textContent = ads.phase1_30_days.expected_results || '-';
-      }
-      if(ads.phase2_60_days) {
-        document.getElementById('p2Goal').textContent = ads.phase2_60_days.goal || '-';
-        document.getElementById('p2Budget').textContent = 'الميزانية: ' + (ads.phase2_60_days.budget || 0);
-        document.getElementById('p2Camps').textContent = (ads.phase2_60_days.campaigns || []).join('، ');
-        document.getElementById('p2Res').textContent = ads.phase2_60_days.expected_results || '-';
-      }
-      if(ads.phase3_90_days) {
-        document.getElementById('p3Goal').textContent = ads.phase3_90_days.goal || '-';
-        document.getElementById('p3Budget').textContent = 'الميزانية: ' + (ads.phase3_90_days.budget || 0);
-        document.getElementById('p3Camps').textContent = (ads.phase3_90_days.campaigns || []).join('، ');
-        document.getElementById('p3Res').textContent = ads.phase3_90_days.expected_results || '-';
-      }
-
-      const briefsBox = document.getElementById('apBriefs');
-      if(ads.ad_creative_briefs && ads.ad_creative_briefs.length > 0) {
-        briefsBox.innerHTML = '';
-        ads.ad_creative_briefs.forEach(b => {
-          briefsBox.innerHTML += `
-            <div class="brief-box">
-              <div class="brief-header">📹 حملة: ${b.campaign}</div>
-              <div class="brief-grid">
-                <div>
-                  <h5 style="color:var(--text-gray); margin-bottom:8px; font-size:14px;">سكريبت الفيديو (حرفياً):</h5>
-                  <div class="script-text">${b.video_script}</div>
-                </div>
-                <div>
-                  <h5 style="color:var(--text-gray); margin-bottom:8px; font-size:14px;">التوجيه الفني:</h5>
-                  <p style="font-size:14px; margin-bottom:12px;">${b.visual_direction}</p>
-                  
-                  <h5 style="color:var(--text-gray); margin-bottom:8px; font-size:14px;">الموسيقى:</h5>
-                  <p style="font-size:14px; margin-bottom:12px;">${b.music_mood}</p>
-                  
-                  <h5 style="color:var(--text-gray); margin-bottom:8px; font-size:14px;">زر الإجراء (CTA):</h5>
-                  <p style="font-size:14px; font-weight:800; color:var(--primary);">${b.cta}</p>
-                </div>
-              </div>
-            </div>
-          `;
-        });
-      }
-
-      const kpisTable = document.getElementById('apKpis');
-      if(ads.kpis && ads.kpis.length > 0) {
-        kpisTable.innerHTML = '';
-        ads.kpis.forEach(k => {
-          kpisTable.innerHTML += `
-            <tr>
-              <td style="color:var(--primary); font-weight:800;">${k.metric}</td>
-              <td>${k.current}</td>
-              <td>${k.target_30d}</td>
-              <td style="color:var(--green);">${k.target_90d}</td>
-            </tr>
-          `;
-        });
-      }
-    });
-  </script>
+  <!--
+    ملاحظة: تم نقل منطق ربط ads-plan إلى js/report-connect.js لتوحيد المصدر
+    وإصلاح ثغرات XSS (sanitize) + تنسيق locale + Bidi RTL.
+    اطلع على block "PAGE: ads-plan.html" في report-connect.js.
+  -->
+  <script src="js/report-connect.js?v=6.1"></script>
 </body>
 </html>

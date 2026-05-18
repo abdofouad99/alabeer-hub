@@ -4486,6 +4486,384 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ==========================================
+        // PAGE: ads-plan.html — خطة الإعلانات المقترحة
+        // ──────────────────────────────────────────
+        // schema الوكيل (Agent 5 — gemini-agents.php:674-700):
+        //   {
+        //     strategy_overview: "",
+        //     total_monthly_budget: 0,
+        //     phase1_30_days: { goal, budget, campaigns[], expected_results },
+        //     phase2_60_days: { goal, budget, campaigns[], expected_results },
+        //     phase3_90_days: { goal, budget, campaigns[], expected_results },
+        //     ad_creative_briefs: [
+        //       { campaign, video_script, visual_direction, music_mood, cta }
+        //     ],
+        //     kpis: [
+        //       { metric, current, target_30d, target_90d }
+        //     ]
+        //   }
+        //
+        // ⚠️ ادعاءات تقرير المراجعة (مع التحقق سطر سطر):
+        //   ✅ صحيح: ثغرة XSS في video_script + visual_direction + cta
+        //      (كان: briefsBox.innerHTML += `...${b.video_script}...`)
+        //   ✅ صحيح: لا تنسيق locale للميزانية
+        //   ✅ صحيح: لا fallback عند فراغ briefs/kpis
+        //   ✅ صحيح: المنطق منعزل في inline script
+        //   ❌ خطأ بسيط: "أسطر 287-359" → الفعلي 274-340
+        //
+        // مشاكل إضافية اكتشفتها (لم يذكرها التقرير):
+        //   🔴 phase titles وهمية في HTML (الاختبار/التوسع/السيطرة)
+        //      تظهر للعميل قبل تحميل البيانات
+        //   🔴 "جاهزية الحملة: مكتملة الأركان" نص ثابت مضلِّل
+        //   🟡 "جاري الجلب..." في kpis يبقى أبدياً عند الفشل
+        //
+        // ⚠️ ملاحظة على العملة: schema يقول budget: 0 (رقم فقط بدون
+        //   عملة). لكن المشروع للسوق السعودي (العبير للتسويق)، فاستخدمت
+        //   "ر.س" كافتراضي، مع إمكانية الاستبدال عبر data.currency لو وُجد.
+        // ==========================================
+        try {
+        if (path.includes('ads-plan.html')) {
+            const ads = (data.page_17_ads_plan && typeof data.page_17_ads_plan === 'object')
+                ? data.page_17_ads_plan
+                : ((ai && ai.page_17_ads_plan) || {});
+
+            // ────────────────────────────────────────────────────
+            // Helpers محلية معزولة
+            // ────────────────────────────────────────────────────
+
+            // hasValueAds: نفس نمط hasValueRec (PR #52) — حماية من
+            // placeholders فارغة مثل "—"، "0"، "loading"، إلخ.
+            const hasValueAds = (v) => {
+                if (v === null || v === undefined) return false;
+                if (typeof v === 'string') {
+                    const s = v.trim();
+                    if (s === '' || s === '—' || s === '-' || s === '...') return false;
+                    if (/^(جاري|loading|placeholder|n\/a|null|undefined)$/i.test(s)) return false;
+                    return true;
+                }
+                if (typeof v === 'number') return Number.isFinite(v);
+                if (Array.isArray(v)) return v.length > 0 && v.some(hasValueAds);
+                if (typeof v === 'object') return Object.keys(v).length > 0;
+                return Boolean(v);
+            };
+
+            // formatBudget: تنسيق رقم → "1,500 ر.س" (مع locale عربي)
+            // - schema يقول budget: 0 (رقم فقط)
+            // - لو الرقم 0 أو غير صالح → "—" (بدلاً من "0 ر.س" مضلِّل)
+            // - currency من data.currency إن وُجد، وإلا "ر.س" افتراضياً
+            const currency = (typeof data.currency === 'string' && data.currency.trim())
+                ? data.currency.trim()
+                : 'ر.س';
+            const formatBudget = (raw) => {
+                const n = Number(raw);
+                if (!Number.isFinite(n) || n <= 0) return '—';
+                try {
+                    return n.toLocaleString('ar-SA') + ' ' + currency;
+                } catch (e) {
+                    // لو فشل locale (متصفح قديم) — fallback لتنسيق يدوي
+                    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ' + currency;
+                }
+            };
+
+            // formatCampaignsList: مصفوفة → نص مفصول، مع rejection للقيم الفارغة
+            const formatCampaignsList = (val) => {
+                if (Array.isArray(val)) {
+                    const items = val.filter(hasValueAds).map(x => String(x).trim());
+                    return items.length > 0 ? items.join('، ') : '';
+                }
+                return hasValueAds(val) ? String(val).trim() : '';
+            };
+
+            // ────────────────────────────────────────────────────
+            // 1) Hero Card: Total Budget + Strategy Overview
+            // ────────────────────────────────────────────────────
+            const apBudgetEl = document.getElementById('apBudget');
+            if (apBudgetEl) {
+                apBudgetEl.textContent = formatBudget(ads.total_monthly_budget);
+                // إضافة dir=ltr للرقم لمنع الانعكاس في RTL
+                apBudgetEl.style.direction = 'ltr';
+                apBudgetEl.style.unicodeBidi = 'isolate';
+                apBudgetEl.style.display = 'inline-block';
+            }
+
+            const apOverviewEl = document.getElementById('apOverview');
+            if (apOverviewEl) {
+                if (hasValueAds(ads.strategy_overview)) {
+                    apOverviewEl.textContent = String(ads.strategy_overview).trim();
+                    apOverviewEl.style.color = 'var(--text-gray)';
+                } else {
+                    apOverviewEl.textContent = 'لم يُرجع التحليل ملخصاً استراتيجياً للإعلانات لهذا التقرير.';
+                    apOverviewEl.style.color = 'var(--text-gray)';
+                    apOverviewEl.style.fontStyle = 'italic';
+                }
+            }
+
+            // ────────────────────────────────────────────────────
+            // 2) Readiness Box (تحرير "مكتملة الأركان" المضلل)
+            // ────────────────────────────────────────────────────
+            // نحسب الجاهزية فعلياً من اكتمال البيانات:
+            // - phase1/2/3 لها goal + budget + campaigns
+            // - briefs غير فارغ
+            // - kpis غير فارغ
+            // كل عنصر يساوي نقطة. الناتج: 0-5
+            const apReadinessText = document.getElementById('apReadinessText');
+            const apReadinessIcon = document.getElementById('apReadinessIcon');
+            if (apReadinessText) {
+                let readyPoints = 0;
+                let totalPoints = 5;
+                const phaseHasContent = (p) => p && (
+                    hasValueAds(p.goal) ||
+                    (Number(p.budget) > 0) ||
+                    (Array.isArray(p.campaigns) && p.campaigns.filter(hasValueAds).length > 0)
+                );
+                if (phaseHasContent(ads.phase1_30_days)) readyPoints++;
+                if (phaseHasContent(ads.phase2_60_days)) readyPoints++;
+                if (phaseHasContent(ads.phase3_90_days)) readyPoints++;
+                if (Array.isArray(ads.ad_creative_briefs) && ads.ad_creative_briefs.filter(b => b && hasValueAds(b.video_script)).length > 0) readyPoints++;
+                if (Array.isArray(ads.kpis) && ads.kpis.filter(k => k && hasValueAds(k.metric)).length > 0) readyPoints++;
+
+                if (readyPoints === 0) {
+                    apReadinessText.textContent = 'بيانات غير متوفرة';
+                    apReadinessText.style.color = 'var(--text-gray)';
+                    if (apReadinessIcon) apReadinessIcon.textContent = '⏳';
+                } else if (readyPoints === totalPoints) {
+                    apReadinessText.textContent = 'مكتملة الأركان';
+                    apReadinessText.style.color = 'var(--green)';
+                    if (apReadinessIcon) apReadinessIcon.textContent = '🎯';
+                } else if (readyPoints >= 3) {
+                    apReadinessText.textContent = `${readyPoints}/${totalPoints} عناصر متوفرة`;
+                    apReadinessText.style.color = 'var(--yellow)';
+                    if (apReadinessIcon) apReadinessIcon.textContent = '⚠️';
+                } else {
+                    apReadinessText.textContent = `${readyPoints}/${totalPoints} فقط`;
+                    apReadinessText.style.color = 'var(--red)';
+                    if (apReadinessIcon) apReadinessIcon.textContent = '❌';
+                }
+            }
+
+            // ────────────────────────────────────────────────────
+            // 3) Phases Roadmap (3 مراحل)
+            // ────────────────────────────────────────────────────
+            const fillPhase = (prefix, phaseObj) => {
+                const goalEl   = document.getElementById(prefix + 'Goal');
+                const budgetEl = document.getElementById(prefix + 'Budget');
+                const campsEl  = document.getElementById(prefix + 'Camps');
+                const resEl    = document.getElementById(prefix + 'Res');
+
+                if (!phaseObj || typeof phaseObj !== 'object') {
+                    if (goalEl)   goalEl.textContent   = '—';
+                    if (budgetEl) budgetEl.textContent = 'الميزانية: —';
+                    if (campsEl)  campsEl.textContent  = '—';
+                    if (resEl)    resEl.textContent    = '—';
+                    return;
+                }
+
+                if (goalEl) {
+                    goalEl.textContent = hasValueAds(phaseObj.goal)
+                        ? String(phaseObj.goal).trim()
+                        : '—';
+                }
+
+                if (budgetEl) {
+                    const formatted = formatBudget(phaseObj.budget);
+                    if (formatted === '—') {
+                        budgetEl.textContent = 'الميزانية: —';
+                    } else {
+                        // استخدام textContent لتجنب أي تدخل HTML
+                        // ولكن نريد dir=ltr فقط للرقم. الحل: نضع الرقم في span منفصل.
+                        budgetEl.textContent = '';
+                        budgetEl.appendChild(document.createTextNode('الميزانية: '));
+                        const numSpan = document.createElement('span');
+                        numSpan.style.direction = 'ltr';
+                        numSpan.style.unicodeBidi = 'isolate';
+                        numSpan.style.display = 'inline-block';
+                        numSpan.textContent = formatted;
+                        budgetEl.appendChild(numSpan);
+                    }
+                }
+
+                if (campsEl) {
+                    const camps = formatCampaignsList(phaseObj.campaigns);
+                    campsEl.textContent = camps || '—';
+                }
+
+                if (resEl) {
+                    resEl.textContent = hasValueAds(phaseObj.expected_results)
+                        ? String(phaseObj.expected_results).trim()
+                        : '—';
+                }
+            };
+
+            fillPhase('p1', ads.phase1_30_days);
+            fillPhase('p2', ads.phase2_60_days);
+            fillPhase('p3', ads.phase3_90_days);
+
+            // ────────────────────────────────────────────────────
+            // 4) Ad Creative Briefs (سكريبتات الفيديو) — XSS-safe
+            // ────────────────────────────────────────────────────
+            // ⚠️ Critical: نبني العناصر بـ createElement وnest textContent
+            // بدلاً من innerHTML += `${b.video_script}` (ثغرة XSS)
+            const briefsBox = document.getElementById('apBriefs');
+            if (briefsBox) {
+                // تنظيف
+                while (briefsBox.firstChild) briefsBox.removeChild(briefsBox.firstChild);
+
+                const briefs = Array.isArray(ads.ad_creative_briefs)
+                    ? ads.ad_creative_briefs.filter(b => b && typeof b === 'object')
+                    : [];
+
+                // تصفية: نتجاهل briefs بدون video_script (الحقل الأهم)
+                const validBriefs = briefs.filter(b => hasValueAds(b.video_script));
+
+                if (validBriefs.length === 0) {
+                    appendMissingData(
+                        briefsBox,
+                        'لا توجد سكريبتات إعلانية',
+                        'لم يُرجع التحليل سكريبتات فيديو جاهزة لهذا التقرير. أعد تشغيل التحليل أو راجع نقاط الضعف للتفاصيل التحريرية.'
+                    );
+                } else {
+                    validBriefs.forEach((b, idx) => {
+                        // ── الحاوية الرئيسية ──
+                        const box = document.createElement('div');
+                        box.className = 'brief-box';
+                        if (idx > 0) box.style.marginTop = '20px';
+
+                        // ── Header ──
+                        const header = document.createElement('div');
+                        header.className = 'brief-header';
+                        const headIcon = document.createElement('span');
+                        headIcon.textContent = '📹 ';
+                        header.appendChild(headIcon);
+                        header.appendChild(document.createTextNode('حملة: '));
+                        const campaignSpan = document.createElement('span');
+                        campaignSpan.textContent = hasValueAds(b.campaign)
+                            ? String(b.campaign).trim()
+                            : 'حملة #' + (idx + 1);
+                        header.appendChild(campaignSpan);
+                        box.appendChild(header);
+
+                        // ── Grid (سكريبت + توجيه) ──
+                        const grid = document.createElement('div');
+                        grid.className = 'brief-grid';
+
+                        // ── العمود الأيمن: السكريبت ──
+                        const leftCol = document.createElement('div');
+                        const scriptH5 = document.createElement('h5');
+                        scriptH5.style.cssText = 'color:var(--text-gray); margin-bottom:8px; font-size:13px; font-weight:700;';
+                        scriptH5.textContent = 'سكريبت الفيديو (حرفياً):';
+                        leftCol.appendChild(scriptH5);
+
+                        const scriptDiv = document.createElement('div');
+                        scriptDiv.className = 'script-text';
+                        // ⚠️ textContent — لا innerHTML — يحمي من XSS تلقائياً
+                        // ويحافظ على \n عبر CSS white-space:pre-wrap (موجود في .script-text)
+                        scriptDiv.textContent = String(b.video_script).trim();
+                        leftCol.appendChild(scriptDiv);
+                        grid.appendChild(leftCol);
+
+                        // ── العمود الأيسر: التوجيه/الموسيقى/CTA ──
+                        const rightCol = document.createElement('div');
+
+                        const buildField = (labelText, value, valueColor) => {
+                            const h5 = document.createElement('h5');
+                            h5.style.cssText = 'color:var(--text-gray); margin-bottom:6px; margin-top:14px; font-size:13px; font-weight:700;';
+                            h5.textContent = labelText;
+                            rightCol.appendChild(h5);
+                            const p = document.createElement('p');
+                            p.style.cssText = 'font-size:14px; color:#fff; line-height:1.6; font-weight:600;';
+                            if (valueColor) {
+                                p.style.color = valueColor;
+                                p.style.fontWeight = '900';
+                                p.style.fontSize = '15px';
+                            }
+                            if (hasValueAds(value)) {
+                                p.textContent = String(value).trim();
+                            } else {
+                                p.textContent = '—';
+                                p.style.color = 'var(--text-gray)';
+                                p.style.fontStyle = 'italic';
+                                p.style.fontWeight = '600';
+                            }
+                            rightCol.appendChild(p);
+                        };
+
+                        // أول حقل بدون margin-top
+                        const visualH5 = document.createElement('h5');
+                        visualH5.style.cssText = 'color:var(--text-gray); margin-bottom:6px; font-size:13px; font-weight:700;';
+                        visualH5.textContent = '🎬 التوجيه البصري:';
+                        rightCol.appendChild(visualH5);
+                        const visualP = document.createElement('p');
+                        visualP.style.cssText = 'font-size:14px; color:#fff; line-height:1.6; font-weight:600;';
+                        if (hasValueAds(b.visual_direction)) {
+                            visualP.textContent = String(b.visual_direction).trim();
+                        } else {
+                            visualP.textContent = '—';
+                            visualP.style.color = 'var(--text-gray)';
+                            visualP.style.fontStyle = 'italic';
+                        }
+                        rightCol.appendChild(visualP);
+
+                        buildField('🎵 الموسيقى والمود:', b.music_mood);
+                        buildField('🎯 زر الإجراء (CTA):', b.cta, 'var(--primary)');
+
+                        grid.appendChild(rightCol);
+                        box.appendChild(grid);
+                        briefsBox.appendChild(box);
+                    });
+                }
+            }
+
+            // ────────────────────────────────────────────────────
+            // 5) KPIs Table — XSS-safe
+            // ────────────────────────────────────────────────────
+            const kpisTable = document.getElementById('apKpis');
+            if (kpisTable) {
+                while (kpisTable.firstChild) kpisTable.removeChild(kpisTable.firstChild);
+
+                const kpis = Array.isArray(ads.kpis)
+                    ? ads.kpis.filter(k => k && typeof k === 'object' && hasValueAds(k.metric))
+                    : [];
+
+                if (kpis.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = 4;
+                    td.style.cssText = 'text-align:center; color:var(--text-gray); padding:24px; font-style:italic;';
+                    td.textContent = 'لم يُرجع التحليل مؤشرات أداء (KPIs) لهذه الخطة الإعلانية.';
+                    tr.appendChild(td);
+                    kpisTable.appendChild(tr);
+                } else {
+                    kpis.forEach(k => {
+                        const tr = document.createElement('tr');
+
+                        const tdMetric = document.createElement('td');
+                        tdMetric.style.cssText = 'color:var(--primary); font-weight:800;';
+                        tdMetric.textContent = String(k.metric).trim();
+                        tr.appendChild(tdMetric);
+
+                        const tdCurrent = document.createElement('td');
+                        tdCurrent.textContent = hasValueAds(k.current) ? String(k.current).trim() : '—';
+                        tr.appendChild(tdCurrent);
+
+                        const tdT30 = document.createElement('td');
+                        tdT30.textContent = hasValueAds(k.target_30d) ? String(k.target_30d).trim() : '—';
+                        tr.appendChild(tdT30);
+
+                        const tdT90 = document.createElement('td');
+                        tdT90.style.cssText = 'color:var(--green); font-weight:700;';
+                        tdT90.textContent = hasValueAds(k.target_90d) ? String(k.target_90d).trim() : '—';
+                        tr.appendChild(tdT90);
+
+                        kpisTable.appendChild(tr);
+                    });
+                }
+            }
+        }
+        } catch (__pageErr) {
+            console.error('[RC] Page section failed: ads-plan.html', __pageErr);
+        }
+
+        // ==========================================
         // GLOBAL: INNER PAGES PROFILE TAGS
         // ==========================================
         const profileAccTypes = document.querySelectorAll('#profileAccountType');
