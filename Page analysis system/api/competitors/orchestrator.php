@@ -133,6 +133,26 @@ function runCompetitorDiscovery(array $clientData, array $cfg): array {
         ];
     }
 
+    // ── STEP 3 + 4: Cross-platform discovery + Enrichment ──
+    require_once __DIR__ . '/cross-platform-discovery.php';
+    require_once __DIR__ . '/enrichment.php';
+
+    $enrichTier = (int)($cfg['analysis']['competitor_enrich_tier'] ?? 3);
+
+    if ($enrichTier > 0) {
+        $enrichedCompetitors = [];
+        foreach ($merged['top_competitors'] as $comp) {
+            // STEP 3: استخراج روابط المنصات من موقع المنافس
+            $comp = discoverCompetitorSocialLinks($comp, $cfg);
+
+            // STEP 4: enrichment الكامل
+            $comp = enrichCompetitor($comp, $profile, $cfg);
+
+            $enrichedCompetitors[] = $comp;
+        }
+        $merged['top_competitors'] = $enrichedCompetitors;
+    }
+
     $duration = round(microtime(true) - $startTime, 2);
     logInfo('Competitor discovery completed', [
         'top_n'      => count($merged['top_competitors']),
