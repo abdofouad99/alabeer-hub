@@ -142,7 +142,7 @@ return [
         'apify_actor_tiktok'  => $get('APIFY_ACTOR_TIKTOK', 'clockworks/free-tiktok-scraper'),
         'apify_actor_twitter' => $get('APIFY_ACTOR_TWITTER', 'nfp1fpt5gUlBwPcor'),
         'apify_actor_website' => $get('APIFY_ACTOR_WEBSITE', 'apify/website-content-crawler'),
-        'apify_actor_ads_fb'  => $get('APIFY_ACTOR_ADS_FB', 'whoareyouanas/meta-ad-scraper'),
+        'apify_actor_ads_fb'  => $get('APIFY_ACTOR_ADS_FB', 'JJghSZmShuco4j9gJ'),
         'ads_default_country' => $get('ADS_DEFAULT_COUNTRY', 'SA'),
 
         // عدد العناصر للسحب لكل منصة

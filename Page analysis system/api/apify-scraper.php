@@ -116,33 +116,41 @@ function scrapeAdsLibrary(
     // لم نعد نُرجع النتيجة المبدئية هنا، بل نستخدمها كمعلومة إضافية
     // لضمان تشغيل ساحب الإعلانات المخصص (Ads Actor) وجلب صور ونصوص الإعلانات فعلياً.
 
-    // ── Actor الجديد: JJghSZmShuco4j9gJ — يقبل URL الصفحة + Ads Library URL مباشرة
-    $actorId = $cfg['apis']['apify_actor_ads_fb'] ?? 'JJghSZmShuco4j9gJ';
-    if (empty($actorId)) {
+    // ── سلسلة actors: الأساسي + fallback تلقائي عند الفشل
+    $primaryActor = $cfg['apis']['apify_actor_ads_fb'] ?? 'JJghSZmShuco4j9gJ';
+    $candidates   = array_values(array_unique(array_filter([
+        $primaryActor,
+        'JJghSZmShuco4j9gJ',  // primary: يقبل startUrls[] camelCase + Page URL + Ads Library URL
+        'OA5DWWrlPj3vhk8SV',  // fallback: يقبل start_urls[] snake_case + max_results_per_url
+    ])));
+    $candidates = array_slice($candidates, 0, 3);
+
+    if (empty($candidates)) {
         return ['success' => false, 'error' => 'لا يوجد Ads Actor مُعرَّف', 'ads' => []];
     }
 
-    $cleanUrl = str_starts_with($pageIdentifier, 'http')
-        ? $pageIdentifier
-        : 'https://www.facebook.com/' . ltrim($pageIdentifier, '/');
+    // ── ADS-A2 FIX: التقاط Page ID الرقمي إذا جاء بصيغة "ID:12345"
+    // المسار الأدق لمكتبة Meta: view_all_page_id بدل q (بحث نصي حرفي يفشل)
+    $pageIdNumeric = '';
+    if (preg_match('/^ID:(\d+)$/i', $pageIdentifier, $idM)) {
+        $pageIdNumeric = $idM[1];
+    }
 
-    preg_match('/facebook\.com\/([^\/\?#]+)/i', $cleanUrl, $m);
-    $pageSlug  = $m[1] ?? '';
-    $adsLibUrl = $pageSlug
-        ? "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&search_type=page&q=" . urlencode($pageSlug)
-        : '';
+    if ($pageIdNumeric !== '') {
+        $cleanUrl  = "https://www.facebook.com/{$pageIdNumeric}";
+        $pageSlug  = $pageIdNumeric;
+        $adsLibUrl = "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&view_all_page_id={$pageIdNumeric}";
+    } else {
+        $cleanUrl = str_starts_with($pageIdentifier, 'http')
+            ? $pageIdentifier
+            : 'https://www.facebook.com/' . ltrim($pageIdentifier, '/');
 
-    $startUrls = [['url' => $cleanUrl]];
-    if ($adsLibUrl) $startUrls[] = ['url' => $adsLibUrl];
-
-    $input = [
-        'startUrls'        => $startUrls,
-        'resultsLimit'     => 50,
-        'onlyTotal'        => false,
-        'includeAboutPage' => false,
-        'isDetailsPerAd'   => false,
-        'activeStatus'     => '',
-    ];
+        preg_match('/facebook\.com\/([^\/\?#]+)/i', $cleanUrl, $m);
+        $pageSlug  = $m[1] ?? '';
+        $adsLibUrl = $pageSlug
+            ? "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country={$country}&search_type=page&q=" . urlencode($pageSlug)
+            : '';
+    }
 
     $fallbackReturn = [
         'success'        => true,
@@ -154,40 +162,126 @@ function scrapeAdsLibrary(
         'ads'            => [],
     ];
 
-    $runId = _apifyStartRun($actorId, json_encode($input), $token);
-    if (!$runId) return $fallbackReturn;
-
-    $items = _apifyWaitAndFetch($runId, $token, 120);  // 120s > Actor timeout (110s)
-    if ($items === null) return $fallbackReturn;
-
-    $ads = [];
-    foreach (($items ?: []) as $item) {
-        $adsList = $item['ads'] ?? null;
-        if (is_array($adsList)) {
-            foreach ($adsList as $ad) $ads[] = _parseAd($ad);
+    foreach ($candidates as $actorId) {
+        // بناء input مخصص لكل actor (schemas مختلفة)
+        if (str_contains($actorId, 'OA5DWWrlPj3vhk8SV')) {
+            // fallback: snake_case schema، يقبل Ads Library URL فقط
+            $startUrlForFallback = $adsLibUrl ?: $cleanUrl;
+            $input = [
+                'start_urls'         => [['url' => $startUrlForFallback]],
+                'max_results_per_url'=> 100,
+                'total_max_results'  => 50,
+                'timeout_secs'       => 0,
+                'proxy_country'      => '',
+            ];
         } else {
-            $ads[] = _parseAd($item);
+            // primary (JJghSZmShuco4j9gJ): camelCase schema، يقبل Page URL + Ads Library URL معاً
+            $startUrls = [['url' => $cleanUrl]];
+            if ($adsLibUrl) $startUrls[] = ['url' => $adsLibUrl];
+            $input = [
+                'startUrls'        => $startUrls,
+                'resultsLimit'     => 50,
+                'onlyTotal'        => false,
+                'includeAboutPage' => false,
+                'isDetailsPerAd'   => false,
+                'activeStatus'     => '',
+            ];
+        }
+
+        logInfo('Starting Ads Library scrape attempt', ['actor' => $actorId, 'page' => $pageIdentifier]);
+
+        $runId = _apifyStartRun($actorId, json_encode($input), $token);
+        if (!$runId) {
+            logError('Failed to start Ads run; trying next actor', ['actor' => $actorId]);
+            continue;
+        }
+
+        $items = _apifyWaitAndFetch($runId, $token, 120);
+        if ($items === null) {
+            logError('Ads scrape timeout; trying next actor', ['actor' => $actorId, 'run_id' => $runId]);
+            continue;
+        }
+
+        $ads = [];
+        foreach (($items ?: []) as $item) {
+            $adsList = $item['ads'] ?? null;
+            if (is_array($adsList)) {
+                foreach ($adsList as $ad) $ads[] = _parseAd($ad);
+            } else {
+                $ads[] = _parseAd($item);
+            }
+        }
+
+        // schema mismatch detection: لو dataset غير فارغ لكن لا توجد حقول معروفة
+        if (count($items ?: []) > 0 && count($ads) === 0) {
+            $sampleKeys = is_array($items[0] ?? null) ? array_slice(array_keys($items[0]), 0, 10) : [];
+            logError('Ads actor schema mismatch — no recognizable ad fields', [
+                'actor' => $actorId,
+                'items_count' => count($items),
+                'sample_keys' => $sampleKeys,
+            ]);
+            continue;
+        }
+
+        if (count($ads) === 0) {
+            logInfo('Ads actor returned 0 ads; trying next actor', ['actor' => $actorId]);
+            continue;
+        }
+
+        $activeCount = count(array_filter($ads, fn($a) => !empty($a['is_active'])));
+
+        logInfo('Ads scrape successful', ['actor' => $actorId, 'total' => count($ads), 'active' => $activeCount]);
+
+        return [
+            'success'        => true,
+            'source'         => 'apify_actor',
+            'actor_used'     => $actorId,
+            'total_ads'      => count($ads),
+            'active_ads'     => $activeCount,
+            'ads'            => array_slice($ads, 0, 30),
+            'is_running_ads' => $activeCount > 0,
+        ];
+    }
+
+    // كل الـ actors فشلوا — fallback على بيانات Facebook إن توفرت
+    logError('All Ads actors failed', ['page' => $pageIdentifier, 'tried' => $candidates]);
+    return $fallbackReturn;
+}
+
+
+/**
+ * ── ADS-A5 FIX: تطبيع موحّد لحالة "نشط" عبر كل actors و scrapers
+ * يفحص بالترتيب: adArchiveStatus → bool flags → status string → وجود تواريخ
+ */
+function _normalizeAdActiveStatus(array $ad): bool {
+    // 1. adArchiveStatus enum (ACTIVE/INACTIVE/...)
+    if (isset($ad['adArchiveStatus']) && is_string($ad['adArchiveStatus'])) {
+        return strtoupper($ad['adArchiveStatus']) === 'ACTIVE';
+    }
+
+    // 2. Boolean flags (camelCase + snake_case)
+    foreach (['isActive', 'is_active', 'currentlyActive', 'active'] as $key) {
+        if (array_key_exists($key, $ad)) {
+            return (bool)$ad[$key];
         }
     }
 
-    if (count($ads) === 0 && ($fbAdsActive ?? false)) {
-        return $fallbackReturn;
+    // 3. Status string (active/live/running)
+    $rawStatus = $ad['ad_delivery_status'] ?? $ad['status'] ?? '';
+    $status = is_string($rawStatus) ? strtolower($rawStatus) : '';
+    if (in_array($status, ['active', 'live', 'running'], true)) {
+        return true;
     }
 
-    // is_running_ads = "هل توجد إعلانات نشطة الآن؟" يجب أن يُشتق من active_ads
-    // وليس من إجمالي الإعلانات (وإلا تظهر "نشط" مع "إعلانات نشطة: 0").
-    $activeCount = count(array_filter($ads, fn($a) => !empty($a['is_active'])));
+    // 4. Heuristic: لديه startDate ولا endDate → يُحتمل أنه نشط
+    $hasStart = !empty($ad['startDate'] ?? $ad['start_date'] ?? $ad['ad_creation_time'] ?? null);
+    $hasEnd   = !empty($ad['endDate']   ?? $ad['end_date']   ?? null);
+    if ($hasStart && !$hasEnd) {
+        return true;
+    }
 
-    return [
-        'success'        => true,
-        'source'         => 'apify_actor',
-        'total_ads'      => count($ads),
-        'active_ads'     => $activeCount,
-        'ads'            => array_slice($ads, 0, 30),
-        'is_running_ads' => $activeCount > 0,
-    ];
+    return false;
 }
-
 
 function _parseAd(array $ad): array {
     $rawStatus = $ad['ad_delivery_status'] ?? $ad['status'] ?? '';
@@ -199,8 +293,7 @@ function _parseAd(array $ad): array {
         'id'                  => $ad['adArchiveID']              ?? $ad['ad_archive_id'] ?? $ad['id']          ?? null,
         'title'               => $ad['adCreativeBody']           ?? $ad['ad_creative_body'] ?? $ad['body'] ?? $ad['title'] ?? '',
         'page_name'           => $ad['pageName']                 ?? $ad['page_name'] ?? '',
-        'is_active'           => ($ad['isActive'] ?? $ad['is_active'] ?? false) || $status === 'active'
-                              || ($status === '' && !empty($ad['startDate'] ?? $ad['start_date'] ?? $ad['ad_creation_time'])), // ADS-1 FIX: إعلان بدون status لكن له تاريخ بدء = نشط
+        'is_active'           => _normalizeAdActiveStatus($ad), // ADS-A5 FIX: helper موحّد
         'start_date'          => $ad['startDate']                ?? $ad['start_date'] ?? $ad['ad_creation_time'] ?? null,
         'platforms'           => $ad['publisherPlatform']        ?? $ad['publisher_platforms'] ?? $ad['platforms'] ?? [],
         'spend'               => $ad['spend']                    ?? null,

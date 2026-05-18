@@ -108,7 +108,9 @@ if (empty($adsData) || count($adsData) < 5) {
     $apifyToken = function_exists('getValidApifyToken') ? getValidApifyToken($cfg) : '';
     if ($apifyToken && ($fbUrl || $pageId)) {
         $searchParam = $pageId ? "ID:{$pageId}" : ($fbUrl ?: $pageName);
-        $result = apifyFetchAdsEnhanced($apifyToken, $cfg, $searchParam, $clientName);
+        // ── ADS-A3 FIX: مرّر بيانات Facebook المحفوظة لاستخدامها كـ fallback خلفي
+        $fbDataForAds = $scanResult['facebook'] ?? [];
+        $result = apifyFetchAdsEnhanced($apifyToken, $cfg, $searchParam, $clientName, $fbDataForAds);
         if (!empty($result['ads'])) {
             $adsData = $result['ads'];
             $entityData = $result['entity'] ?? [];
@@ -258,12 +260,13 @@ function fetchAdsFromMetaAPI(string $pageIdOrName, array $cfg): array {
 /**
  * المصدر الثاني: Apify محسّن
  */
-function apifyFetchAdsEnhanced(string $token, array $cfg, string $searchParam, string $clientName): array {
+function apifyFetchAdsEnhanced(string $token, array $cfg, string $searchParam, string $clientName, array $fbData = []): array {
     if (!function_exists('scrapeAdsLibrary')) {
         return ['ads' => [], 'entity' => []];
     }
 
-    $result = scrapeAdsLibrary($searchParam, $token, $cfg, 'ALL', []);
+    // ── ADS-A3 FIX: تمرير بيانات Facebook المحفوظة كـ fallback خلفي
+    $result = scrapeAdsLibrary($searchParam, $token, $cfg, 'ALL', $fbData);
 
     if (!($result['success'] ?? false)) {
         return ['ads' => [], 'entity' => []];
@@ -318,24 +321,11 @@ function fetchAdsPublicScraping(string $fbUrl): array {
         if (is_array($decoded)) {
             foreach ($decoded as $ad) {
                 if (!is_array($ad)) continue;
-                // قراءة حالة الإعلان من الحقول الفعلية بدلاً من تثبيتها كـ true.
-                // الأسماء المحتملة لحقل الحالة في JSON المضمن قد تختلف بين
-                // إصدارات Facebook، لذلك نبحث في عدة مفاتيح ثم نسقط على
-                // false (محافظ — لا نفترض النشاط بدون دليل) إذا غابت كلها.
-                $isActive = null;
-                foreach (['isActive', 'is_active', 'active', 'currentlyActive'] as $key) {
-                    if (array_key_exists($key, $ad)) {
-                        $isActive = (bool) $ad[$key];
-                        break;
-                    }
-                }
-                // بعض الـ payloads تستخدم enum string مثل "ACTIVE"/"INACTIVE"
-                if ($isActive === null && isset($ad['adArchiveStatus']) && is_string($ad['adArchiveStatus'])) {
-                    $isActive = strtoupper($ad['adArchiveStatus']) === 'ACTIVE';
-                }
-                if ($isActive === null) {
-                    $isActive = false; // محافظ: لا نفترض النشاط بدون دليل
-                }
+                // ── ADS-A5 FIX: استخدام الـ helper الموحّد من apify-scraper.php
+                // لضمان نفس منطق "نشط" في كل المسارات (Apify + Public Scraping)
+                $isActive = function_exists('_normalizeAdActiveStatus')
+                    ? _normalizeAdActiveStatus($ad)
+                    : false; // محافظ إذا لم يكن apify-scraper محمّلاً
 
                 $ads[] = [
                     'id'         => $ad['adArchiveID'] ?? $ad['id'] ?? null,
@@ -685,64 +675,6 @@ function fetchRealMetaMetrics(string $token, string $clientName): array {
         'ctr'         => round(floatval($d['ctr'] ?? 0), 2).'%',
         'status_label'=> $roas >= 3 ? '✅ ممتاز' : ($roas >= 1.5 ? '⚠️ متوسط' : '❌ خسارة'),
         'status_class'=> $roas >= 3 ? 'status-green' : ($roas >= 1.5 ? 'status-yellow' : 'status-red'),
-    ];
-}
-
-/**
- * جلب الإعلانات من Apify
- */
-function apifyFetchAds(string $token, string $actor, string $fbUrl, string $clientName): array {
-    $input = ['searchPageOrAdLibraryUrl'=>$fbUrl,'maxResults'=>30,'locale'=>'ar_AR'];
-    $base  = 'https://api.apify.com/v2';
-    $hdrs  = ['Content-Type: application/json','Authorization: Bearer '.$token];
-
-    $ch = curl_init("{$base}/acts/{$actor}/runs");
-    curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($input),CURLOPT_HTTPHEADER=>$hdrs,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>30]);
-    $run = json_decode(curl_exec($ch),true); curl_close($ch);
-    $runId = $run['data']['id'] ?? null;
-    if (!$runId) return ['ads'=>[],'entity'=>[]];
-
-    $waited=0; $datasetId=null;
-    while ($waited < 120) {
-        sleep(5); $waited+=5;
-        $ch2 = curl_init("{$base}/actor-runs/{$runId}");
-        curl_setopt_array($ch2,[CURLOPT_HTTPHEADER=>$hdrs,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>15]);
-        $st = json_decode(curl_exec($ch2),true); curl_close($ch2);
-        $status = $st['data']['status'] ?? '';
-        if ($status==='SUCCEEDED') { $datasetId=$st['data']['defaultDatasetId']??null; break; }
-        if (in_array($status,['FAILED','ABORTED','TIMED-OUT'])) break;
-    }
-    if (!$datasetId) return ['ads'=>[],'entity'=>[]];
-
-    $ch3 = curl_init("{$base}/datasets/{$datasetId}/items?format=json&limit=30");
-    curl_setopt_array($ch3,[CURLOPT_HTTPHEADER=>$hdrs,CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>30]);
-    $items = json_decode(curl_exec($ch3),true); curl_close($ch3);
-    if (!is_array($items)||empty($items)) return ['ads'=>[],'entity'=>[]];
-
-    $ads = [];
-    foreach ($items as $i=>$item) {
-        $snap = $item['snapshot'] ?? $item;
-        $ads[]=[
-            'id'        =>$item['adArchiveId']??$item['id']??'ad_'.$i,
-            'page_name' =>$item['pageName']??$clientName,
-            'is_active' =>($item['isActive']??true)!==false,
-            'start_date'=>$item['startDate']??null,
-            'title'     =>$snap['title']??'',
-            'text'      =>$snap['body']['text']??$item['adBodyText']??$item['text']??'',
-            'image_url' =>$snap['images'][0]['resizedImageUrl']??$item['imageUrl']??'',
-            'video_url' =>$snap['videos'][0]['videoHdUrl']??$item['videoUrl']??'',
-            'cta'       =>$snap['callToActionType']??'',
-            'platforms' =>$item['publisherPlatforms']??['facebook'],
-        ];
-    }
-
-    return [
-        'ads'    => $ads,
-        'entity' => [
-            'page_name'  =>$items[0]['pageName']??$clientName,
-            'page_likes' =>$items[0]['pageLikeCount']??0,
-            'platform'   =>'facebook',
-        ],
     ];
 }
 
