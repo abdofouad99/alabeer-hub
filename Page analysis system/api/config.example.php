@@ -101,6 +101,13 @@ return [
         'fb_vision_top_images'  => (int)$get('FB_VISION_TOP_IMAGES',  '5'),
         // عدد المنشورات الافتراضي عند سحب Facebook (50 = تحليل أعمق)
         'fb_max_posts'          => (int)$get('FB_MAX_POSTS', '50'),
+
+        // ── Competitors v2 ──
+        'competitor_discovery_mode'     => $get('COMPETITOR_DISCOVERY_MODE', 'auto'),
+        'competitor_max_candidates'     => (int)$get('COMPETITOR_MAX_CANDIDATES', '30'),
+        'competitor_top_n'              => (int)$get('COMPETITOR_TOP_N', '5'),
+        'competitor_min_validation_score' => (int)$get('COMPETITOR_MIN_VALIDATION_SCORE', '40'),
+        'competitor_retry_if_less_than'   => (int)$get('COMPETITOR_RETRY_IF_LESS_THAN', '3'),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
@@ -155,6 +162,14 @@ return [
 
         // Google PageSpeed Insights
         'google_pagespeed_key'  => $get('GOOGLE_PAGESPEED_KEY', ''),
+
+        // ── Competitors v2 ──
+        'apify_actor_google_places'           => $get('APIFY_ACTOR_GOOGLE_PLACES', 'LmLOOMYKuCUrYsda2'),
+        'apify_actor_google_search'           => $get('APIFY_ACTOR_GOOGLE_SEARCH', 'YNcgn7yiLc72ayYeB'),
+        'apify_actor_google_search_fallback'  => $get('APIFY_ACTOR_GOOGLE_SEARCH_FALLBACK', 'V8SFJw3gKgULelpok'),
+        'apify_actor_fb_pages_search'         => $get('APIFY_ACTOR_FB_PAGES_SEARCH', 'YAg3YuPbbASz7JzWG'),
+        'apify_actor_fb_pages_search_fallback'=> $get('APIFY_ACTOR_FB_PAGES_SEARCH_FALLBACK', 'HBdQuY0Qwd2bDGM4a'),
+        'apify_actor_google_maps_reviews'     => $get('APIFY_ACTOR_GOOGLE_MAPS_REVIEWS', 'Xb8osYTtOjlsgI6k9'),
     ],
 
     // ── 5) إعدادات التطبيق ───────────────────────────────────

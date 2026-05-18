@@ -979,35 +979,27 @@ function runAnalysis(int $assessmentId): array {
 
     skip_ads:
 
-    // ─── 7) رادار المنافسين (Google Search Scraper) ───────────
-    // ⛔ Time-budget skip disabled: restored timeouts so analysis runs fully
-    // if ((microtime(true) - $analysisStartTime) > ($maxAnalysisTime - 60)) { goto skip_competitors; }
-    // ── DB Migration: معالج مركزياً في migrate.php ─────────────
-    // (يشتغل تلقائياً مرة واحدة عبر init.php)
+    // ─── 7) رادار المنافسين v2 ─────────────────────────────────
+    require_once __DIR__ . '/competitors/orchestrator.php';
+
     $compRadar = null;
-    $compName = $leadData['company_name'] ?? $scanResult['og']['title'] ?? '';
-    $compAudience = $leadData['target_audience'] ?? '';
-    if (!empty($compName) && ($cfg['analysis']['enable_apify'] ?? false)) {
+    if (($cfg['analysis']['enable_apify'] ?? false)) {
         try {
-            $token = getValidApifyToken($cfg);
-            if ($token) {
-                $compResult = scrapeCompetitorsViaGoogle($compName, $compAudience, $token);
-                if ($compResult['success'] ?? false) {
-                    $compRadar = $compResult['competitors'];
-                    $saveScanProgress('competitor_radar', $compRadar); // ✅ حفظ فوري
-                } else {
-                    logError('Competitor radar scrape failed', [
-                        'company' => $compName,
-                        'error'   => $compResult['error'] ?? 'Unknown error',
-                    ]);
-                }
+            $compResult = runCompetitorDiscovery($scanResult, $cfg);
+            if ($compResult['success'] ?? false) {
+                $saveScanProgress('competitor_discovery', $compResult);
+                // الـ enrichment يأتي في Sprint 3 — حالياً نحفظ Discovery فقط
+                $compRadar = $compResult['top_competitors'];
             } else {
-                logError('Competitor radar skipped — no valid Apify token', ['company' => $compName]);
+                logError('Competitor discovery failed', [
+                    'error' => $compResult['error'] ?? 'Unknown',
+                    'diagnostics' => $compResult['diagnostics'] ?? [],
+                ]);
             }
         } catch (\Throwable $e) {
-            logError('Competitor radar scrape exception', [
-                'company' => $compName,
-                'error'   => $e->getMessage(),
+            logError('Competitor discovery exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
@@ -1045,7 +1037,11 @@ function runAnalysis(int $assessmentId): array {
     $scanResult['lead_objective']   = $leadData['objective']       ?? '';
     $scanResult['lead_audience']    = $leadData['target_audience'] ?? '';
     $scanResult['lead_budget']      = $leadData['ad_budget']       ?? '';
-    $scanResult['competitor_radar'] = $compRadar;
+    // BUG-COMP-B2: لا تدوس على نتيجة page-scan بـ null
+    if (!empty($compRadar)) {
+        $scanResult['competitor_radar'] = $compRadar;
+    }
+    // ابقِ القيمة الموجودة من runPageScan إن نجحت
 
     // الـ Social الأساسي للتسجيل: أغنى البيانات
     $scanResult['social'] = $scanResult['facebook'] ?? $scanResult['instagram'] ?? $scanResult['social'] ?? null;

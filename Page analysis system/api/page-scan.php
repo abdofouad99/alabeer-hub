@@ -238,42 +238,21 @@ function runPageScan(string $rawUrl, array $cfg): array {
         }
     }
 
-    // ── Step 4: تحليل المنافسين (كمّي) ─────────────────────────
+    // ── Step 4: تحليل المنافسين v2 ─────────────────────────
     if ($cfg['analysis']['enable_apify'] ?? false) {
         try {
-            require_once __DIR__ . '/apify-scraper.php';
-            if (function_exists('getValidApifyToken') && function_exists('scrapeCompetitorsViaGoogle')) {
-                $compToken   = getValidApifyToken($cfg);
-                $companyName = $result['social']['page_name']
-                            ?? $result['facebook']['page_name']
-                            ?? $result['instagram']['username']
-                            ?? '';
-                if ($compToken && $companyName) {
-                    $competitorsResult = scrapeCompetitorsViaGoogle($companyName, '', $compToken);
-                    if (!empty($competitorsResult['success']) && !empty($competitorsResult['competitors'])) {
-                        // enrichCompetitorsData يستدعي runPageScan لكل منافس →
-                        // ×6 actors لكل منافس. عطّل افتراضياً لتفادي استنفاد
-                        // حصة Apify الشهرية، وفعّل عبر ENABLE_COMPETITOR_ENRICH=true.
-                        $enrich = ($cfg['analysis']['enable_competitor_enrich'] ?? false)
-                                  && function_exists('enrichCompetitorsData');
-                        $competitors = $enrich
-                            ? enrichCompetitorsData($competitorsResult['competitors'], $cfg)
-                            : $competitorsResult['competitors'];
-                        $result['competitors']      = $competitors;
-                        $result['competitor_radar'] = $competitors;
-                    } else {
-                        if (function_exists('logError')) {
-                            logError('Page-scan competitor scrape failed', [
-                                'company' => $companyName,
-                                'error'   => $competitorsResult['error'] ?? 'Unknown',
-                            ]);
-                        }
-                    }
-                }
+            require_once __DIR__ . '/competitors/orchestrator.php';
+            $compResult = runCompetitorDiscovery($result, $cfg);
+            if ($compResult['success'] ?? false) {
+                $result['competitors']      = $compResult['top_competitors'];
+                $result['competitor_radar'] = $compResult['top_competitors'];
+                $result['competitor_meta']  = $compResult['metadata'] ?? [];
             }
         } catch (\Throwable $e) {
             if (function_exists('logError')) {
-                logError('Page-scan competitor scrape exception', ['error' => $e->getMessage()]);
+                logError('Page-scan competitor v2 exception', [
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
     }
