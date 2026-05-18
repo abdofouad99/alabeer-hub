@@ -153,6 +153,19 @@ function runCompetitorDiscovery(array $clientData, array $cfg): array {
         $merged['top_competitors'] = $enrichedCompetitors;
     }
 
+    // ── STEP 5: AI Analysis لكل منافس ──
+    require_once __DIR__ . '/ai-analysis.php';
+    $enrichedCompetitors = analyzeAllCompetitorsDeep(
+        $merged['top_competitors'],
+        $clientData,
+        $cfg
+    );
+    $merged['top_competitors'] = $enrichedCompetitors;
+
+    // ── STEP 6: Market Summary ──
+    require_once __DIR__ . '/market-summary.php';
+    $marketSummary = buildMarketSummary($enrichedCompetitors, $clientData, $cfg);
+
     $duration = round(microtime(true) - $startTime, 2);
     logInfo('Competitor discovery completed', [
         'top_n'      => count($merged['top_competitors']),
@@ -163,6 +176,7 @@ function runCompetitorDiscovery(array $clientData, array $cfg): array {
         'success'         => true,
         'profile'         => $profile,
         'top_competitors' => $merged['top_competitors'],
+        'market_summary'  => $marketSummary,
         'metadata' => [
             'discovery_duration_s' => $duration,
             'sources_used'         => [
