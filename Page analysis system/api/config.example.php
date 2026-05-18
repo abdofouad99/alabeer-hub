@@ -108,6 +108,13 @@ return [
         'competitor_top_n'              => (int)$get('COMPETITOR_TOP_N', '5'),
         'competitor_min_validation_score' => (int)$get('COMPETITOR_MIN_VALIDATION_SCORE', '40'),
         'competitor_retry_if_less_than'   => (int)$get('COMPETITOR_RETRY_IF_LESS_THAN', '3'),
+
+        // ── Competitors v2 / Sprint 3 (Enrichment) ──
+        'competitor_enrich_tier'          => (int)$get('COMPETITOR_ENRICH_TIER', '3'),
+        'competitor_include_reviews'      => filter_var($get('COMPETITOR_INCLUDE_REVIEWS', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'competitor_parallel_enrich'      => filter_var($get('COMPETITOR_PARALLEL_ENRICH', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'competitor_cache_hours'          => (int)$get('COMPETITOR_CACHE_HOURS', '6'),
+        'competitor_max_reviews_per_comp' => (int)$get('COMPETITOR_MAX_REVIEWS_PER_COMP', '20'),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
