@@ -739,6 +739,48 @@ document.addEventListener('DOMContentLoaded', () => {
                     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+                // ── formatMoney: ينسّق رقم/نص يحوي خسائر مالية كعملة محلية ──
+                // المشكلة: AI يُرجع cost_of_inaction كنص خام مثل "6427800" أو "4504.41"
+                // بدون فاصلات الآلاف ولا وحدة عملة. الواجهة كانت تعرضه كرقم خام
+                // غير مفهوم للعميل.
+                // المنطق:
+                //   - 0 أو فارغ → نص فارغ (لا نعرض "0 ر.س" المضلِّل)
+                //   - رقم خالص (يقبل عشري) → نسّق + ر.س
+                //   - فيها رمز عملة موجود (ر.س / ريال / $ / €...) → اتركها
+                //   - فيها % → نسبة، اتركها
+                //   - خلاف ذلك → اتركها (نص حر)
+                const formatMoney = (raw) => {
+                    if (raw == null) return '';
+                    const s = String(raw).trim();
+                    if (s === '' || s === '—' || s === '-' || s === '0') return '';
+                    // لو فيها %، اتركها (نسبة وليست عملة)
+                    if (/%/.test(s)) return s;
+                    // لو رقم خالص (يقبل عشري ومجموعات بفواصل): نسّقه
+                    // ⚠️ هذا الفحص قبل فحص رمز العملة لأن "4504.41" تحوي '.' الذي
+                    // كان يطابق character-class بشكل خاطئ في الإصدار السابق.
+                    const cleaned = s.replace(/[,٬\s]/g, '');
+                    if (/^-?\d+(\.\d+)?$/.test(cleaned)) {
+                        const n = parseFloat(cleaned);
+                        if (!isNaN(n) && n !== 0) {
+                            // لو رقم كبير (>=1000)، نستخدم toLocaleString
+                            // لو صغير، نُبقيه بمنزلتين عشريتين كحد أقصى
+                            const formatted = Math.abs(n) >= 1000
+                                ? n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+                                : n.toFixed(n % 1 === 0 ? 0 : 2);
+                            return `${formatted} ر.س`;
+                        }
+                        return ''; // 0.0 → فارغ
+                    }
+                    // لو فيها رمز عملة معروف، اتركها كما هي
+                    // ⚠️ alternation (?:...) وليس character class [...] (الإصدار السابق
+                    // كان مكسوراً: '|' و '?' و '.' و كل حرف يُعتبَر عضواً في الـ class).
+                    if (/(?:ر\.?\s*س|ريال|\$|€|£|usd|eur|sar|aed|درهم|جنيه)/i.test(s)) {
+                        return s;
+                    }
+                    // نص حر (مثلاً "زيادة العملاء بنسبة 10x")
+                    return s;
+                };
+
                 const page15 = Array.isArray(ai.page_15_weaknesses) ? ai.page_15_weaknesses : [];
                 const page1  = ai.page_1_report || {};
                 const topThreats = Array.isArray(page1.top_3_threats) ? page1.top_3_threats : [];
@@ -753,12 +795,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         .map(w => {
                             const icon = w.icon || '📉';
                             const title = w.title || 'نقطة ضعف';
-                            const cost = w.cost_of_inaction || w.business_impact || w.expected_improvement || '';
+                            const costRaw = w.cost_of_inaction || w.business_impact || w.expected_improvement || '';
+                            const cost = formatMoney(costRaw);
                             const root = w.root_cause || w.description || '';
-                            // النص: cost_of_inaction أولاً (لأنه يجيب على "كم تخسر")، ثم root_cause
-                            const desc = cost
-                                ? `${escapeHtml(cost)}${root ? ' — ' + escapeHtml(root).substring(0, 80) : ''}`
-                                : escapeHtml(String(root).substring(0, 140));
+                            // النص: cost_of_inaction (منسّق) + root_cause
+                            // نضع label "خسارة شهرية:" قبل الرقم لإضافة سياق واضح
+                            const costPart = cost
+                                ? `<strong style="color:var(--red);">خسارة محتملة: ${escapeHtml(cost)}</strong>`
+                                : '';
+                            const rootPart = root
+                                ? escapeHtml(String(root).substring(0, 100))
+                                : '';
+                            const desc = costPart && rootPart
+                                ? `${costPart} — ${rootPart}`
+                                : (costPart || rootPart || 'يحتاج معالجة عاجلة');
                             const sev = (w.severity || '').toLowerCase();
                             const color = sev === 'high' ? 'var(--red)'
                                         : sev === 'medium' ? 'var(--yellow)'
@@ -767,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="lose-icon" style="color:${color};">${escapeHtml(icon)}</div>
                                 <div class="lose-text">
                                     <h4>${escapeHtml(title)}</h4>
-                                    <p>${desc || 'يحتاج معالجة عاجلة'}</p>
+                                    <p>${desc}</p>
                                 </div>
                             </div>`;
                         });
@@ -817,7 +867,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fStageData && cj.stages) {
                 // بيانات حقيقية من الذكاء الاصطناعي
                 let minScore = 100;
-                let bottleneckId = 'resultFVal3';
+                let bottleneckStageKey = 'trust'; // الافتراضي: الثقة
+
+                // ── pickColorClass: لون الشريط حسب الـ score الفعلي ──
+                // قبل الإصلاح: كانت الألوان f-green/f-red/f-yellow ثابتة في HTML
+                // بحسب ترتيب المرحلة (الثقة دائماً حمراء)، فإذا كان bottleneck
+                // الفعلي هو "الوعي"، يبقى شريط الثقة أحمر — تناقض بصري.
+                // الآن: اللون يُحسب من score المرحلة (>=70 أخضر، 50-69 أصفر، <50 أحمر).
+                const pickColorClass = (score) => {
+                    if (score >= 70) return 'f-green';
+                    if (score >= 50) return 'f-yellow';
+                    if (score >= 30) return 'f-red-dark';
+                    return 'f-red';
+                };
+
                 fStageData.forEach(f => {
                     const stageData = cj.stages[f.stage];
                     if (!stageData) return;
@@ -828,17 +891,62 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (stageEl) {
                         stageEl.style.width = Math.max(30, val) + '%';
                     }
+                    // ── طبّق لون الشريط حسب score المرحلة ──
+                    const barId = f.stageId.replace('Stage', 'Bar');
+                    const barEl = document.getElementById(barId);
+                    if (barEl) {
+                        // أزل كل كلاسات الألوان القديمة + pulse-red
+                        barEl.classList.remove('f-green','f-green-dark','f-yellow','f-red','f-red-dark','pulse-red');
+                        // أضف اللون الصحيح
+                        barEl.classList.add(pickColorClass(val));
+                    }
                     if (val < minScore) {
                         minScore = val;
-                        bottleneckId = f.id;
+                        bottleneckStageKey = f.stage;
                     }
                 });
-                // أظهر نقطة الاختناق
-                const bottleneckBadge = document.getElementById('resultBottleneckBadge');
-                if (bottleneckBadge) bottleneckBadge.style.display = 'inline';
+
+                // ── أولوية cj.bottleneck_stage من AI، وإلا minScore المحسوبة ──
+                // result.php يحوّل page_8_journey.biggest_funnel_leak.stage إلى
+                // bottleneck_stage بالأسماء المطابقة (action→purchase, decision→trust, ...)
+                // فلو AI أرجع تحديداً صريحاً نستخدمه، وإلا نتبع أدنى score.
+                // ⚠️ validStages whitelist يحمي الـ querySelector من AI input غير متوقع
+                //    (مثلاً لو AI أرجع stage جديد لم نتوقعه). لا تُوسّع هذه القائمة بدون
+                //    مراجعة الـ HTML للتأكد من وجود data-stage مطابق.
+                const aiBottleneck = cj.bottleneck_stage || '';
+                const validStages = ['awareness', 'attraction', 'trust', 'purchase', 'loyalty'];
+                const finalBottleneck = validStages.includes(aiBottleneck)
+                    ? aiBottleneck
+                    : bottleneckStageKey;
+
+                // ── إخفاء كل الـ badges (احتياط — بعضها قد يكون مرئياً من render سابق) ──
+                document.querySelectorAll('.bottleneck-badge').forEach(b => {
+                    b.style.display = 'none';
+                });
+
+                // ── إظهار الـ badge على المرحلة الصحيحة + إضافة pulse-red للشريط ──
+                const stageToBarId = {
+                    awareness:  'resultFBar1',
+                    attraction: 'resultFBar2',
+                    trust:      'resultFBar3',
+                    purchase:   'resultFBar4',
+                    loyalty:    'resultFBar5',
+                };
+                const targetBadge = document.querySelector(
+                    `.bottleneck-badge[data-stage="${finalBottleneck}"]`
+                );
+                if (targetBadge) targetBadge.style.display = 'inline';
+                const targetBarId = stageToBarId[finalBottleneck];
+                const targetBar = targetBarId ? document.getElementById(targetBarId) : null;
+                if (targetBar) {
+                    // فرض اللون الأحمر + pulse للمرحلة الـ bottleneck (حتى لو scoreها ≥30)
+                    targetBar.classList.remove('f-green','f-green-dark','f-yellow','f-red-dark');
+                    targetBar.classList.add('f-red', 'pulse-red');
+                }
+
                 // تحديث الـ funnel desc من AI
                 const fDesc = document.getElementById('resultFunnelDesc');
-                if (fDesc && cj.bottleneck_stage) {
+                if (fDesc) {
                     const stageNames = {
                         awareness: 'الوعي',
                         attraction: 'الجذب',
@@ -847,12 +955,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         loyalty: 'الولاء',
                     };
                     fDesc.innerHTML = `يتوقف معظم العملاء في <strong>مرحلة ${
-                        stageNames[cj.bottleneck_stage] || cj.bottleneck_stage
+                        stageNames[finalBottleneck] || finalBottleneck
                     }</strong> — ${
-                        cj.bottleneck_fix || 'تحتاج لمعالجة هذه المرحلة بشكل عاجل.'
+                        sanitize(cj.bottleneck_fix || 'تحتاج لمعالجة هذه المرحلة بشكل عاجل.')
                     }<div class="fix-box" id="resultFixBox"><div class="fix-box-title">كيف نحل هذه العقدة؟</div><ul id="resultFixList">${
                         (cj.fix_steps || [])
-                            .map(s => `<li><span style="color:var(--green);">✔</span> ${s}</li>`)
+                            .map(s => `<li><span style="color:var(--green);">✔</span> ${sanitize(s)}</li>`)
                             .join('') ||
                         '<li><span style="color:var(--green);">✔</span> راجع تقرير رحلة العميل للتفاصيل الكاملة</li>'
                     }</ul></div>`;
@@ -869,8 +977,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (stageEl) stageEl.style.width = '0%';
                 });
 
-                const badge = document.getElementById('resultBottleneckBadge');
-                if (badge) badge.style.display = 'none';
+                // أزل كل ألوان الأشرطة و pulse-red، واعرضها بلون رمادي محايد
+                ['resultFBar1','resultFBar2','resultFBar3','resultFBar4','resultFBar5'].forEach(id => {
+                    const bar = document.getElementById(id);
+                    if (bar) {
+                        bar.classList.remove('f-green','f-green-dark','f-yellow','f-red','f-red-dark','pulse-red');
+                    }
+                });
+                // أخفِ كل الـ badges
+                document.querySelectorAll('.bottleneck-badge').forEach(b => {
+                    b.style.display = 'none';
+                });
 
                 const fDesc = document.getElementById('resultFunnelDesc');
                 if (fDesc) {
@@ -1158,11 +1275,65 @@ document.addEventListener('DOMContentLoaded', () => {
             const curId = new URLSearchParams(window.location.search).get('id') || '';
             if (recViewAllEl) recViewAllEl.href = 'recommendations.html?id=' + curId;
 
+            // ── normalizePriority: يحوّل priority من أي شكل إلى string موحّد ──
+            // المشكلة: AI يُنتج priority كرقم (1,2,3) أحياناً وكنص (high/medium/low) أحياناً.
+            // الكود السابق كان يقارن === 'critical' فقط، فيفشل مع الأرقام.
+            // التحويل:
+            //   1 (الأعلى) → 'critical'
+            //   2          → 'high'
+            //   3          → 'medium'
+            //   4+         → 'low'
+            //   string     → كما هو (إذا كان ضمن critical/high/medium/low)
+            const normalizePriority = (raw) => {
+                if (raw == null) return 'medium';
+                if (typeof raw === 'number') {
+                    if (raw <= 1) return 'critical';
+                    if (raw === 2) return 'high';
+                    if (raw === 3) return 'medium';
+                    return 'low';
+                }
+                const s = String(raw).toLowerCase().trim();
+                if (['critical','حرج','حرجة','عاجل جدا'].includes(s)) return 'critical';
+                if (['high','عالي','عالية','عاجل','urgent'].includes(s)) return 'high';
+                if (['low','منخفض','منخفضة','مستقبلي'].includes(s)) return 'low';
+                if (['medium','متوسط','متوسطة'].includes(s)) return 'medium';
+                // أرقام مرسلة كنصوص ("1", "2", ...)
+                const n = parseInt(s, 10);
+                if (!isNaN(n)) {
+                    if (n <= 1) return 'critical';
+                    if (n === 2) return 'high';
+                    if (n === 3) return 'medium';
+                    return 'low';
+                }
+                return 'medium';
+            };
+
+            // ── pickField: يقرأ أول حقل غير فارغ من قائمة aliases ──
+            // يعالج التباين بين أسماء الحقول التي يُرجعها AI:
+            //   description vs desc, step_by_step vs bullets, expected_roi vs roi, ...
+            const pickField = (obj, ...keys) => {
+                for (const k of keys) {
+                    const v = obj && obj[k];
+                    if (v == null) continue;
+                    if (typeof v === 'string' && v.trim() === '') continue;
+                    if (Array.isArray(v) && v.length === 0) continue;
+                    return v;
+                }
+                return null;
+            };
+
             if (resultRecsList && recs.length > 0) {
-                const highRecs = recs.filter(
-                    r => r.priority === 'critical' || r.priority === 'high'
+                // طبّع الأولوية أولاً، ثم رتّب حسبها (critical → high → medium → low)
+                const priRank = { critical: 0, high: 1, medium: 2, low: 3 };
+                const recsWithPriority = recs.map(r => ({
+                    ...r,
+                    _normPriority: normalizePriority(r.priority)
+                }));
+                const sortedRecs = [...recsWithPriority].sort(
+                    (a, b) => (priRank[a._normPriority] ?? 2) - (priRank[b._normPriority] ?? 2)
                 );
-                const preview = (highRecs.length >= 3 ? highRecs : recs).slice(0, 3);
+                const preview = sortedRecs.slice(0, 3);
+
                 const priColor = p =>
                     p === 'critical' || p === 'high'
                         ? 'var(--red)'
@@ -1183,10 +1354,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         : p === 'low'
                         ? 'مستقبلي'
                         : 'متوسط';
+
                 resultRecsList.innerHTML =
                     preview
                         .map(rec => {
-                            const p = rec.priority || 'medium';
+                            const p = rec._normPriority;
                             const ac = priColor(p);
                             const ar = priRgb(p);
                             const icon =
@@ -1198,38 +1370,51 @@ document.addEventListener('DOMContentLoaded', () => {
                                     : p === 'low'
                                     ? '🤝'
                                     : '✍️');
-                            const step1 =
-                                rec.bullets && rec.bullets[0]
-                                    ? `<div style="margin-top:8px;font-size:12px;color:var(--text-gray);font-weight:700;">▶ ${sanitize(
-                                          rec.bullets[0]
-                                      )}</div>`
-                                    : '';
+
+                            // step_by_step (الجديد) أو bullets (الـ legacy)
+                            const bullets = pickField(rec, 'step_by_step', 'bullets', 'steps') || [];
+                            const firstBullet = Array.isArray(bullets) && bullets[0] ? bullets[0] : '';
+                            const step1 = firstBullet
+                                ? `<div style="margin-top:8px;font-size:12px;color:var(--text-gray);font-weight:700;">▶ ${sanitize(firstBullet)}</div>`
+                                : '';
+
                             const whyNow = rec.why_now
-                                ? `<div style="font-size:11px;font-weight:800;color:${ac};margin-top:6px;">⚡ ${sanitize(
-                                      rec.why_now
-                                  )}</div>`
+                                ? `<div style="font-size:11px;font-weight:800;color:${ac};margin-top:6px;">⚡ ${sanitize(rec.why_now)}</div>`
                                 : '';
-                            const roiBox = rec.roi
-                                ? `<div style="margin-top:10px;padding:6px 12px;background:rgba(${ar},0.08);border:1px solid rgba(${ar},0.2);border-radius:8px;font-size:12px;font-weight:800;color:${ac};">💰 ${sanitize(
-                                      rec.roi
-                                  )}</div>`
+
+                            // expected_roi (الجديد) أو roi (الـ legacy)
+                            const roi = pickField(rec, 'expected_roi', 'roi');
+                            const roiBox = roi
+                                ? `<div style="margin-top:10px;padding:6px 12px;background:rgba(${ar},0.08);border:1px solid rgba(${ar},0.2);border-radius:8px;font-size:12px;font-weight:800;color:${ac};">💰 ROI متوقع: ${sanitize(String(roi))}</div>`
                                 : '';
+
+                            // budget_needed + time_to_implement (حقول إضافية مفيدة)
+                            const budget = pickField(rec, 'budget_needed', 'budget');
+                            const timeToImp = pickField(rec, 'time_to_implement', 'time');
+                            const metaRow = (budget || timeToImp)
+                                ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                                       ${budget ? `<span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:6px;color:var(--text-gray);">💵 ${sanitize(String(budget))}</span>` : ''}
+                                       ${timeToImp ? `<span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:6px;color:var(--text-gray);">⏱️ ${sanitize(String(timeToImp))}</span>` : ''}
+                                   </div>`
+                                : '';
+
+                            // description (الجديد) أو desc (الـ legacy)
+                            const desc = pickField(rec, 'description', 'desc') || '';
+                            const descShort = String(desc).substring(0, 120);
+                            const descSuffix = String(desc).length > 120 ? '…' : '';
+
+                            const title = pickField(rec, 'title', 'name') || 'توصية';
+
                             return `<div style="background:rgba(${ar},0.04);border:1px solid rgba(${ar},0.2);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
               <div style="position:absolute;top:0;right:0;background:${ac};color:${
                                 p === 'medium' ? '#000' : '#fff'
-                            };font-size:10px;font-weight:900;padding:3px 12px;border-radius:0 16px 0 10px;">${priLabel(
-                                p
-                            )}${p === 'critical' ? ' ⚠️' : ''}</div>
+                            };font-size:10px;font-weight:900;padding:3px 12px;border-radius:0 16px 0 10px;">${priLabel(p)}${p === 'critical' ? ' ⚠️' : ''}</div>
               <div style="display:flex;align-items:flex-start;gap:14px;margin-top:8px;">
                 <div style="font-size:22px;flex-shrink:0;">${icon}</div>
                 <div style="flex:1;">
-                  <h4 style="font-size:15px;font-weight:900;color:${ac};margin-bottom:4px;">${sanitize(
-                                rec.title || 'توصية'
-                            )}</h4>
-                  <p style="font-size:13px;color:var(--text-gray);font-weight:600;line-height:1.6;">${sanitize(
-                      (rec.desc || '').substring(0, 100)
-                  )}${(rec.desc || '').length > 100 ? '...' : ''}</p>
-                  ${whyNow}${step1}${roiBox}
+                  <h4 style="font-size:15px;font-weight:900;color:${ac};margin-bottom:4px;">${sanitize(title)}</h4>
+                  <p style="font-size:13px;color:var(--text-gray);font-weight:600;line-height:1.6;">${sanitize(descShort)}${descSuffix}</p>
+                  ${whyNow}${step1}${metaRow}${roiBox}
                 </div>
               </div>
             </div>`;
