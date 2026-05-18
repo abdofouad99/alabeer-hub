@@ -4877,10 +4877,46 @@ document.addEventListener('DOMContentLoaded', () => {
         profileNiches.forEach(el => (el.textContent = sanitize(pt)));
 
         // ==========================================
-        // PAGE: roadmap-30d.html
+        // PAGE: roadmap-30d.html — خارطة 30 يوم
+        // ──────────────────────────────────────────
+        // schema الوكيل (Agent 5 — gemini-agents.php:696-720):
+        //   page_18_roadmap: {
+        //     week1..week4: {
+        //       theme,                  ← اسم الأسبوع (مثل "الإصلاح الجذري")
+        //       daily_tasks[],          ← objects: {date_offset, morning_task, afternoon_task, ...}
+        //       week_kpis[],            ← مصفوفة نصوص (أهداف الأسبوع)
+        //       expected_week_results,  ← نص (نتيجة الأسبوع المتوقعة)
+        //     },
+        //     financial_projection: {investment, revenue_month1, revenue_month3, roi_month3, assumptions}
+        //   }
+        //
+        // result.php يجمع هذا في data.action_month بـ buildWeek (مُصلَح في PR هذا):
+        //   week1..week4: { title, goals[], tasks[], kpi }
+        //   expected_result: نص مدمج من roi_month3 + assumptions
+        //
+        // ⚠️ Bug تاريخي مُصلَح في result.php:
+        //   - حقل 'kpi' لم يكن مبنياً → JS يقرأ undefined → "غير محدد"
+        //   - حقل 'expected_result' لم يكن مبنياً → نفس النتيجة
         // ==========================================
         try {
         if (path.includes('roadmap-30d.html')) {
+            // ────────────────────────────────────────────────────
+            // Helpers محلية معزولة
+            // ────────────────────────────────────────────────────
+            const hasValueRm = (v) => {
+                if (v === null || v === undefined) return false;
+                if (typeof v === 'string') {
+                    const s = v.trim();
+                    if (s === '' || s === '—' || s === '-' || s === '...') return false;
+                    if (/^(جاري|loading|placeholder|n\/a|null|undefined)$/i.test(s)) return false;
+                    return true;
+                }
+                if (typeof v === 'number') return Number.isFinite(v);
+                if (Array.isArray(v)) return v.length > 0 && v.some(hasValueRm);
+                if (typeof v === 'object') return Object.keys(v).length > 0;
+                return Boolean(v);
+            };
+
             const roadmap =
                 (data.ai_report &&
                     (data.ai_report.action_month ||
@@ -4888,6 +4924,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         data.ai_report.plan_30d)) ||
                 data.action_month ||
                 null;
+
             const getWeek = num => {
                 if (!roadmap) return null;
                 return (
@@ -4897,72 +4934,153 @@ document.addEventListener('DOMContentLoaded', () => {
                     null
                 );
             };
+
             const asArray = value =>
                 Array.isArray(value)
-                    ? value
-                    : typeof value === 'string' && value.trim()
-                    ? [value]
-                    : [];
+                    ? value.filter(hasValueRm)
+                    : (hasValueRm(value) ? [String(value).trim()] : []);
+
+            // ── messages thoroughly thought through ──
+            // لو ما فيه roadmap نهائياً = AI لم يُنتج page_18_roadmap (فشل/timeout)
+            // لو فيه roadmap لكن الأسابيع فارغة = الوكيل أنتج لكن الحقول قاصرة
+            const missingMsgWeek = 'لم يُرجع التحليل تفاصيل لهذا الأسبوع. أعد تشغيل التحليل.';
+            const missingMsgFull = 'لم يُرجع تحليل الذكاء الاصطناعي خطة 30 يوم لهذا التقرير. أعد تشغيل التحليل من لوحة الإدارة.';
 
             if (!roadmap) {
+                // ── حالة 1: لا توجد roadmap نهائياً ──
                 for (let i = 1; i <= 4; i++) {
-                    setTextIf('titleW' + i, 'غير متوفر من بيانات التقرير');
+                    setTextIf('titleW' + i, 'الأسبوع ' + i);
                     const goals = document.getElementById('goalsW' + i);
-                    if (goals) goals.innerHTML = '<span class="goal-tag">غير متوفر</span>';
+                    if (goals) {
+                        // CSP-safe: استخدام DOM بدل innerHTML
+                        while (goals.firstChild) goals.removeChild(goals.firstChild);
+                        const span = document.createElement('span');
+                        span.className = 'goal-tag';
+                        span.style.cssText = 'opacity:0.6;font-style:italic;';
+                        span.textContent = '— غير محدد —';
+                        goals.appendChild(span);
+                    }
                     const tasks = document.getElementById('tasksW' + i);
-                    if (tasks)
+                    if (tasks) {
+                        // missingDataHtml يستخدم sanitize داخلياً → آمن
                         tasks.innerHTML = missingDataHtml(
-                            'خطة الأسبوع غير متوفرة',
-                            'لم يرجع OpenAI خطة 30 يوم لهذا التقرير، لذلك لا يتم عرض مهام عامة أو ثابتة.'
+                            'مهام الأسبوع غير متوفرة',
+                            missingMsgFull
                         );
-                    setTextIf('kpiW' + i, 'غير متوفر بدون خطة شهرية صادرة من بيانات التقرير.');
+                    }
+                    setTextIf('kpiW' + i, missingMsgWeek);
+                    const kpiP = document.getElementById('kpiW' + i);
+                    if (kpiP) kpiP.style.fontStyle = 'italic';
                 }
-                setTextIf(
-                    'expectedResultText',
-                    'النتيجة المتوقعة غير متوفرة لأن خطة 30 يوم لم ترجع ضمن بيانات هذا التقرير.'
-                );
+                const exEl = document.getElementById('expectedResultText');
+                if (exEl) {
+                    exEl.textContent = 'لم يُرجع التحليل النتيجة النهائية المتوقعة لهذا التقرير.';
+                    exEl.style.fontStyle = 'italic';
+                    exEl.style.opacity = '0.85';
+                }
             } else {
+                // ── حالة 2: roadmap موجودة (قد تكون كاملة أو ناقصة) ──
                 for (let i = 1; i <= 4; i++) {
                     const week = getWeek(i) || {};
-                    setTextIf('titleW' + i, week.title || week.name || `الأسبوع ${i}`);
-                    const goals = document.getElementById('goalsW' + i);
-                    const weekGoals = asArray(week.goals || week.objectives || week.tags);
-                    if (goals) {
-                        goals.innerHTML = weekGoals.length
-                            ? weekGoals
-                                  .map(goal => `<span class="goal-tag">${sanitize(goal)}</span>`)
-                                  .join('')
-                            : '<span class="goal-tag">غير محدد من البيانات</span>';
+
+                    // ── Title ──
+                    // schema الوكيل يستخدم theme، buildWeek يحوّله إلى title
+                    // لو غاب → fallback إلى "الأسبوع N" (لا hardcoded fancy text)
+                    const titleVal = week.title || week.name || week.theme;
+                    if (hasValueRm(titleVal)) {
+                        setTextIf('titleW' + i, String(titleVal).trim());
+                    } else {
+                        setTextIf('titleW' + i, 'الأسبوع ' + i);
+                        const titleEl = document.getElementById('titleW' + i);
+                        if (titleEl) {
+                            titleEl.style.opacity = '0.7';
+                            titleEl.style.fontStyle = 'italic';
+                        }
                     }
+
+                    // ── Goals (مصفوفة) ──
+                    const goals = document.getElementById('goalsW' + i);
+                    const weekGoals = asArray(week.goals || week.objectives || week.tags || week.week_kpis);
+                    if (goals) {
+                        // CSP-safe: استخدام DOM
+                        while (goals.firstChild) goals.removeChild(goals.firstChild);
+                        if (weekGoals.length > 0) {
+                            weekGoals.forEach(goal => {
+                                const span = document.createElement('span');
+                                span.className = 'goal-tag';
+                                span.textContent = String(goal).trim();
+                                goals.appendChild(span);
+                            });
+                        } else {
+                            const span = document.createElement('span');
+                            span.className = 'goal-tag';
+                            span.style.cssText = 'opacity:0.6;font-style:italic;';
+                            span.textContent = '— لم يحدد التحليل أهدافاً —';
+                            goals.appendChild(span);
+                        }
+                    }
+
+                    // ── Tasks (مصفوفة نصوص) ──
                     const tasks = document.getElementById('tasksW' + i);
                     const weekTasks = asArray(week.tasks || week.actions || week.steps);
                     if (tasks) {
-                        tasks.innerHTML = weekTasks.length
-                            ? weekTasks
-                                  .map(
-                                      task =>
-                                          `<div class="task-item"><div class="task-check">✓</div><div class="task-text">${sanitize(
-                                              task
-                                          )}</div></div>`
-                                  )
-                                  .join('')
-                            : missingDataHtml(
-                                  'مهام الأسبوع غير متوفرة',
-                                  'هذا الأسبوع موجود في الخطة لكن لم ترجع له مهام واضحة.'
-                              );
+                        // CSP-safe: بناء بـ DOM لتجنب innerHTML للنصوص الواردة من AI
+                        while (tasks.firstChild) tasks.removeChild(tasks.firstChild);
+                        if (weekTasks.length > 0) {
+                            weekTasks.forEach(task => {
+                                const item = document.createElement('div');
+                                item.className = 'task-item';
+                                const check = document.createElement('div');
+                                check.className = 'task-check';
+                                check.textContent = '✓';
+                                const txt = document.createElement('div');
+                                txt.className = 'task-text';
+                                txt.textContent = String(task).trim();
+                                item.appendChild(check);
+                                item.appendChild(txt);
+                                tasks.appendChild(item);
+                            });
+                        } else {
+                            // missingDataHtml يستخدم sanitize داخلياً → آمن من XSS
+                            tasks.innerHTML = missingDataHtml(
+                                'مهام الأسبوع غير متوفرة',
+                                missingMsgWeek
+                            );
+                        }
                     }
-                    setTextIf(
-                        'kpiW' + i,
-                        week.kpi || week.success_metric || week.metric || 'غير محدد من البيانات'
-                    );
+
+                    // ── KPI (نص) ──
+                    // الإصلاح: result.php الآن يبني week.kpi من expected_week_results
+                    const kpiVal = week.kpi || week.success_metric || week.metric || week.expected_week_results;
+                    if (hasValueRm(kpiVal)) {
+                        setTextIf('kpiW' + i, String(kpiVal).trim());
+                    } else {
+                        setTextIf('kpiW' + i, '— لم يحدد التحليل مؤشر نجاح —');
+                        const kpiP = document.getElementById('kpiW' + i);
+                        if (kpiP) {
+                            kpiP.style.opacity = '0.7';
+                            kpiP.style.fontStyle = 'italic';
+                        }
+                    }
                 }
-                setTextIf(
-                    'expectedResultText',
-                    roadmap.expected_result ||
-                        roadmap.expected_outcome ||
-                        data.expected_result ||
-                        'غير محدد من البيانات'
-                );
+
+                // ── Expected Result (نص واحد للجذر) ──
+                // result.php الآن يبنيه من financial_projection.roi_month3 + assumptions
+                const expectedVal = roadmap.expected_result ||
+                    roadmap.expected_outcome ||
+                    data.expected_result;
+                const exEl = document.getElementById('expectedResultText');
+                if (exEl) {
+                    if (hasValueRm(expectedVal)) {
+                        exEl.textContent = String(expectedVal).trim();
+                        exEl.style.fontStyle = '';
+                        exEl.style.opacity = '';
+                    } else {
+                        exEl.textContent = 'لم يُرجع التحليل تقديراً للنتيجة النهائية لهذا التقرير.';
+                        exEl.style.fontStyle = 'italic';
+                        exEl.style.opacity = '0.85';
+                    }
+                }
             }
         }
         } catch (__pageErr) {
