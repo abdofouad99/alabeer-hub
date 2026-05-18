@@ -284,26 +284,194 @@ function _normalizeAdActiveStatus(array $ad): bool {
 }
 
 function _parseAd(array $ad): array {
-    $rawStatus = $ad['ad_delivery_status'] ?? $ad['status'] ?? '';
-    $status = is_string($rawStatus) ? strtolower($rawStatus) : '';
-    $images = $ad['snapshot']['images'] ?? [];
-    $imgUrl = is_array($images) && isset($images[0]['original_image_url']) ? $images[0]['original_image_url'] : null;
+    // ── استخراج الـ snapshot (يحتوي معظم الحقول الفعلية)
+    $snapshot = (isset($ad['snapshot']) && is_array($ad['snapshot'])) ? $ad['snapshot'] : [];
+
+    // ── نص الإعلان: snapshot.body.text أولاً (Apify Meta Ad Library schema)
+    $bodyText = '';
+    $bodyField = $snapshot['body'] ?? $ad['body'] ?? null;
+    if (is_array($bodyField)) {
+        $bodyText = (string)($bodyField['text'] ?? '');
+    } elseif (is_string($bodyField)) {
+        $bodyText = $bodyField;
+    }
+    // fallback: المسارات القديمة من Meta API الرسمي
+    $title = $bodyText !== ''
+        ? $bodyText
+        : (string)($ad['adCreativeBody'] ?? $ad['ad_creative_body'] ?? $ad['title'] ?? '');
+    $title = trim($title);
+
+    // ── العنوان (headline) — قد يكون null أو placeholder غير مفيد
+    $headlineRaw = $snapshot['title'] ?? $ad['title'] ?? '';
+    $headlineRaw = is_string($headlineRaw) ? trim($headlineRaw) : '';
+    // قيم تالفة شائعة في Apify لـ Meta Ad Library
+    $headlineBlocklist = ['{{product.name}}', 'instagram.com', 'facebook.com'];
+    $headline = in_array($headlineRaw, $headlineBlocklist, true) ? '' : $headlineRaw;
+
+    // ── الصورة: للصور images[]، للفيديو videos[].videoPreviewImageUrl
+    $imgUrl = null;
+    if (!empty($snapshot['images']) && is_array($snapshot['images'])) {
+        $first = $snapshot['images'][0] ?? [];
+        if (is_array($first)) {
+            $imgUrl = $first['original_image_url']
+                   ?? $first['originalImageUrl']
+                   ?? $first['resized_image_url']
+                   ?? $first['resizedImageUrl']
+                   ?? $first['url']
+                   ?? null;
+        }
+    }
+    if (!$imgUrl && !empty($snapshot['videos']) && is_array($snapshot['videos'])) {
+        $firstV = $snapshot['videos'][0] ?? [];
+        if (is_array($firstV)) {
+            $imgUrl = $firstV['videoPreviewImageUrl']
+                   ?? $firstV['video_preview_image_url']
+                   ?? null;
+        }
+    }
+    $imgUrl = $imgUrl ?: ($ad['image_url'] ?? $ad['thumbnail'] ?? $ad['thumbnail_url'] ?? null);
+
+    // ── رابط الفيديو نفسه
+    $videoUrl = null;
+    if (!empty($snapshot['videos']) && is_array($snapshot['videos'])) {
+        $firstV = $snapshot['videos'][0] ?? [];
+        if (is_array($firstV)) {
+            $videoUrl = $firstV['videoHdUrl']
+                     ?? $firstV['video_hd_url']
+                     ?? $firstV['videoSdUrl']
+                     ?? $firstV['video_sd_url']
+                     ?? null;
+        }
+    }
+
+    // ── start/end date — تطبيع لـ ISO 8601
+    $startDate = _normalizeAdDate(
+        $ad['startDateFormatted']
+        ?? $ad['start_date_formatted']
+        ?? $ad['startDate']
+        ?? $ad['start_date']
+        ?? $ad['ad_creation_time']
+        ?? null
+    );
+    $endDate = _normalizeAdDate(
+        $ad['endDateFormatted']
+        ?? $ad['end_date_formatted']
+        ?? $ad['endDate']
+        ?? $ad['end_date']
+        ?? null
+    );
+
+    // ── page_name من 3 مسارات محتملة
+    $pageName = $ad['pageName']
+             ?? $snapshot['pageName']
+             ?? $ad['page_name']
+             ?? '';
+    if (empty($pageName) && isset($ad['pageInfo']['page']['name'])) {
+        $pageName = (string)$ad['pageInfo']['page']['name'];
+    }
+
+    // ── CTA & Link
+    $ctaType = $snapshot['ctaType'] ?? $snapshot['cta_type'] ?? $ad['cta_type'] ?? '';
+    $ctaText = $snapshot['ctaText'] ?? $snapshot['cta_text'] ?? $ad['cta_text'] ?? '';
+    $linkUrl = $snapshot['linkUrl'] ?? $snapshot['link_url'] ?? $ad['destination_url'] ?? '';
+
+    // ── حقول إضافية مفيدة لـ AI و الواجهة
+    $displayFormat = $snapshot['displayFormat'] ?? $snapshot['display_format'] ?? $ad['display_format'] ?? '';
+    $caption = $snapshot['caption'] ?? '';
+    $linkDescription = $snapshot['linkDescription'] ?? $snapshot['link_description'] ?? '';
+    $pageLikeCount = $snapshot['pageLikeCount'] ?? $snapshot['page_like_count'] ?? null;
+    $pageCategories = $snapshot['pageCategories'] ?? $snapshot['page_categories'] ?? [];
+
+    // ── DPA / Carousel cards
+    $cards = [];
+    if (!empty($snapshot['cards']) && is_array($snapshot['cards'])) {
+        foreach ($snapshot['cards'] as $card) {
+            if (!is_array($card)) continue;
+            $cardBody = $card['body'] ?? '';
+            if (is_array($cardBody)) $cardBody = (string)($cardBody['text'] ?? '');
+            $cards[] = [
+                'title'     => (string)($card['title'] ?? ''),
+                'body'      => (string)$cardBody,
+                'image_url' => $card['original_image_url']
+                            ?? $card['originalImageUrl']
+                            ?? $card['resized_image_url']
+                            ?? $card['image_url']
+                            ?? '',
+                'link_url'  => $card['link_url'] ?? $card['linkUrl'] ?? '',
+                'cta_text'  => $card['cta_text'] ?? $card['ctaText'] ?? '',
+            ];
+        }
+    }
 
     return [
-        'id'                  => $ad['adArchiveID']              ?? $ad['ad_archive_id'] ?? $ad['id']          ?? null,
-        'title'               => $ad['adCreativeBody']           ?? $ad['ad_creative_body'] ?? $ad['body'] ?? $ad['title'] ?? '',
-        'page_name'           => $ad['pageName']                 ?? $ad['page_name'] ?? '',
-        'is_active'           => _normalizeAdActiveStatus($ad), // ADS-A5 FIX: helper موحّد
-        'start_date'          => $ad['startDate']                ?? $ad['start_date'] ?? $ad['ad_creation_time'] ?? null,
-        'platforms'           => $ad['publisherPlatform']        ?? $ad['publisher_platforms'] ?? $ad['platforms'] ?? [],
-        'spend'               => $ad['spend']                    ?? null,
-        'impressions'         => $ad['impressions']              ?? null,
-        'image_url'           => $imgUrl ?? $ad['image_url'] ?? $ad['thumbnail'] ?? null,
-        // ✅ بيانات هدف الإعلان
-        'objective'           => $ad['ad_creative_link_caption'] ?? $ad['objective'] ?? $ad['campaign_type'] ?? '',
-        'cta_type'            => $ad['snapshot']['cta_type']     ?? $ad['cta_type'] ?? '',
-        'call_to_action_type' => $ad['snapshot']['link_url']     ?? $ad['destination_url'] ?? '',
+        // الحقول الأساسية (تستهلكها OpenAI و الواجهة)
+        'id'                  => $ad['adArchiveID'] ?? $ad['ad_archive_id'] ?? $ad['id'] ?? null,
+        'title'               => $title,                  // النص الكامل (للـ backward compat)
+        'text'                => $title,                  // alias لـ OpenAI و JS (يبحث عن text أولاً)
+        'body'                => $title,                  // alias إضافي للـ JS
+        'headline'            => $headline,
+        'page_name'           => $pageName,
+        'is_active'           => _normalizeAdActiveStatus($ad),
+        'active'              => _normalizeAdActiveStatus($ad),  // alias لـ JS
+        'start_date'          => $startDate,
+        'end_date'            => $endDate,
+        'startDate'           => $startDate,              // alias لـ JS raw_items
+        'endDate'             => $endDate,                // alias لـ JS raw_items
+        'platforms'           => $ad['publisherPlatform']
+                              ?? $ad['publisher_platforms']
+                              ?? $ad['platforms']
+                              ?? [],
+        'spend'               => $ad['spend'] ?? null,
+        'impressions'         => $ad['impressions']
+                              ?? $ad['reachEstimate']
+                              ?? null,
+        'image_url'           => $imgUrl,
+        'video_url'           => $videoUrl,
+
+        // CTA & Link (نسختين: snake للـ PHP backward compat، camel للـ JS raw_items pattern)
+        'cta_type'            => $ctaType,
+        'cta_text'            => $ctaText,
+        'ctaText'             => $ctaText,                // alias JS
+        'call_to_action_type' => $ctaType,                // backward compat
+        'landing_url'         => $linkUrl,
+        'link_url'            => $linkUrl,
+        'linkUrl'             => $linkUrl,                // alias JS
+        'link_description'    => $linkDescription,
+        'linkDescription'     => $linkDescription,
+        'linkTitle'           => $headline,               // alias JS
+
+        // حقول metadata إضافية لـ AI deeper analysis
+        'display_format'      => $displayFormat,
+        'caption'             => $caption,
+        'objective'           => $caption ?: ($ad['ad_creative_link_caption'] ?? $ad['objective'] ?? ''),
+        'page_like_count'     => $pageLikeCount,
+        'page_categories'     => is_array($pageCategories) ? $pageCategories : [],
+        'cards'               => $cards,
+        'collation_count'     => $ad['collationCount'] ?? null,
     ];
+}
+
+/**
+ * تطبيع تاريخ الإعلان إلى ISO 8601 string
+ * يقبل: ISO string / Unix int / Unix string
+ */
+function _normalizeAdDate($raw): ?string {
+    if ($raw === null || $raw === '') return null;
+    if (is_string($raw)) {
+        // إذا كان ISO أصلاً (يحوي T أو -) نتركه
+        if (strpos($raw, 'T') !== false || strpos($raw, '-') !== false) {
+            return $raw;
+        }
+        // إذا كان رقماً كنص (Unix timestamp)
+        if (ctype_digit($raw)) {
+            return gmdate('Y-m-d\TH:i:s\Z', (int)$raw);
+        }
+        return $raw;
+    }
+    if (is_int($raw) || is_float($raw)) {
+        return gmdate('Y-m-d\TH:i:s\Z', (int)$raw);
+    }
+    return null;
 }
 
 
