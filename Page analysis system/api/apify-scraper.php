@@ -204,10 +204,27 @@ function scrapeAdsLibrary(
 
         $ads = [];
         foreach (($items ?: []) as $item) {
+            if (!is_array($item)) continue;
+
+            // ── ADS-A6 FIX: تخطّي meta records في dataset Apify
+            // 1. سجلات العداد فقط: { "totalCount": N }
+            if (isset($item['totalCount']) && count($item) <= 2) continue;
+            // 2. سجلات page metadata: تحتوي pageInfo و inputUrl لكن بدون adArchiveID
+            $hasAdMarker = !empty($item['adArchiveID'])
+                        || !empty($item['ad_archive_id'])
+                        || !empty($item['snapshot'])
+                        || !empty($item['ads']);
+            if (!$hasAdMarker) continue;
+
             $adsList = $item['ads'] ?? null;
             if (is_array($adsList)) {
-                foreach ($adsList as $ad) $ads[] = _parseAd($ad);
+                foreach ($adsList as $ad) {
+                    if (!is_array($ad)) continue;
+                    if (empty($ad['adArchiveID']) && empty($ad['ad_archive_id'])) continue;
+                    $ads[] = _parseAd($ad);
+                }
             } else {
+                if (empty($item['adArchiveID']) && empty($item['ad_archive_id'])) continue;
                 $ads[] = _parseAd($item);
             }
         }
