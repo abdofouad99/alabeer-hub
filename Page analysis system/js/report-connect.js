@@ -1788,55 +1788,71 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? parseInt(ttData.following).toLocaleString()
                     : '--';
             }
-            // Total Likes
-            if (document.getElementById('tt-likes')) {
-                const el = document.getElementById('tt-likes');
-                el.textContent = ttData.likes ? parseInt(ttData.likes).toLocaleString() : '--';
-            }
+            // ── إصلاح BUG #12: حذف كتلة tt-likes المكررة (كانت تكرار حرفي للتي قبلها) ──
             // Videos
             if (document.getElementById('ttVideos')) {
+                // ── إصلاح BUG #11: Falsy-Zero ─────────────────────────
                 const el = document.getElementById('ttVideos');
-                if (ttData.video_count) {
-                    el.textContent = ttData.video_count + ' فيديو';
+                const vc = ttData.video_count;
+                if (vc === null || vc === undefined) {
+                    el.textContent = '--';
+                } else if (vc === 0) {
+                    el.textContent = 'لا توجد فيديوهات';
+                    el.className = 'si-badge badge-warn';
+                } else {
+                    el.textContent = vc + ' فيديو';
                     el.className =
-                        parseInt(ttData.video_count) > 20
+                        parseInt(vc) > 20
                             ? 'si-badge badge-ok'
                             : 'si-badge badge-warn';
-                } else {
-                    el.textContent = '--';
                 }
             }
             // Average Likes
             if (document.getElementById('ttAvgLikes')) {
+                // ── إصلاح BUG #11: Falsy-Zero ─────────────────────────
                 const el = document.getElementById('ttAvgLikes');
-                if (ttData.avg_likes) {
-                    el.textContent = parseFloat(ttData.avg_likes).toLocaleString();
-                    el.className = 'si-badge badge-ok';
-                } else {
+                const al = ttData.avg_likes;
+                if (al === null || al === undefined) {
                     el.textContent = '--';
+                } else if (parseFloat(al) === 0) {
+                    el.textContent = '0';
+                    el.className = 'si-badge badge-warn';
+                } else {
+                    el.textContent = parseFloat(al).toLocaleString();
+                    el.className = 'si-badge badge-ok';
                 }
             }
             // Average Comments
             if (document.getElementById('ttAvgComments')) {
+                // ── إصلاح BUG #11: Falsy-Zero ─────────────────────────
                 const el = document.getElementById('ttAvgComments');
-                if (ttData.avg_comments) {
-                    el.textContent = parseFloat(ttData.avg_comments).toFixed(1);
-                    el.className = 'si-badge badge-ok';
-                } else {
+                const ac = ttData.avg_comments;
+                if (ac === null || ac === undefined) {
                     el.textContent = '--';
+                } else if (parseFloat(ac) === 0) {
+                    el.textContent = '0';
+                    el.className = 'si-badge badge-warn';
+                } else {
+                    el.textContent = parseFloat(ac).toFixed(1);
+                    el.className = 'si-badge badge-ok';
                 }
             }
             // Engagement Rate
             if (document.getElementById('ttEngagement')) {
+                // ── إصلاح BUG #11: Falsy-Zero ─────────────────────────
                 const el = document.getElementById('ttEngagement');
-                if (ttData.engagement_rate) {
-                    el.textContent = parseFloat(ttData.engagement_rate).toFixed(2) + '%';
+                const er = ttData.engagement_rate;
+                if (er === null || er === undefined) {
+                    el.textContent = '--';
+                } else if (parseFloat(er) === 0) {
+                    el.textContent = '0%';
+                    el.className = 'si-badge badge-warn';
+                } else {
+                    el.textContent = parseFloat(er).toFixed(2) + '%';
                     el.className =
-                        parseFloat(ttData.engagement_rate) >= 3
+                        parseFloat(er) >= 3
                             ? 'si-badge badge-ok'
                             : 'si-badge badge-warn';
-                } else {
-                    el.textContent = '--';
                 }
             }
             // Bio
@@ -1888,10 +1904,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('tt-score').textContent = ttScore;
                 const progTT = document.getElementById('prog-tt');
                 if (progTT) {
+                    // ── إصلاح BUG #9: استخدام classList بدلاً من className ──
                     progTT.style.width = ttScore + '%';
-                    progTT.className =
-                        'progress-fill ' +
-                        (ttScore >= 70 ? 'green' : ttScore >= 40 ? 'yellow' : 'red');
+                    progTT.classList.remove('green', 'yellow', 'red');
+                    progTT.classList.add(
+                        ttScore >= 70 ? 'green' : ttScore >= 40 ? 'yellow' : 'red'
+                    );
                 }
             }
 
@@ -1903,6 +1921,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!twitterUrl && _gtw) _gtw.classList.add('card-disabled');
 
             const twData = srObj.twitter || {};
+            // ── إصلاح BUG #2: معالجة فشل API لتويتر ──────────────────────
+            // عندما يكون scan_data.twitter.success === false أو يحتوي error،
+            // نعرض رسالة الخطأ بدلاً من ملء البطاقات بـ '--' بدون توضيح.
+            // مسح _gtw.innerHTML يحذف كل العناصر ذات IDs، فالكتل التالية
+            // تُتجاوز تلقائياً (كل document.getElementById سيرجع null).
+            if ((twData.success === false || twData.error) && _gtw) {
+                _gtw.innerHTML = `
+                    <div style="grid-column:1/-1;padding:48px 24px;text-align:center;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:16px;">
+                        <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+                        <h3 style="color:var(--red);font-size:20px;font-weight:900;margin-bottom:12px;">تعذّر فحص حساب تويتر</h3>
+                        <p style="color:var(--text-gray);font-size:14px;font-weight:600;line-height:1.7;max-width:500px;margin:0 auto;">
+                            ${sanitize(twData.error || 'لم نتمكّن من الوصول لبيانات الحساب في الوقت الحالي.')}
+                        </p>
+                        ${twitterUrl ? `<p style="margin-top:16px;font-size:13px;"><a href="${sanitize(twitterUrl)}" target="_blank" rel="noopener" style="color:var(--primary);">فتح الحساب يدوياً ↗</a></p>` : ''}
+                    </div>
+                `;
+            }
             // Followers
             if (document.getElementById('twFollowers')) {
                 const el = document.getElementById('twFollowers');
@@ -1929,15 +1964,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Tweets count
             if (document.getElementById('twTweets')) {
+                // ── إصلاح BUG #11: Falsy-Zero ─────────────────────────
                 const el = document.getElementById('twTweets');
-                if (twData.posts_count) {
-                    el.textContent = twData.posts_count + ' تغريدة';
+                const pc = twData.posts_count;
+                if (pc === null || pc === undefined) {
+                    el.textContent = '--';
+                } else if (pc === 0) {
+                    el.textContent = 'لا توجد تغريدات';
+                    el.className = 'si-badge badge-warn';
+                } else {
+                    el.textContent = pc + ' تغريدة';
                     el.className =
-                        parseInt(twData.posts_count) > 100
+                        parseInt(pc) > 100
                             ? 'si-badge badge-ok'
                             : 'si-badge badge-warn';
-                } else {
-                    el.textContent = '--';
                 }
             }
             // Bio
@@ -2026,10 +2066,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('tw-score').textContent = twScore;
                 const progTW = document.getElementById('prog-tw');
                 if (progTW) {
+                    // ── إصلاح BUG #9: استخدام classList بدلاً من className ──
                     progTW.style.width = twScore + '%';
-                    progTW.className =
-                        'progress-fill ' +
-                        (twScore >= 70 ? 'green' : twScore >= 40 ? 'yellow' : 'red');
+                    progTW.classList.remove('green', 'yellow', 'red');
+                    progTW.classList.add(
+                        twScore >= 70 ? 'green' : twScore >= 40 ? 'yellow' : 'red'
+                    );
                 }
             }
 
@@ -2052,16 +2094,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 'مكتمل',
                 'ناقص'
             );
+            // ── إصلاح BUG #1: Meta Title كان hardcoded "موجود" في HTML ──
+            // الآن يقرأ من wsData.title الفعلي ويتحقق من طوله (10–60 حرف).
+            updateSeoBadge(
+                'badge-meta-title',
+                wsData.title && wsData.title.length >= 10 && wsData.title.length <= 60,
+                'مكتمل (' + (wsData.title?.length || 0) + ' حرف)',
+                wsData.title ? 'يحتاج تحسين الطول' : 'مفقود'
+            );
             updateSeoBadge('badge-og', wsData.has_og_tags, 'موجود', 'مفقود');
             updateSeoBadge('badge-schema', wsData.has_schema, 'مثبت', 'غير مثبت');
             updateSeoBadge('badge-h1', wsData.h1, 'موجود', 'مفقود');
             updateSeoBadge('badge-contact-form', wsData.has_contact_form, 'موجود', 'مفقود');
             updateSeoBadge('badge-phone', wsData.has_phone, 'ظاهر', 'مخفي');
             updateSeoBadge('badge-cta', wsData.has_cta, 'واضح', 'غائب');
+            // ── إصلاح BUG #8: fallback من services_list إلى all_services ──
+            // الـ scraper يضع القيم في wsData.all_services حالياً بينما
+            // wsData.services_list يبقى فارغاً → يعرض "لا توجد" خطأ.
+            const servicesList =
+                (wsData.services_list && wsData.services_list.length > 0)
+                    ? wsData.services_list
+                    : (wsData.all_services || []);
             updateSeoBadge(
                 'badge-services',
-                wsData.services_list && wsData.services_list.length > 0,
-                wsData.services_list?.length + ' خدمة',
+                servicesList.length > 0,
+                servicesList.length + ' خدمة',
                 'لا توجد'
             );
 
@@ -2075,7 +2132,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Metrics
             if (document.getElementById('metric-pages')) {
-                document.getElementById('metric-pages').textContent = wsData.pages_count || '--';
+                // ── إصلاح BUG #3: المفتاح الفعلي في JSON هو pages_crawled ──
+                // wsData.pages_count كان دائماً undefined → يعرض '--'.
+                // نحتفظ بـ pages_count كـ fallback للتوافق الخلفي.
+                document.getElementById('metric-pages').textContent =
+                    wsData.pages_crawled ?? wsData.pages_count ?? '--';
             }
             if (document.getElementById('metric-words')) {
                 document.getElementById('metric-words').textContent = wsData.word_count || '--';
@@ -2087,10 +2148,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('website-score').textContent = webScore;
                 const progWeb = document.getElementById('prog-website');
                 if (progWeb) {
+                    // ── إصلاح BUG #9: استخدام classList بدلاً من className ──
                     progWeb.style.width = webScore + '%';
-                    progWeb.className =
-                        'progress-fill ' +
-                        (webScore >= 70 ? 'green' : webScore >= 40 ? 'yellow' : 'red');
+                    progWeb.classList.remove('green', 'yellow', 'red');
+                    progWeb.classList.add(
+                        webScore >= 70 ? 'green' : webScore >= 40 ? 'yellow' : 'red'
+                    );
                 }
             }
 
@@ -2135,9 +2198,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 cEl.className = c >= 5 ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
             if (document.getElementById('igSaves')) {
-                const s = igData.avg_saves || igData.saves_rate || 0;
-                document.getElementById('igSaves').textContent =
-                    s > 0 ? parseFloat(s).toFixed(1) + '%' : '--';
+                // ── إصلاح BUG #6: avg_saves عدد مطلق، saves_rate نسبة ──
+                // الكود السابق كان يضيف '%' على كليهما → خطأ دلالي.
+                // نعطي الأولوية لـ saves_rate إن وجد، وإلا نعرض avg_saves
+                // كعدد بدون '%'.
+                const sEl = document.getElementById('igSaves');
+                const rate = igData.saves_rate;
+                const abs = igData.avg_saves;
+                if (rate !== undefined && rate !== null && !isNaN(parseFloat(rate))) {
+                    sEl.textContent = parseFloat(rate).toFixed(1) + '%';
+                } else if (abs !== undefined && abs !== null && !isNaN(parseFloat(abs))) {
+                    const v = parseFloat(abs);
+                    sEl.textContent = v > 0 ? v.toFixed(1) + ' حفظ/منشور' : '0';
+                } else {
+                    sEl.textContent = '--';
+                }
             }
             if (document.getElementById('igPosts')) {
                 const pc = igData.posts_count || 0;
@@ -2146,21 +2221,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 pcEl.className = pc >= 50 ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
             if (document.getElementById('igPostsWeek')) {
-                const pw = igData.posts_per_week || 0;
+                // ── إصلاح BUG #5: Falsy-Zero ──────────────────────────
+                // posts_per_week === 0 يعني "لا ينشر" (معلومة مهمة) وليس
+                // فقدان بيانات. نميز بين null/undefined و 0 صريحاً.
+                const pw = igData.posts_per_week;
                 const pwEl = document.getElementById('igPostsWeek');
-                pwEl.textContent = pw > 0 ? pw + '/أسبوع' : '--';
-                pwEl.className = pw >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                if (pw === null || pw === undefined) {
+                    pwEl.textContent = '--';
+                    pwEl.className = 'si-badge badge-warn data-missing';
+                } else if (pw === 0) {
+                    pwEl.textContent = 'لا ينشر';
+                    pwEl.className = 'si-badge badge-warn';
+                } else {
+                    pwEl.textContent = pw + '/أسبوع';
+                    pwEl.className = pw >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                }
             }
             if (document.getElementById('igLastPost')) {
-                const lp = igData.last_post_days || 0;
+                // ── إصلاح BUG #4: Falsy-Zero ──────────────────────────
+                // last_post_days === 0 يعني "نُشر اليوم" (إيجابي) لكن
+                // التحويل بـ || 0 ثم > 0 كان يعرض '--' خطأ.
+                const lp = igData.last_post_days;
                 const lpEl = document.getElementById('igLastPost');
-                lpEl.textContent = lp > 0 ? lp + ' يوم' : '--';
-                lpEl.className =
-                    lp <= 7
-                        ? 'si-badge badge-ok'
-                        : lp <= 21
-                        ? 'si-badge badge-warn'
-                        : 'si-badge badge-warn';
+                if (lp === null || lp === undefined) {
+                    lpEl.textContent = 'غير متوفر';
+                    lpEl.className = 'si-badge badge-warn data-missing';
+                } else if (lp === 0) {
+                    lpEl.textContent = 'اليوم';
+                    lpEl.className = 'si-badge badge-ok';
+                } else if (lp === 1) {
+                    lpEl.textContent = 'أمس';
+                    lpEl.className = 'si-badge badge-ok';
+                } else {
+                    lpEl.textContent = lp + ' يوم';
+                    lpEl.className = lp <= 7 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                }
             }
             if (document.getElementById('igVideoPct')) {
                 const vp = igData.deep_analysis?.types_percent?.video || igData.video_percent || 0;
@@ -2172,8 +2267,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // The Apify scraper exposes this as `highlight_reel_count`,
                 // not `highlights_count`. The old code used the wrong key
                 // and always rendered '--'. We accept both for safety.
-                const hl = igData.highlight_reel_count ?? igData.highlights_count ?? igData.highlights ?? 0;
-                document.getElementById('igHighlights').textContent = hl > 0 ? hl : '--';
+                // ── إصلاح BUG #10: عرض 0 صريحاً بدل '--' (لا يستخدم Highlights) ──
+                const hl =
+                    igData.highlight_reel_count ??
+                    igData.highlights_count ??
+                    igData.highlights;
+                const hlEl = document.getElementById('igHighlights');
+                if (hl === null || hl === undefined) {
+                    hlEl.textContent = '--';
+                } else {
+                    hlEl.textContent = hl;
+                }
             }
 
             // IG Business/Verified
@@ -2212,10 +2316,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('ig-score').textContent = igScore;
                 const progIg = document.getElementById('prog-ig');
                 if (progIg) {
+                    // ── إصلاح BUG #9: استخدام classList بدلاً من className ──
                     progIg.style.width = igScore + '%';
-                    progIg.className =
-                        'progress-fill ' +
-                        (igScore >= 70 ? 'green' : igScore >= 40 ? 'yellow' : 'red');
+                    progIg.classList.remove('green', 'yellow', 'red');
+                    progIg.classList.add(
+                        igScore >= 70 ? 'green' : igScore >= 40 ? 'yellow' : 'red'
+                    );
                 }
             }
 
@@ -2313,16 +2419,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 fbpEl.className = fbp >= 50 ? 'si-badge badge-ok' : 'si-badge badge-warn';
             }
             if (document.getElementById('fbPostsWeek')) {
-                const fbpw = fbData.posts_per_week || 0;
+                // ── إصلاح BUG #5: Falsy-Zero ──────────────────────────
+                const fbpw = fbData.posts_per_week;
                 const fbpwEl = document.getElementById('fbPostsWeek');
-                fbpwEl.textContent = fbpw > 0 ? fbpw + '/أسبوع' : '--';
-                fbpwEl.className = fbpw >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                if (fbpw === null || fbpw === undefined) {
+                    fbpwEl.textContent = '--';
+                    fbpwEl.className = 'si-badge badge-warn data-missing';
+                } else if (fbpw === 0) {
+                    fbpwEl.textContent = 'لا ينشر';
+                    fbpwEl.className = 'si-badge badge-warn';
+                } else {
+                    fbpwEl.textContent = fbpw + '/أسبوع';
+                    fbpwEl.className = fbpw >= 3 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                }
             }
             if (document.getElementById('fbLastPost')) {
-                const fblp = fbData.last_post_days || 0;
+                // ── إصلاح BUG #5: Falsy-Zero ──────────────────────────
+                const fblp = fbData.last_post_days;
                 const fblpEl = document.getElementById('fbLastPost');
-                fblpEl.textContent = fblp > 0 ? fblp + ' يوم' : '--';
-                fblpEl.className = fblp <= 7 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                if (fblp === null || fblp === undefined) {
+                    fblpEl.textContent = 'غير متوفر';
+                    fblpEl.className = 'si-badge badge-warn data-missing';
+                } else if (fblp === 0) {
+                    fblpEl.textContent = 'اليوم';
+                    fblpEl.className = 'si-badge badge-ok';
+                } else if (fblp === 1) {
+                    fblpEl.textContent = 'أمس';
+                    fblpEl.className = 'si-badge badge-ok';
+                } else {
+                    fblpEl.textContent = fblp + ' يوم';
+                    fblpEl.className = fblp <= 7 ? 'si-badge badge-ok' : 'si-badge badge-warn';
+                }
             }
             if (document.getElementById('fbHashtags')) {
                 const fht = fbData.deep_analysis?.top_hashtags?.length || 0;
@@ -2398,10 +2525,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('fb-score').textContent = fbScore;
                 const progFb = document.getElementById('prog-fb');
                 if (progFb) {
+                    // ── إصلاح BUG #9: استخدام classList بدلاً من className ──
                     progFb.style.width = fbScore + '%';
-                    progFb.className =
-                        'progress-fill ' +
-                        (fbScore >= 70 ? 'green' : fbScore >= 40 ? 'yellow' : 'red');
+                    progFb.classList.remove('green', 'yellow', 'red');
+                    progFb.classList.add(
+                        fbScore >= 70 ? 'green' : fbScore >= 40 ? 'yellow' : 'red'
+                    );
                 }
             }
 
