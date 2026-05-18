@@ -4155,196 +4155,330 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ==========================================
         // PAGE: recommendations.html
+        // ──────────────────────────────────────────
+        // المصادر المحتملة (مؤكدة بقراءة gemini-agents.php و ai-analyze.php):
+        //
+        // 1) Multi-Agent (Agent 5) — مفاتيح Schema الفعلي:
+        //    priority(رقم 1-12)، title، description، why_now،
+        //    step_by_step[]، tools_needed[]، budget_needed،
+        //    time_to_implement، expected_roi، risk_if_ignored،
+        //    category، difficulty(easy|medium|hard)
+        //
+        // 2) Single-prompt fallback — مفاتيح Schema مختلف:
+        //    priority(نص "high"|"medium"|"low")، icon، title، desc،
+        //    why_now، bullets[]، roi، time_to_implement
+        //
+        // ai.recommendations يأتي من result.php بعد دمج المسارين
+        // (ai-analyze.php سطر 178: $result['recommendations'] = page_16_recommendations)
         // ==========================================
         try {
         if (path.includes('recommendations.html')) {
+            // ────────────────────────────────────────────────────────
+            // Helpers محلية — معزولة عن باقي الصفحات
+            // ────────────────────────────────────────────────────────
+
+            // hasValueRec: حماية ضد placeholders الـ AI الفارغة
+            // (نفس النمط المستخدم في PR #50/#51 — strengths/weaknesses)
+            const hasValueRec = (v) => {
+                if (v === null || v === undefined) return false;
+                if (typeof v === 'string') {
+                    const s = v.trim();
+                    if (s === '' || s === '—' || s === '-' || s === '...') return false;
+                    if (/^(جاري|loading|placeholder|n\/a|null|undefined)$/i.test(s)) return false;
+                    return true;
+                }
+                if (typeof v === 'number') return Number.isFinite(v);
+                if (Array.isArray(v)) return v.length > 0 && v.some(hasValueRec);
+                if (typeof v === 'object') return Object.keys(v).length > 0;
+                return Boolean(v);
+            };
+
+            // normalizePriority:
+            // ── Agent 5: priority رقم (1-12). الترتيب من 1=الأعلى. نوزّع بالأثلاث:
+            //    1-4 → high، 5-8 → medium، 9+ → low
+            // ── Single-prompt: priority نص "high"|"medium"|"low" → نمرّره كما هو
+            // ── حماية: لو عدد التوصيات قليل أو القيمة غير معروفة، نرجع afflback ذكي
+            const normalizePriority = (rec, fallbackIndex, totalCount) => {
+                const raw = rec && rec.priority;
+
+                // مسار 1: نص (single-prompt)
+                if (typeof raw === 'string' && raw.trim() !== '') {
+                    const s = raw.toLowerCase().trim();
+                    if (s.includes('critical')) return 'critical';
+                    if (s.includes('high') || s === 'عاجل' || s === 'قصوى') return 'high';
+                    if (s.includes('med')  || s === 'متوسطة' || s === 'متوسط') return 'medium';
+                    if (s.includes('low')  || s === 'منخفضة' || s === 'مستقبلية') return 'low';
+                }
+
+                // مسار 2: رقم (Agent 5)
+                if (typeof raw === 'number' && Number.isFinite(raw)) {
+                    if (raw <= 0) return 'high'; // غير منطقي لكن نتعامل معه
+                    if (raw <= 4) return 'high';
+                    if (raw <= 8) return 'medium';
+                    return 'low';
+                }
+
+                // مسار 3: نص يحوي رقم (مثل "1" أو "priority 3")
+                if (typeof raw === 'string') {
+                    const num = parseInt(raw.replace(/\D/g, ''), 10);
+                    if (Number.isFinite(num) && num > 0) {
+                        if (num <= 4) return 'high';
+                        if (num <= 8) return 'medium';
+                        return 'low';
+                    }
+                }
+
+                // Fallback: الموضع في القائمة (لو الترتيب من Agent 5 صحيح)
+                if (Number.isFinite(fallbackIndex) && Number.isFinite(totalCount)) {
+                    const idx = fallbackIndex + 1;
+                    const third = Math.max(1, Math.ceil(totalCount / 3));
+                    if (idx <= third) return 'high';
+                    if (idx <= third * 2) return 'medium';
+                    return 'low';
+                }
+                return 'medium';
+            };
+
+            // ترجمة priority للنص العربي للعرض
+            const priorityLabel = (p) => {
+                if (p === 'critical') return 'حرجة';
+                if (p === 'high')     return 'قصوى';
+                if (p === 'medium')   return 'متوسطة';
+                if (p === 'low')      return 'مستقبلية';
+                return 'متوسطة';
+            };
+
+            // class CSS (ينطبق على المعرّفات الموجودة في recommendations.html)
+            const priorityClass = (p) => {
+                if (p === 'critical') return 'critical';
+                if (p === 'high')     return 'high';
+                if (p === 'medium')   return 'med';
+                if (p === 'low')      return 'low';
+                return 'med';
+            };
+
+            // ترجمة difficulty (Agent 5 ينتجها بالإنجليزية)
+            const translateDifficulty = (d) => {
+                if (!hasValueRec(d)) return '';
+                const s = String(d).toLowerCase().trim();
+                if (s === 'easy'   || s.includes('سهل')) return 'سهلة';
+                if (s === 'medium' || s.includes('متوسط')) return 'متوسطة';
+                if (s === 'hard'   || s.includes('صعب')) return 'صعبة';
+                return String(d);
+            };
+
+            // formatList: مصفوفة → نص مفصول بفاصلة عربية، أو قيمة نصية كما هي
+            const formatList = (val) => {
+                if (Array.isArray(val)) {
+                    const items = val.filter(hasValueRec).map(x => String(x).trim());
+                    return items.length > 0 ? items.join('، ') : '';
+                }
+                return hasValueRec(val) ? String(val).trim() : '';
+            };
+
+            // sanitizeRec: غلاف رفيع حول sanitize العالمية + حماية إضافية
+            const sanitizeRec = (val) => {
+                if (!hasValueRec(val)) return '';
+                return sanitize(String(val));
+            };
+
+            // appendMetaIfPresent: يبني صف rec-meta فقط إذا توفّرت قيمة حقيقية
+            const appendMetaIfPresent = (label, icon, value, extraClass = '') => {
+                const v = sanitizeRec(value);
+                if (!v) return '';
+                return `<div class="rec-meta ${extraClass}"><span class="meta-label">${icon} ${label}:</span> ${v}</div>`;
+            };
+
+            // appendMetricIfPresent: يبني خانة metric فقط إذا توفّرت قيمة حقيقية
+            const appendMetricIfPresent = (label, icon, value) => {
+                const v = sanitizeRec(value);
+                if (!v) return '';
+                return `<div class="rec-metric"><span class="metric-icon">${icon}</span><span class="metric-label">${label}:</span> ${v}</div>`;
+            };
+
+            // ────────────────────────────────────────────────────────
+            // 1) ترويسة الصفحة (الاسم/المقبض/الصورة)
+            // ────────────────────────────────────────────────────────
             const recClientName = document.getElementById('recClientName');
             const recHandle = document.getElementById('recHandle');
             const recTotalCount = document.getElementById('recTotalCount');
             const recProfileImg = document.getElementById('recProfileImg');
 
             if (recClientName) recClientName.textContent = clientName;
-            if (recHandle)
-                recHandle.textContent = clientUrl
-                    ? '@' + clientUrl.replace('https://', '').replace('www.', '').split('/')[0]
-                    : '@' + clientName.replace(/\s+/g, '');
-            if (recProfileImg && clientName)
+
+            // ── Bidi/RTL fix: المقبض يجب أن يُعرض LTR لمنع انقلابه ──
+            // (مثال: @alabeermarketing.com يصبح alabeermarketing.com@ في RTL)
+            if (recHandle) {
+                let handleText;
+                if (clientUrl) {
+                    handleText = '@' + clientUrl
+                        .replace(/^https?:\/\//, '')
+                        .replace(/^www\./, '')
+                        .split('/')[0];
+                } else {
+                    handleText = '@' + clientName.replace(/\s+/g, '');
+                }
+                recHandle.textContent = handleText;
+                recHandle.style.direction = 'ltr';
+                recHandle.style.unicodeBidi = 'isolate';
+                recHandle.style.display = 'inline-block';
+            }
+
+            if (recProfileImg && clientName) {
                 recProfileImg.textContent = Array.from(clientName)[0].toUpperCase();
+            }
+
+            // ────────────────────────────────────────────────────────
+            // 2) جلب التوصيات (مع cross-source fallback)
+            // ────────────────────────────────────────────────────────
+            // الترتيب:
+            //   أ) ai.recommendations (المُدمج في report-connect.js — يغطي المسارين)
+            //   ب) data.page_16_recommendations (Multi-Agent مباشرة من الجذر)
+            //   ج) data.recommendations (Single-prompt مباشرة من الجذر)
+            let recsRaw = [];
+            if (Array.isArray(ai.recommendations) && ai.recommendations.length > 0) {
+                recsRaw = ai.recommendations;
+            } else if (Array.isArray(data.page_16_recommendations) && data.page_16_recommendations.length > 0) {
+                recsRaw = data.page_16_recommendations;
+            } else if (Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+                recsRaw = data.recommendations;
+            }
 
             const recHighList = document.getElementById('recHighList');
             const recMedList = document.getElementById('recMedList');
             const recLowList = document.getElementById('recLowList');
 
-            if (
-                ai.recommendations &&
-                Array.isArray(ai.recommendations) &&
-                ai.recommendations.length > 0
-            ) {
-                let highHtml = '';
-                let medHtml = '';
-                let lowHtml = '';
-                let totalRecs = 0;
+            // ────────────────────────────────────────────────────────
+            // 3) حالة عدم وجود بيانات (لا fallback مضلِّل)
+            // ────────────────────────────────────────────────────────
+            if (recsRaw.length === 0) {
+                const emptyMsg = '<div style="padding:24px; color:var(--text-gray); font-size:14px; font-style:italic; text-align:center;">لم يتمكن المحلل الذكي من صياغة توصيات لهذا الحساب — حاول إعادة التحليل أو راجع نقاط الضعف لمزيد من التفاصيل.</div>';
+                if (recHighList) recHighList.innerHTML = emptyMsg;
+                if (recMedList)  recMedList.innerHTML  = '<div style="padding:20px; color:var(--text-gray); font-size:14px; font-style:italic;">لا توجد توصيات متوسطة الأولوية حالياً.</div>';
+                if (recLowList)  recLowList.innerHTML  = '<div style="padding:20px; color:var(--text-gray); font-size:14px; font-style:italic;">لا توجد توصيات مستقبلية حالياً.</div>';
+                if (recTotalCount) recTotalCount.textContent = '0 إجراء';
+            } else {
+                // ────────────────────────────────────────────────────
+                // 4) بناء بطاقة التوصية — يدعم schema الوكيل + fallback
+                // ────────────────────────────────────────────────────
+                const totalCount = recsRaw.length;
 
-                // ── Free tier: عرض 3 توصيات بالضبط (slice(0, 3)). Paid: القائمة كاملة. ──
-                const isPaidTier = true; // data.package_tier === 'paid'; // معطل مؤقتاً لغرض التصميم
-                const visibleRecs = isPaidTier
-                    ? ai.recommendations
-                    : ai.recommendations.slice(0, 3);
-                const totalCount = ai.recommendations.length;
+                // ── Free tier: عرض 3 توصيات بالضبط. Paid: القائمة كاملة. ──
+                const isPaidTier = true; // data.package_tier === 'paid'; // معطل مؤقتاً
+                const visibleRecs = isPaidTier ? recsRaw : recsRaw.slice(0, 3);
 
-                // ═══════════════════════════════════════════════════════════════════
-                // دالة بناء بطاقة التوصية التفصيلية
-                // ═══════════════════════════════════════════════════════════════════
                 const buildRecCard = (rec, index) => {
-                    totalRecs++;
-                    const priority = rec.priority
-                        ? rec.priority.toLowerCase()
-                        : totalRecs <= 2
-                        ? 'high'
-                        : totalRecs <= 4
-                        ? 'medium'
-                        : 'low';
-                    // تحديد الفئة: critical أولاً، ثم high، ثم med، ثم low
-                    const iconClass = priority.includes('critical')
-                        ? 'critical'
-                        : priority.includes('high')
-                        ? 'high'
-                        : priority.includes('med')
-                        ? 'med'
-                        : 'low';
-                    const iconEmoji =
-                        rec.icon ||
-                        (priority.includes('critical')
-                            ? '🛑'
-                            : priority.includes('high')
-                            ? '🔴'
-                            : priority.includes('med')
-                            ? '🟡'
-                            : '🟢');
-                    const priorityText = priority.includes('critical')
-                        ? 'حرجة'
-                        : priority.includes('high')
-                        ? 'قصوى'
-                        : priority.includes('med')
-                        ? 'متوسطة'
-                        : 'مستقبلية';
+                    // 4-أ) تطبيع الأولوية
+                    const pNorm = normalizePriority(rec, index, visibleRecs.length);
+                    const cls   = priorityClass(pNorm);
+                    const pText = priorityLabel(pNorm);
 
-                    const title = sanitize(rec.title || 'توصية هامة');
-                    const desc = sanitize(rec.desc || rec.description || '');
-                    const whyNow = sanitize(rec.why_now || '');
-                    const evidence = sanitize(rec.evidence || '');
-                    const roi = sanitize(rec.roi || '');
-                    const time = sanitize(rec.time_to_implement || '');
-                    const difficulty = sanitize(rec.difficulty || '');
-                    const scoreImpact = sanitize(rec.score_impact || '');
-                    const strategicContext = sanitize(rec.strategic_context || '');
+                    // 4-ب) الأيقونة (من الـ AI أو افتراضية حسب الأولوية)
+                    const iconEmoji = hasValueRec(rec.icon) ? sanitize(rec.icon) :
+                        (pNorm === 'critical' ? '🛑' :
+                         pNorm === 'high'     ? '🔴' :
+                         pNorm === 'medium'   ? '🟡' : '🟢');
 
-                    // الخطوات (bullets)
-                    let bulletsHtml = '';
-                    if (rec.bullets && Array.isArray(rec.bullets) && rec.bullets.length > 0) {
-                        bulletsHtml = `<div class="rec-steps">
-                <div class="rec-steps-title">📋 خطوات التنفيذ:</div>
-                ${rec.bullets.map(b => `<div class="rec-step">${sanitize(b)}</div>`).join('')}
-              </div>`;
+                    // 4-ج) العنوان (مطلوب — fallback إلى رمز رمادي بدل نص خادع)
+                    const title = sanitizeRec(rec.title) || '—';
+
+                    // 4-د) الوصف (Agent 5: description | Single-prompt: desc)
+                    const desc = sanitizeRec(rec.description) || sanitizeRec(rec.desc) || '';
+
+                    // 4-هـ) لماذا الآن (مشترك بين المسارين)
+                    const whyNow = sanitizeRec(rec.why_now);
+
+                    // 4-و) خطوات التنفيذ (Agent 5: step_by_step | Single-prompt: bullets)
+                    let stepsArr = [];
+                    if (Array.isArray(rec.step_by_step) && rec.step_by_step.length > 0) {
+                        stepsArr = rec.step_by_step.filter(hasValueRec);
+                    } else if (Array.isArray(rec.bullets) && rec.bullets.length > 0) {
+                        stepsArr = rec.bullets.filter(hasValueRec);
                     }
+                    const stepsHtml = stepsArr.length > 0
+                        ? `<div class="rec-steps">
+                             <div class="rec-steps-title">📋 خطوات التنفيذ بالتفصيل:</div>
+                             ${stepsArr.map((s, i) => `<div class="rec-step">${i + 1}. ${sanitize(String(s))}</div>`).join('')}
+                           </div>`
+                        : '';
+
+                    // 4-ز) الحقول الإضافية (Agent 5 فقط — جميعها كانت مُهمَلة)
+                    const tools     = formatList(rec.tools_needed);   // مصفوفة → نص مفصول
+                    const budget    = sanitizeRec(rec.budget_needed);
+                    const risk      = sanitizeRec(rec.risk_if_ignored);
+                    const category  = sanitizeRec(rec.category);
+
+                    // 4-ح) الحقول المشتركة
+                    const time = sanitizeRec(rec.time_to_implement);
+                    // العائد: Agent 5: expected_roi | Single-prompt: roi
+                    const roi  = sanitizeRec(rec.expected_roi) || sanitizeRec(rec.roi);
+                    const diff = translateDifficulty(rec.difficulty);
+
+                    // 4-ط) بناء meta rows (سياق + لماذا الآن + خطر الإهمال)
+                    const metaRows = [
+                        appendMetaIfPresent('لماذا الآن', '⚡', whyNow, 'highlight'),
+                        appendMetaIfPresent('خطر الإهمال', '⚠️', risk),
+                        appendMetaIfPresent('التصنيف', '🏷️', category, 'strategic'),
+                    ].filter(x => x).join('');
+
+                    // 4-ي) بناء metrics box (الأدوات + الميزانية + الوقت + العائد + الصعوبة)
+                    const metricsHtml = [
+                        appendMetricIfPresent('الأدوات', '🛠️', tools),
+                        appendMetricIfPresent('الميزانية', '💰', budget),
+                        appendMetricIfPresent('الوقت', '⏱️', time),
+                        appendMetricIfPresent('العائد', '📈', roi),
+                        appendMetricIfPresent('الصعوبة', '🔧', diff),
+                    ].filter(x => x).join('');
 
                     return `
-              <div class="rec-card-detailed ${iconClass}">
+              <div class="rec-card-detailed ${cls}">
                 <div class="rec-header">
-                  <div class="rec-icon-large ${iconClass}">${iconEmoji}</div>
+                  <div class="rec-icon-large ${cls}">${iconEmoji}</div>
                   <div class="rec-header-content">
-                    <div class="rec-priority-badge ${iconClass}">🚨 أولوية ${priorityText}</div>
+                    <div class="rec-priority-badge ${cls}">🚨 أولوية ${pText}</div>
                     <h4 class="rec-title">${title}</h4>
                   </div>
                 </div>
                 <div class="rec-body">
-                  <div class="rec-desc">${desc}</div>
-
-                  ${
-                      strategicContext
-                          ? `<div class="rec-meta strategic"><span class="meta-label">🎯 السياق الاستراتيجي:</span> ${strategicContext}</div>`
-                          : ''
-                  }
-                  ${
-                      evidence
-                          ? `<div class="rec-meta"><span class="meta-label">📊 الدليل:</span> ${evidence}</div>`
-                          : ''
-                  }
-                  ${
-                      whyNow
-                          ? `<div class="rec-meta highlight"><span class="meta-label">⚡ لماذا الآن:</span> ${whyNow}</div>`
-                          : ''
-                  }
-
-                  ${bulletsHtml}
-
-                  <div class="rec-metrics">
-                    ${
-                        roi
-                            ? `<div class="rec-metric"><span class="metric-icon">💰</span><span class="metric-label">العائد:</span> ${roi}</div>`
-                            : ''
-                    }
-                    ${
-                        time
-                            ? `<div class="rec-metric"><span class="metric-icon">⏱️</span><span class="metric-label">الوقت:</span> ${time}</div>`
-                            : ''
-                    }
-                    ${
-                        difficulty
-                            ? `<div class="rec-metric"><span class="metric-icon">🔧</span><span class="metric-label">الصعوبة:</span> ${difficulty}</div>`
-                            : ''
-                    }
-                    ${
-                        scoreImpact
-                            ? `<div class="rec-metric"><span class="metric-icon">📈</span><span class="metric-label">التأثير:</span> ${scoreImpact}</div>`
-                            : ''
-                    }
-                  </div>
+                  ${desc ? `<div class="rec-desc">${desc}</div>` : ''}
+                  ${metaRows}
+                  ${stepsHtml}
+                  ${metricsHtml ? `<div class="rec-metrics">${metricsHtml}</div>` : ''}
                 </div>
               </div>
             `;
                 };
 
+                // ────────────────────────────────────────────────────
+                // 5) توزيع التوصيات على الحاويات الثلاث
+                // ────────────────────────────────────────────────────
+                let highHtml = '';
+                let medHtml  = '';
+                let lowHtml  = '';
+
                 visibleRecs.forEach((rec, i) => {
-                    const priority = rec.priority ? rec.priority.toLowerCase() : 'medium';
+                    const pNorm = normalizePriority(rec, i, visibleRecs.length);
                     const cardHtml = buildRecCard(rec, i);
-                    // critical توضع في high (القصوى)، وكذلك high
-                    if (priority.includes('critical') || priority.includes('high'))
-                        highHtml += cardHtml;
-                    else if (priority.includes('med')) medHtml += cardHtml;
-                    else lowHtml += cardHtml;
+                    if (pNorm === 'critical' || pNorm === 'high') highHtml += cardHtml;
+                    else if (pNorm === 'medium')                  medHtml  += cardHtml;
+                    else                                          lowHtml  += cardHtml;
                 });
 
-                if (recHighList)
-                    recHighList.innerHTML =
-                        highHtml ||
-                        '<div style="padding: 20px; color: var(--text-gray);">✅ لا توجد توصيات قصوى حالياً — وضع ممتاز!</div>';
-                if (recMedList)
-                    recMedList.innerHTML =
-                        medHtml ||
-                        '<div style="padding: 20px; color: var(--text-gray);">لا توجد توصيات متوسطة.</div>';
-                if (recLowList)
-                    recLowList.innerHTML =
-                        lowHtml ||
-                        '<div style="padding: 20px; color: var(--text-gray);">لا توجد توصيات مستقبلية حالياً.</div>';
+                // ── حقن البطاقات + رسائل رمادية أنيقة عند فراغ حاوية ──
+                const emptyHigh = '<div style="padding:20px; color:var(--text-gray); font-size:14px; font-style:italic;">✅ لا توجد إجراءات قصوى حالياً — وضع جيد!</div>';
+                const emptyMed  = '<div style="padding:20px; color:var(--text-gray); font-size:14px; font-style:italic;">لا توجد توصيات متوسطة الأولوية حالياً.</div>';
+                const emptyLow  = '<div style="padding:20px; color:var(--text-gray); font-size:14px; font-style:italic;">لا توجد تحسينات مستقبلية حالياً.</div>';
 
+                if (recHighList) recHighList.innerHTML = highHtml || emptyHigh;
+                if (recMedList)  recMedList.innerHTML  = medHtml  || emptyMed;
+                if (recLowList)  recLowList.innerHTML  = lowHtml  || emptyLow;
+
+                // ── العداد الكلي ──
                 if (recTotalCount) {
                     recTotalCount.textContent = isPaidTier
                         ? totalCount + ' إجراء'
                         : visibleRecs.length + ' من ' + totalCount + ' إجراء (باقة مجانية)';
                 }
-            } else {
-                // Fallback if no recommendations array
-                if (recHighList)
-                    recHighList.innerHTML =
-                        '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة نقاط الضعف لمزيد من التفاصيل.</div>';
-                if (recMedList)
-                    recMedList.innerHTML =
-                        '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة خطة العمل لمزيد من التفاصيل.</div>';
-                if (recLowList)
-                    recLowList.innerHTML =
-                        '<div style="padding: 20px; color: var(--text-gray);">الرجاء مراجعة نقاط القوة لمزيد من التفاصيل.</div>';
-                if (recTotalCount) recTotalCount.textContent = '... إجراء';
             }
         }
         } catch (__pageErr) {
