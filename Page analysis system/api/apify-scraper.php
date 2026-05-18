@@ -249,6 +249,40 @@ function scrapeAdsLibrary(
 }
 
 
+/**
+ * ── ADS-A5 FIX: تطبيع موحّد لحالة "نشط" عبر كل actors و scrapers
+ * يفحص بالترتيب: adArchiveStatus → bool flags → status string → وجود تواريخ
+ */
+function _normalizeAdActiveStatus(array $ad): bool {
+    // 1. adArchiveStatus enum (ACTIVE/INACTIVE/...)
+    if (isset($ad['adArchiveStatus']) && is_string($ad['adArchiveStatus'])) {
+        return strtoupper($ad['adArchiveStatus']) === 'ACTIVE';
+    }
+
+    // 2. Boolean flags (camelCase + snake_case)
+    foreach (['isActive', 'is_active', 'currentlyActive', 'active'] as $key) {
+        if (array_key_exists($key, $ad)) {
+            return (bool)$ad[$key];
+        }
+    }
+
+    // 3. Status string (active/live/running)
+    $rawStatus = $ad['ad_delivery_status'] ?? $ad['status'] ?? '';
+    $status = is_string($rawStatus) ? strtolower($rawStatus) : '';
+    if (in_array($status, ['active', 'live', 'running'], true)) {
+        return true;
+    }
+
+    // 4. Heuristic: لديه startDate ولا endDate → يُحتمل أنه نشط
+    $hasStart = !empty($ad['startDate'] ?? $ad['start_date'] ?? $ad['ad_creation_time'] ?? null);
+    $hasEnd   = !empty($ad['endDate']   ?? $ad['end_date']   ?? null);
+    if ($hasStart && !$hasEnd) {
+        return true;
+    }
+
+    return false;
+}
+
 function _parseAd(array $ad): array {
     $rawStatus = $ad['ad_delivery_status'] ?? $ad['status'] ?? '';
     $status = is_string($rawStatus) ? strtolower($rawStatus) : '';
@@ -259,8 +293,7 @@ function _parseAd(array $ad): array {
         'id'                  => $ad['adArchiveID']              ?? $ad['ad_archive_id'] ?? $ad['id']          ?? null,
         'title'               => $ad['adCreativeBody']           ?? $ad['ad_creative_body'] ?? $ad['body'] ?? $ad['title'] ?? '',
         'page_name'           => $ad['pageName']                 ?? $ad['page_name'] ?? '',
-        'is_active'           => ($ad['isActive'] ?? $ad['is_active'] ?? false) || $status === 'active'
-                              || ($status === '' && !empty($ad['startDate'] ?? $ad['start_date'] ?? $ad['ad_creation_time'])), // ADS-1 FIX: إعلان بدون status لكن له تاريخ بدء = نشط
+        'is_active'           => _normalizeAdActiveStatus($ad), // ADS-A5 FIX: helper موحّد
         'start_date'          => $ad['startDate']                ?? $ad['start_date'] ?? $ad['ad_creation_time'] ?? null,
         'platforms'           => $ad['publisherPlatform']        ?? $ad['publisher_platforms'] ?? $ad['platforms'] ?? [],
         'spend'               => $ad['spend']                    ?? null,

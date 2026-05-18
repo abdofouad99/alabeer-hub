@@ -321,24 +321,11 @@ function fetchAdsPublicScraping(string $fbUrl): array {
         if (is_array($decoded)) {
             foreach ($decoded as $ad) {
                 if (!is_array($ad)) continue;
-                // قراءة حالة الإعلان من الحقول الفعلية بدلاً من تثبيتها كـ true.
-                // الأسماء المحتملة لحقل الحالة في JSON المضمن قد تختلف بين
-                // إصدارات Facebook، لذلك نبحث في عدة مفاتيح ثم نسقط على
-                // false (محافظ — لا نفترض النشاط بدون دليل) إذا غابت كلها.
-                $isActive = null;
-                foreach (['isActive', 'is_active', 'active', 'currentlyActive'] as $key) {
-                    if (array_key_exists($key, $ad)) {
-                        $isActive = (bool) $ad[$key];
-                        break;
-                    }
-                }
-                // بعض الـ payloads تستخدم enum string مثل "ACTIVE"/"INACTIVE"
-                if ($isActive === null && isset($ad['adArchiveStatus']) && is_string($ad['adArchiveStatus'])) {
-                    $isActive = strtoupper($ad['adArchiveStatus']) === 'ACTIVE';
-                }
-                if ($isActive === null) {
-                    $isActive = false; // محافظ: لا نفترض النشاط بدون دليل
-                }
+                // ── ADS-A5 FIX: استخدام الـ helper الموحّد من apify-scraper.php
+                // لضمان نفس منطق "نشط" في كل المسارات (Apify + Public Scraping)
+                $isActive = function_exists('_normalizeAdActiveStatus')
+                    ? _normalizeAdActiveStatus($ad)
+                    : false; // محافظ إذا لم يكن apify-scraper محمّلاً
 
                 $ads[] = [
                     'id'         => $ad['adArchiveID'] ?? $ad['id'] ?? null,
