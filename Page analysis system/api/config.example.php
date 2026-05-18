@@ -115,6 +115,12 @@ return [
         'competitor_parallel_enrich'      => filter_var($get('COMPETITOR_PARALLEL_ENRICH', 'true'), FILTER_VALIDATE_BOOLEAN),
         'competitor_cache_hours'          => (int)$get('COMPETITOR_CACHE_HOURS', '6'),
         'competitor_max_reviews_per_comp' => (int)$get('COMPETITOR_MAX_REVIEWS_PER_COMP', '20'),
+
+        // ── Competitors v2 / Sprint 4 (AI Analysis) ──
+        'competitor_ai_strict_mode' => filter_var($get('COMPETITOR_AI_STRICT_MODE', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'competitor_ai_provider'    => $get('COMPETITOR_AI_PROVIDER', 'openai'),
+        'competitor_ai_model'       => $get('COMPETITOR_AI_MODEL', 'gpt-4o-mini'),
+        'competitor_ai_temperature' => (float)$get('COMPETITOR_AI_TEMPERATURE', '0.2'),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
