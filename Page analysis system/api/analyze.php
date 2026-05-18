@@ -1041,6 +1041,9 @@ function runAnalysis(int $assessmentId): array {
     if (!empty($compRadar)) {
         $scanResult['competitor_radar'] = $compRadar;
     }
+    if (!empty($compResult['market_summary'])) {
+        $scanResult['market_summary'] = $compResult['market_summary'];
+    }
     // ابقِ القيمة الموجودة من runPageScan إن نجحت
 
     // الـ Social الأساسي للتسجيل: أغنى البيانات
