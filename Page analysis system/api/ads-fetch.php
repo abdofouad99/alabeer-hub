@@ -405,11 +405,28 @@ function fetchHtmlContent(string $url, int $timeout = 15): string|false {
  * OpenAI deep analysis — نفس الـ 12 سؤال من الأداة الأصلية
  */
 function callOpenAIDeepAnalysis(string $key, array $cfg, array $ads, array $entity, string $clientName, string $websiteUrl=''): string {
-    $adsContext = implode("\n---\n", array_map(
-        fn($ad, $i) => "الإعلان ".($i + 1).": ".($ad['text'] ?? $ad['title'] ?? '(بدون نص)'),
-        $ads,
-        array_keys($ads)
-    ));
+    $adsContext = implode("\n---\n", array_map(function($ad, $i) {
+        $idx      = $i + 1;
+        $text     = trim((string)($ad['text'] ?? $ad['title'] ?? ''));
+        $headline = trim((string)($ad['headline'] ?? ''));
+        $cta      = trim((string)($ad['cta_text'] ?? $ad['cta_type'] ?? ''));
+        $format   = trim((string)($ad['display_format'] ?? ''));
+        $platforms= is_array($ad['platforms'] ?? null) ? implode('، ', $ad['platforms']) : '';
+        $landing  = trim((string)($ad['landing_url'] ?? $ad['link_url'] ?? ''));
+        $caption  = trim((string)($ad['caption'] ?? ''));
+        $isActive = !empty($ad['is_active']);
+
+        $lines = ["الإعلان {$idx}:"];
+        $lines[] = "النص: " . ($text !== '' ? $text : '(بدون نص)');
+        if ($headline !== '')  $lines[] = "العنوان: {$headline}";
+        if ($caption !== '')   $lines[] = "وصف الرابط: {$caption}";
+        if ($cta !== '')       $lines[] = "زر الدعوة (CTA): {$cta}";
+        if ($format !== '')    $lines[] = "نوع الإعلان: {$format}";
+        if ($platforms !== '') $lines[] = "المنصات: {$platforms}";
+        if ($landing !== '')   $lines[] = "صفحة الهبوط: {$landing}";
+        $lines[] = "الحالة: " . ($isActive ? 'نشط' : 'متوقف');
+        return implode("\n", $lines);
+    }, $ads, array_keys($ads)));
     $followers     = $entity['page_likes'] ?? $entity['followers_count'] ?? 0;
     $platform      = $entity['platform'] ?? 'facebook';
     $entityContext = "المعلن: {$clientName}، المتابعين: {$followers}، المنصة: {$platform}";
@@ -463,10 +480,28 @@ function callOpenAIDeepAnalysis(string $key, array $cfg, array $ads, array $enti
  * NVIDIA AI — نفس الـ 12 سؤال من الأداة الأصلية (legacy)
  */
 function callNvidiaDeepAnalysis(string $key, array $ads, array $entity, string $clientName, string $websiteUrl=''): string {
-    $adsContext    = implode("\n---\n", array_map(
-        fn($ad,$i) => "الإعلان ".($i+1).": ".($ad['text']??$ad['title']??'(بدون نص)'),
-        $ads, array_keys($ads)
-    ));
+    $adsContext    = implode("\n---\n", array_map(function($ad, $i) {
+        $idx      = $i + 1;
+        $text     = trim((string)($ad['text'] ?? $ad['title'] ?? ''));
+        $headline = trim((string)($ad['headline'] ?? ''));
+        $cta      = trim((string)($ad['cta_text'] ?? $ad['cta_type'] ?? ''));
+        $format   = trim((string)($ad['display_format'] ?? ''));
+        $platforms= is_array($ad['platforms'] ?? null) ? implode('، ', $ad['platforms']) : '';
+        $landing  = trim((string)($ad['landing_url'] ?? $ad['link_url'] ?? ''));
+        $caption  = trim((string)($ad['caption'] ?? ''));
+        $isActive = !empty($ad['is_active']);
+
+        $lines = ["الإعلان {$idx}:"];
+        $lines[] = "النص: " . ($text !== '' ? $text : '(بدون نص)');
+        if ($headline !== '')  $lines[] = "العنوان: {$headline}";
+        if ($caption !== '')   $lines[] = "وصف الرابط: {$caption}";
+        if ($cta !== '')       $lines[] = "زر الدعوة (CTA): {$cta}";
+        if ($format !== '')    $lines[] = "نوع الإعلان: {$format}";
+        if ($platforms !== '') $lines[] = "المنصات: {$platforms}";
+        if ($landing !== '')   $lines[] = "صفحة الهبوط: {$landing}";
+        $lines[] = "الحالة: " . ($isActive ? 'نشط' : 'متوقف');
+        return implode("\n", $lines);
+    }, $ads, array_keys($ads)));
     $followers     = $entity['page_likes'] ?? $entity['followers_count'] ?? 0;
     $platform      = $entity['platform'] ?? 'facebook';
     $entityContext = "المعلن: {$clientName}، المتابعين: {$followers}، المنصة: {$platform}";
@@ -522,7 +557,19 @@ function callGeminiDeepAnalysis(array $cfg, array $ads, array $entity, string $c
     $model = $cfg['apis']['gemini_model'] ?? 'gemini-2.0-flash';
     if (empty($keys) || empty($ads)) return '';
 
-    $adsCtx  = implode("\n---\n", array_map(fn($ad,$i)=>"إعلان ".($i+1).": ".($ad['text']??''), $ads, array_keys($ads)));
+    $adsCtx = implode("\n---\n", array_map(function($ad, $i) {
+        $idx      = $i + 1;
+        $text     = trim((string)($ad['text'] ?? $ad['title'] ?? ''));
+        $headline = trim((string)($ad['headline'] ?? ''));
+        $cta      = trim((string)($ad['cta_text'] ?? $ad['cta_type'] ?? ''));
+        $format   = trim((string)($ad['display_format'] ?? ''));
+        $lines = ["إعلان {$idx}:"];
+        $lines[] = "النص: " . ($text !== '' ? $text : '(بدون نص)');
+        if ($headline !== '') $lines[] = "العنوان: {$headline}";
+        if ($cta !== '')      $lines[] = "CTA: {$cta}";
+        if ($format !== '')   $lines[] = "النوع: {$format}";
+        return implode("\n", $lines);
+    }, $ads, array_keys($ads)));
     $prompt  = "حلل هذه الإعلانات لـ {$clientName} وأجب على 12 سؤال تسويقي: نوع الحملة، الهدف، الاتساق، رحلة العميل، الهدر، الميزانية، المنصة، التعديلات، الرسائل، الجمهور. اجعل الرد Markdown احترافياً.\nالإعلانات:\n{$adsCtx}";
 
     foreach ($keys as $key) {
