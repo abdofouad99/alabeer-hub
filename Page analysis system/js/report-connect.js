@@ -5092,63 +5092,192 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         try {
         if (path.includes('plan.html')) {
+            // ─────────────────────────────────────────────
+            // helpers محلية لـ plan.html (نمط PR #50/#52/#54)
+            // ─────────────────────────────────────────────
+
+            // hasValuePlan: حماية ضد placeholders فارغة من الـ AI
+            // (نفس فكرة hasValueRec في PR #52)
+            const hasValuePlan = (v) => {
+                if (v === null || v === undefined) return false;
+                if (typeof v === 'number') return Number.isFinite(v);
+                if (typeof v === 'boolean') return true;
+                if (typeof v === 'string') {
+                    const t = v.trim();
+                    if (!t) return false;
+                    // placeholders شائعة
+                    if (/^[—–\-\.]+$/.test(t)) return false;
+                    if (t === 'null' || t === 'undefined' || t === 'N/A') return false;
+                    return true;
+                }
+                if (Array.isArray(v)) return v.length > 0 && v.some(hasValuePlan);
+                if (typeof v === 'object') return Object.keys(v).length > 0;
+                return false;
+            };
+
+            // normalizePlanPriority:
+            // schema page_16_recommendations:
+            //   Multi-Agent (Agent 5): priority = رقم 1-12
+            //   Single-Prompt mode:    priority = "high" | "medium" | "low"
+            // الكود السابق فلتر فقط على نص ⇒ Schema Mismatch
+            // كان يُسبّب Phase 2 فارغة دائماً في multi-agent
+            // (كشف نفس النمط في PR #52 لـ recommendations.html)
+            const normalizePlanPriority = (rec, fallbackIndex, totalCount) => {
+                const raw = rec && rec.priority;
+
+                // 1) رقم صريح
+                if (typeof raw === 'number' && Number.isFinite(raw)) {
+                    const n = Math.floor(raw);
+                    if (n >= 1 && n <= 4) return 'high';
+                    if (n >= 5 && n <= 8) return 'medium';
+                    if (n >= 9) return 'low';
+                }
+
+                // 2) نص — قد يكون "high"/"عالية"/"1"/"رقم 2" إلخ
+                if (typeof raw === 'string') {
+                    const t = raw.trim().toLowerCase();
+                    if (!t) {
+                        // فارغ → fallback
+                    } else if (t === 'critical' || t === 'حرج' || t === 'حرجة') {
+                        return 'high';
+                    } else if (t === 'high' || t === 'عالية' || t === 'عالي' || t === 'مرتفعة') {
+                        return 'high';
+                    } else if (t === 'medium' || t === 'med' || t === 'متوسطة' || t === 'متوسط') {
+                        return 'medium';
+                    } else if (t === 'low' || t === 'منخفضة' || t === 'منخفض') {
+                        return 'low';
+                    } else {
+                        // قد يكون رقم بصيغة نص ("1") أو "رقم 2"
+                        const m = t.match(/\d+/);
+                        if (m) {
+                            const n = parseInt(m[0], 10);
+                            if (Number.isFinite(n)) {
+                                if (n >= 1 && n <= 4) return 'high';
+                                if (n >= 5 && n <= 8) return 'medium';
+                                if (n >= 9) return 'low';
+                            }
+                        }
+                    }
+                }
+
+                // 3) fallback by index — نفس منهج PR #52
+                // أول ثلث = high، أوسط ثلث = medium، آخر ثلث = low
+                if (typeof fallbackIndex === 'number' && typeof totalCount === 'number' && totalCount > 0) {
+                    const third = totalCount / 3;
+                    if (fallbackIndex < third) return 'high';
+                    if (fallbackIndex < 2 * third) return 'medium';
+                    return 'low';
+                }
+                return 'medium';
+            };
+
+            // formatRoasNumber: 3.5 → "3.5x"، "3.5x" → "3.5x"، "350%" → "350%"
+            const formatRoasNumber = (v) => {
+                if (typeof v === 'number' && Number.isFinite(v)) {
+                    return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'x';
+                }
+                if (typeof v === 'string' && v.trim()) {
+                    const t = v.trim();
+                    if (/^\d+(\.\d+)?\s*x$/i.test(t)) return t.toLowerCase();
+                    if (/^\d+(\.\d+)?\s*%$/.test(t)) return t;
+                    const n = parseFloat(t);
+                    if (Number.isFinite(n)) {
+                        return (n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)) + 'x';
+                    }
+                    return t;
+                }
+                return null;
+            };
+
+            // setPlanText: تعيين textContent بأمان (XSS-safe كلياً)
+            const setPlanText = (id, text) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = text;
+            };
+
+            // ─────────────────────────────────────────────
             // Update client name
+            // ─────────────────────────────────────────────
             const planName = document.getElementById('planClientName');
             if (planName) planName.textContent = clientName;
 
+            // ─────────────────────────────────────────────
             // Phase 1: Quick Wins (from action_week)
+            // ─────────────────────────────────────────────
             const phase1 = document.getElementById('tasksPhase1');
-            if (phase1 && data.action_week && data.action_week.length > 0) {
-                phase1.innerHTML = data.action_week
-                    .map(
-                        action =>
-                            `<div class="rm-task"><i style="color:var(--green);">✓</i> ${sanitize(action)}</div>`
-                    )
-                    .join('');
+            if (phase1) {
+                const aw = Array.isArray(data.action_week) ? data.action_week.filter(hasValuePlan) : [];
+                if (aw.length > 0) {
+                    phase1.innerHTML = aw
+                        .map(
+                            action =>
+                                `<div class="rm-task"><i style="color:var(--green);">✓</i> ${sanitize(String(action))}</div>`
+                        )
+                        .join('');
+                } else {
+                    // بدلاً من ترك "⌛ جاري التحليل..." الأبدية
+                    phase1.innerHTML = `<div class="rm-task" style="color:#9ca3af;font-style:italic;"><i>—</i> لا توجد بيانات إجراءات أسبوعية في هذا التقرير.</div>`;
+                }
             }
 
+            // ─────────────────────────────────────────────
             // Phase 2: Core Optimization (from High/Med recommendations)
+            // باستخدام normalizePlanPriority للتعامل مع schema
+            // الرقمي (Multi-Agent) والنصي (Single-Prompt) معاً
+            // ─────────────────────────────────────────────
             const phase2 = document.getElementById('tasksPhase2');
-            if (phase2 && data.recommendations && data.recommendations.length > 0) {
-                const coreTasks = data.recommendations
-                    .filter(
-                        r =>
-                            r.priority === 'critical' ||
-                            r.priority === 'high' ||
-                            r.priority === 'medium'
-                    )
-                    .map(r => r.title);
+            if (phase2) {
+                const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+                const total = recs.length;
+                const coreTasks = recs
+                    .map((r, i) => ({
+                        title: r && (r.title || r.name) ? String(r.title || r.name).trim() : '',
+                        prio: normalizePlanPriority(r, i, total)
+                    }))
+                    .filter(x => hasValuePlan(x.title) && (x.prio === 'high' || x.prio === 'medium'));
+
                 if (coreTasks.length > 0) {
                     phase2.innerHTML = coreTasks
                         .slice(0, 6)
                         .map(
-                            title =>
-                                `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${sanitize(title)}</div>`
+                            x =>
+                                `<div class="rm-task"><i style="color:var(--yellow);">⚡</i> ${sanitize(x.title)}</div>`
                         )
                         .join('');
+                } else if (total > 0) {
+                    // التوصيات موجودة لكن بلا priority عالية/متوسطة بعد التطبيع
+                    phase2.innerHTML = `<div class="rm-task" style="color:#9ca3af;font-style:italic;"><i>—</i> لم يُحدَّد توصيات بأولوية عالية أو متوسطة لهذه المرحلة.</div>`;
                 } else {
-                    phase2.innerHTML = `<div class="rm-task"><i>!</i> لا توجد توصيات مؤكدة من بيانات التقرير لهذه المرحلة.</div>`;
+                    phase2.innerHTML = `<div class="rm-task" style="color:#9ca3af;font-style:italic;"><i>—</i> لا توجد توصيات في هذا التقرير.</div>`;
                 }
             }
 
+            // ─────────────────────────────────────────────
             // Phase 3: Scaling (Dynamic from data)
+            // ─────────────────────────────────────────────
             const phase3 = document.getElementById('tasksPhase3');
             if (phase3) {
                 let scaleTasks = [];
 
-                // بناءً على نقاط القوة
-                if (data.strengths && data.strengths.length > 0) {
-                    const topStrength =
-                        data.strengths[0].title || data.strengths[0].name || data.strengths[0];
-                    scaleTasks.push('استغلال نقطة القوة: ' + topStrength);
+                // بناءً على نقاط القوة (schema Agent 5: title + description)
+                if (Array.isArray(data.strengths) && data.strengths.length > 0) {
+                    const s0 = data.strengths[0];
+                    let topStrength = '';
+                    if (s0 && typeof s0 === 'object') {
+                        topStrength = s0.title || s0.name || '';
+                    } else if (typeof s0 === 'string') {
+                        topStrength = s0;
+                    }
+                    if (hasValuePlan(topStrength)) {
+                        scaleTasks.push('استغلال نقطة القوة: ' + String(topStrength).trim());
+                    }
                 }
 
                 // بناءً على حالة الإعلانات
-                if (sr.ads_library && sr.ads_library.total_ads > 0) {
+                const totalAds = (sr.ads_library && Number(sr.ads_library.total_ads)) || 0;
+                if (totalAds > 0) {
                     scaleTasks.push(
-                        'مضاعفة ميزانية الحملات الرابحة من ' +
-                            sr.ads_library.total_ads +
-                            ' إعلان حالي'
+                        'مضاعفة ميزانية الحملات الرابحة من ' + totalAds + ' إعلان حالي'
                     );
                 } else if (sr.hasPixel || sr.has_fb_pixel) {
                     scaleTasks.push('إطلاق أول حملة إعلانية — البنية التحتية جاهزة');
@@ -5156,19 +5285,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // بناءً على عدد المتابعين
                 const totalF =
-                    (sr.facebook?.followers || 0) +
-                    (sr.instagram?.followers || 0) +
-                    (sr.tiktok?.followers || 0);
+                    Number((sr.facebook && sr.facebook.followers) || 0) +
+                    Number((sr.instagram && sr.instagram.followers) || 0) +
+                    Number((sr.tiktok && sr.tiktok.followers) || 0);
                 if (totalF >= 1000) {
                     scaleTasks.push(
-                        'إطلاق Retargeting لـ ' + totalF.toLocaleString() + ' متابع حالي'
+                        'إطلاق Retargeting لـ ' + totalF.toLocaleString('ar-SA') + ' متابع حالي'
                     );
                 }
 
                 // بناءً على التقييمات
-                if (sr.facebook && sr.facebook.rating > 0) {
+                const fbRating = Number((sr.facebook && sr.facebook.rating) || 0);
+                if (fbRating > 0) {
                     scaleTasks.push(
-                        'بناء برنامج ولاء — تقييمك ' + sr.facebook.rating + '/5 يعطي أساساً'
+                        'بناء برنامج ولاء — تقييمك ' + fbRating + '/5 يعطي أساساً'
                     );
                 } else if (sr.facebook && sr.facebook.rating === 0) {
                     scaleTasks.push('بناء برنامج ولاء بعد جمع 10+ تقييمات');
@@ -5176,9 +5306,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // بناءً على المنصات
                 const activePlats = [];
-                if (sr.facebook?.followers > 0) activePlats.push('Facebook');
-                if (sr.instagram?.followers > 0) activePlats.push('Instagram');
-                if (sr.tiktok?.followers > 0) activePlats.push('TikTok');
+                if (Number((sr.facebook && sr.facebook.followers) || 0) > 0) activePlats.push('Facebook');
+                if (Number((sr.instagram && sr.instagram.followers) || 0) > 0) activePlats.push('Instagram');
+                if (Number((sr.tiktok && sr.tiktok.followers) || 0) > 0) activePlats.push('TikTok');
                 if (activePlats.length >= 2) {
                     scaleTasks.push('التوسع في استهداف شرائح جديدة على ' + activePlats.join(' و'));
                 }
@@ -5191,30 +5321,74 @@ document.addEventListener('DOMContentLoaded', () => {
                                   `<div class="rm-task"><i style="color:var(--primary);">🚀</i> ${sanitize(task)}</div>`
                           )
                           .join('')
-                    : `<div class="rm-task"><i>!</i> لا توجد بيانات توسع مؤكدة لهذا التقرير.</div>`;
+                    : `<div class="rm-task" style="color:#9ca3af;font-style:italic;"><i>—</i> لا توجد بيانات توسع مؤكدة لهذا التقرير.</div>`;
             }
 
-            // ROI from real Meta Ads Manager metrics only.
-            const roiVals = document.querySelectorAll('.roi-card .val');
-            if (roiVals.length >= 3) {
-                const metrics =
-                    sr.ads_library && sr.ads_library.real_metrics
-                        ? sr.ads_library.real_metrics
-                        : null;
-                if (metrics) {
-                    roiVals[0].textContent =
-                        metrics.conversion_rate != null
-                            ? String(metrics.conversion_rate)
-                            : 'غير متوفر';
-                    roiVals[1].textContent =
-                        metrics.roas != null ? String(metrics.roas) : 'غير متوفر';
-                    roiVals[2].textContent =
-                        metrics.cpa != null ? String(metrics.cpa) : 'غير متوفر';
-                } else {
-                    roiVals[0].textContent = 'غير متوفر';
-                    roiVals[1].textContent = 'غير متوفر';
-                    roiVals[2].textContent = 'غير متوفر';
-                }
+            // ─────────────────────────────────────────────
+            // ROI Cards: 3 بطاقات (CR, ROAS, CAC)
+            // المصدر الموثوق الأول: sr.ads_library.real_metrics
+            //   (يتطلب ربط Meta Ads Manager OAuth — ads-fetch.php)
+            // المصدر الاحتياطي الشفّاف: ai_report.page_12_ads.total_budget_recommendation.expected_monthly_roas
+            //   (رقم من Agent 4 — يُعرض مع وسم "متوقع من الخطة")
+            // لا hardcoded fallbacks وهمية (مثل "2.5%" أو "ريال 45")
+            // ─────────────────────────────────────────────
+            const metrics =
+                (sr.ads_library && sr.ads_library.real_metrics)
+                    ? sr.ads_library.real_metrics
+                    : null;
+            const totalAdsCount = (sr.ads_library && Number(sr.ads_library.total_ads)) || 0;
+            const aiReport = (data && data.ai_report) || {};
+            const adsPlanData = aiReport.page_12_ads || {};
+            const totalBudgetRec = adsPlanData.total_budget_recommendation || {};
+            const aiExpectedRoas = totalBudgetRec.expected_monthly_roas;
+
+            // CR
+            if (metrics && hasValuePlan(metrics.conversion_rate)) {
+                const cr = metrics.conversion_rate;
+                setPlanText('roiCr', typeof cr === 'number' ? cr + '%' : String(cr));
+                setPlanText('roiCrSub', 'من حسابك الإعلاني');
+            } else {
+                setPlanText('roiCr', 'غير متوفر');
+                setPlanText(
+                    'roiCrSub',
+                    totalAdsCount > 0
+                        ? 'يحتاج ربط Meta Ads Manager'
+                        : 'لا توجد إعلانات نشطة لقياس المعدل'
+                );
+            }
+
+            // ROAS
+            if (metrics && hasValuePlan(metrics.roas)) {
+                const roasFmt = formatRoasNumber(metrics.roas);
+                setPlanText('roiRoas', roasFmt || String(metrics.roas));
+                setPlanText('roiRoasSub', 'من حسابك الإعلاني');
+            } else if (hasValuePlan(aiExpectedRoas) && Number(aiExpectedRoas) > 0) {
+                const roasFmt = formatRoasNumber(Number(aiExpectedRoas));
+                setPlanText('roiRoas', roasFmt || String(aiExpectedRoas));
+                setPlanText('roiRoasSub', 'متوقع من الخطة الإعلانية المقترحة');
+            } else {
+                setPlanText('roiRoas', 'غير متوفر');
+                setPlanText(
+                    'roiRoasSub',
+                    totalAdsCount > 0
+                        ? 'يحتاج ربط Meta Ads Manager'
+                        : 'لا توجد إعلانات نشطة لقياس العائد'
+                );
+            }
+
+            // CAC
+            if (metrics && hasValuePlan(metrics.cpa)) {
+                const cpa = metrics.cpa;
+                setPlanText('roiCac', typeof cpa === 'number' ? String(cpa) : String(cpa));
+                setPlanText('roiCacSub', 'من حسابك الإعلاني');
+            } else {
+                setPlanText('roiCac', 'غير متوفر');
+                setPlanText(
+                    'roiCacSub',
+                    totalAdsCount > 0
+                        ? 'يحتاج ربط Meta Ads Manager'
+                        : 'يحتاج بيانات حملات نشطة'
+                );
             }
         }
         } catch (__pageErr) {
