@@ -121,6 +121,11 @@ return [
         'competitor_ai_provider'    => $get('COMPETITOR_AI_PROVIDER', 'openai'),
         'competitor_ai_model'       => $get('COMPETITOR_AI_MODEL', 'gpt-4o-mini'),
         'competitor_ai_temperature' => (float)$get('COMPETITOR_AI_TEMPERATURE', '0.2'),
+
+        // ── Competitors v2 / Sprint 5 (Deep Ads) ──
+        'competitor_deep_ads_enabled'      => filter_var($get('COMPETITOR_DEEP_ADS_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'competitor_deep_ads_max_per_day'  => (int)$get('COMPETITOR_DEEP_ADS_MAX_PER_DAY', '20'),
+        'competitor_deep_ads_cache_hours'  => (int)$get('COMPETITOR_DEEP_ADS_CACHE_HOURS', '24'),
     ],
 
     // ── 4) مفاتيح APIs ───────────────────────────────────────
