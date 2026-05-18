@@ -549,24 +549,71 @@ if (is_array($page10)) {
     }
 }
 
+// ── جسر page_18_roadmap → action_month ─────────────────────────
+// schema الوكيل (gemini-agents.php:696-720) لكل أسبوع:
+//   theme, daily_tasks[], week_kpis[], expected_week_results
+// + financial_projection: {investment, expected_revenue_month1,
+//     expected_revenue_month3, roi_month3, assumptions}
+//
+// ⚠️ Bug تاريخي: buildWeek القديم كان يبني title/goals/tasks فقط —
+//   حقلا 'kpi' و 'expected_result' لم يكونا موجودَين أبداً، فيقرأ
+//   JS قيماً فارغة ويعرض "غير محدد من البيانات".
+//
+// الإصلاح: إضافة الحقلين المفقودَين من الـ schema الفعلي:
+//   - kpi: من expected_week_results (وصف نتائج الأسبوع المتوقعة)
+//   - expected_result (للجذر): من roi_month3 + assumptions معاً
+//     (روي الشهر 3 + الافتراضات = "النتيجة النهائية المتوقعة")
 if (empty($aiReport['action_month'])) {
     $r = safeGet($aiReport, 'page_18_roadmap', null);
     if ($r) {
         $buildWeek = function(string $wk) use ($r) {
             return [
-                'title' => safeGetString($r, "{$wk}.theme", '—'),
+                // theme = اسم الأسبوع (مثل "الإصلاح الجذري")
+                'title' => safeGetString($r, "{$wk}.theme", ''),
+                // week_kpis = أهداف الأسبوع كمصفوفة نصوص قصيرة
                 'goals' => safeGetArray($r, "{$wk}.week_kpis"),
-                'tasks' => array_map(
-                    fn($d) => safeGetString($d, 'date_offset', '') . ': ' . safeGetString($d, 'morning_task.task', '') . ' | ' . safeGetString($d, 'afternoon_task.task', ''),
-                    safeGetArray($r, "{$wk}.daily_tasks")
-                ),
+                // daily_tasks → نصوص مدمجة للعرض (date_offset + morning + afternoon)
+                'tasks' => array_values(array_filter(
+                    array_map(function($d) {
+                        $offset = safeGetString($d, 'date_offset', '');
+                        $morning = safeGetString($d, 'morning_task.task', '');
+                        $afternoon = safeGetString($d, 'afternoon_task.task', '');
+                        // فلترة الأسطر الفاسدة كلياً (بدون مهمتي صباح أو مساء)
+                        if ($morning === '' && $afternoon === '') return '';
+                        $parts = [];
+                        if ($offset !== '') $parts[] = $offset;
+                        if ($morning !== '') $parts[] = $morning;
+                        if ($afternoon !== '') $parts[] = $afternoon;
+                        return implode(' — ', $parts);
+                    }, safeGetArray($r, "{$wk}.daily_tasks")),
+                    fn($t) => $t !== ''
+                )),
+                // ── إصلاح: kpi مشتق من expected_week_results في schema ──
+                'kpi' => safeGetString($r, "{$wk}.expected_week_results", ''),
             ];
         };
+
+        // ── بناء expected_result من financial_projection ──
+        // الوكيل يُنتج تفاصيل مالية + assumptions، نجمعها في وصف نهائي.
+        // إذا لم يتوفر شيء → نتركها فارغة ليعرض الـ JS رسالة "غير متوفر".
+        $fp = safeGet($r, 'financial_projection', []);
+        $roi = is_array($fp) ? safeGetString($fp, 'roi_month3', '') : '';
+        $assumptions = is_array($fp) ? safeGetString($fp, 'assumptions', '') : '';
+        $expectedResult = '';
+        if ($roi !== '' && $assumptions !== '') {
+            $expectedResult = "العائد المتوقع بعد 90 يوم: {$roi} — الافتراضات: {$assumptions}";
+        } elseif ($roi !== '') {
+            $expectedResult = "العائد المتوقع بعد 90 يوم: {$roi}";
+        } elseif ($assumptions !== '') {
+            $expectedResult = $assumptions;
+        }
+
         $aiReport['action_month'] = [
             'week1' => $buildWeek('week1'),
             'week2' => $buildWeek('week2'),
             'week3' => $buildWeek('week3'),
             'week4' => $buildWeek('week4'),
+            'expected_result' => $expectedResult,
         ];
     }
 }
