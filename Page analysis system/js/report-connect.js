@@ -79,6 +79,176 @@ function sanitize(str) {
 }
 
 // ============================================================
+// Sprint 4 helpers (competitors v2)
+//   setIfNotNull   — set element textContent only when value is not null/undefined/''
+//   formatNumber   — pretty-print large numbers as 1.5K / 2.3M
+//   threatLabel    — localize ai_analysis.threat_level
+//   renderCompetitorCard — build a per-competitor DOM card
+// `sanitize` already exists above and is reused here.
+// ============================================================
+function setIfNotNull(elementId, value, formatter = (v) => v) {
+    if (value === null || value === undefined || value === '') return;
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = formatter(value);
+}
+
+function formatNumber(n) {
+    if (n === null || n === undefined) return '';
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000)    return (n / 1000).toFixed(1) + 'K';
+    return n.toString();
+}
+
+function threatLabel(level) {
+    const labels = { high: '🔴 تهديد عالي', medium: '🟡 تهديد متوسط', low: '🟢 تهديد منخفض' };
+    return labels[level] || level;
+}
+
+/**
+ * بناء بطاقة منافس واحد
+ */
+function renderCompetitorCard(comp, rank) {
+    const card = document.createElement('div');
+    card.className = 'competitor-card';
+    card.dataset.competitorIdx = String(rank - 1);
+
+    const ai = comp.ai_analysis || {};
+    const platforms = comp.platforms || {};
+    const qa = comp.quick_analysis || {};
+    const ads = comp.ads_info || {};
+
+    // Header
+    let html = `
+        <div class="comp-header">
+            <div class="comp-rank">${rank}</div>
+            <div class="comp-info">
+                <h3 class="comp-name">${sanitize(comp.name)}</h3>
+                ${comp.category ? `<p class="comp-category">${sanitize(comp.category)}</p>` : ''}
+                <div class="comp-meta-row">
+                    ${comp.rating ? `<span class="rating-badge">⭐ ${comp.rating}</span>` : ''}
+                    ${comp.reviews_count > 0 ? `<span class="reviews-badge">${comp.reviews_count} مراجعة</span>` : ''}
+                    ${ai.threat_level ? `<span class="threat-badge threat-${ai.threat_level}">${threatLabel(ai.threat_level)}</span>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Platforms
+    const platformIcons = { facebook: '📘', instagram: '📷', tiktok: '🎵', twitter: '🐦' };
+    const platformLabels = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', twitter: 'Twitter/X' };
+    let platformsHtml = '<div class="comp-platforms">';
+    let hasAnyPlatform = false;
+
+    for (const [pKey, pData] of Object.entries(platforms)) {
+        if (!pData || !pData.followers) continue;
+        hasAnyPlatform = true;
+        const meta = [];
+        if (pData.engagement_rate) meta.push(`تفاعل ${pData.engagement_rate}%`);
+        if (pData.posts_per_week) meta.push(`${pData.posts_per_week}/أسبوع`);
+
+        platformsHtml += `
+            <div class="platform-stat" data-platform="${pKey}">
+                <div class="platform-icon">${platformIcons[pKey] || '🔗'}</div>
+                <div class="platform-data">
+                    <div class="ps-num">${formatNumber(pData.followers)}</div>
+                    <div class="ps-label">متابعين ${platformLabels[pKey]}</div>
+                    ${meta.length ? `<div class="ps-meta">${meta.join(' • ')}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    platformsHtml += '</div>';
+    if (hasAnyPlatform) html += platformsHtml;
+
+    // Quick pills
+    const pills = [];
+    if (qa.has_ssl)   pills.push('🔒 SSL');
+    if (qa.has_fb_pixel) pills.push('📊 Pixel');
+    if (qa.has_ga)    pills.push('📈 GA');
+    if (qa.has_cta)   pills.push('🎯 CTA واضح');
+    if (ads.is_running_ads) {
+        pills.push(`📢 ${ads.ads_count > 0 ? ads.ads_count + ' إعلانات نشطة' : 'يطلق إعلانات'}`);
+    }
+    if (Array.isArray(qa.tech_stack) && qa.tech_stack.length > 0) {
+        qa.tech_stack.slice(0, 3).forEach(t => pills.push(`⚙️ ${sanitize(t)}`));
+    }
+    if (pills.length > 0) {
+        html += `<div class="comp-quick-pills">${pills.map(p => `<span class="qp">${p}</span>`).join('')}</div>`;
+    }
+
+    // AI Analysis (فقط لو ai.analyzed = true)
+    if (ai.analyzed) {
+        // Strengths
+        const strengths = (ai.strengths || []).filter(s => typeof s === 'string' && s.trim());
+        if (strengths.length > 0) {
+            html += `<div class="comp-ai-section"><h4>نقاط القوة</h4><ul class="strengths-list">`;
+            strengths.forEach(s => html += `<li>${sanitize(s)}</li>`);
+            html += `</ul></div>`;
+        }
+
+        const weaknesses = (ai.weaknesses || []).filter(w => typeof w === 'string' && w.trim());
+        if (weaknesses.length > 0) {
+            html += `<div class="comp-ai-section"><h4>نقاط الضعف</h4><ul class="weaknesses-list">`;
+            weaknesses.forEach(w => html += `<li>${sanitize(w)}</li>`);
+            html += `</ul></div>`;
+        }
+
+        const attack = (ai.attack_plan || []).filter(a => typeof a === 'string' && a.trim());
+        if (attack.length > 0) {
+            html += `<div class="comp-ai-section"><h4>خطة الهجوم</h4><ul class="attack-plan-list">`;
+            attack.forEach(a => html += `<li>${sanitize(a)}</li>`);
+            html += `</ul></div>`;
+        }
+
+        // Steal / Avoid
+        if (ai.steal_this || ai.avoid_this) {
+            html += `<div class="comp-ai-row">`;
+            if (ai.steal_this) {
+                html += `
+                    <div class="steal-this">
+                        <div class="ai-row-icon">💎</div>
+                        <div>
+                            <div class="ai-row-label">انسخ هذا</div>
+                            <div class="ai-row-value">${sanitize(ai.steal_this)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (ai.avoid_this) {
+                html += `
+                    <div class="avoid-this">
+                        <div class="ai-row-icon">⚠️</div>
+                        <div>
+                            <div class="ai-row-label">تجنّب هذا</div>
+                            <div class="ai-row-value">${sanitize(ai.avoid_this)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            html += `</div>`;
+        }
+    }
+
+    // Deep ads button (Sprint 5)
+    const fbUrl = (comp.social || {}).facebook || '';
+    if (fbUrl) {
+        html += `
+            <button class="btn-deep-ads" data-fb-url="${sanitize(fbUrl)}" data-comp-name="${sanitize(comp.name)}">
+                🔍 تحليل عميق لإعلانات هذا المنافس
+            </button>
+        `;
+    }
+
+    // Data warnings
+    if (comp._warning) {
+        html += `<div class="comp-warning">⚠️ ${sanitize(comp._warning)}</div>`;
+    }
+
+    card.innerHTML = html;
+    return card;
+}
+
+// ============================================================
 // escapeHtml — alias-style helper guaranteed to return a string
 // Use for ANY interpolation of API/user data inside a template
 // literal that builds HTML (e.g. innerHTML = `...${value}...`).
@@ -2580,112 +2750,54 @@ document.addEventListener('DOMContentLoaded', () => {
             if (compName) compName.textContent = clientName;
             if (vsName) vsName.textContent = clientName;
 
+            // ── Market Summary ──
+            const summary = data.market_summary || {};
+            const rankBadge = document.getElementById('clientRankBadge');
+            const positionText = document.getElementById('clientPositionText');
+            if (rankBadge) rankBadge.textContent = summary.client_position || '—';
+            if (positionText && summary.market_leader) {
+                positionText.textContent = `الأقوى في السوق: ${summary.market_leader}`;
+            }
+
+            // Market averages (إخفاء لو null)
+            setIfNotNull('marketAvgFollowers', summary.market_averages?.avg_followers, formatNumber);
+            setIfNotNull('marketAvgEngagement', summary.market_averages?.avg_engagement, v => `${v}%`);
+            setIfNotNull('marketAvgRating', summary.market_averages?.avg_rating, v => `⭐ ${v}`);
+
+            // ── Competitors Grid ──
             const grid = document.getElementById('competitorsGrid');
-            if (grid && data.competitor_radar && data.competitor_radar.length > 0) {
-                let html = '';
-                const ranks = ['1st', '2nd', '3rd', '4th', '5th'];
-
-                data.competitor_radar.slice(0, 5).forEach((comp, i) => {
-                    // ── إصلاح: لا hardcoded fallbacks للنقاط ──
-                    // قبل الإصلاح كان يُحقن "وجود قوي في السوق" / "خدمة عملاء بطيئة" لكل
-                    // منافس بدون بيانات فعلية، مما يعرض على العميل تحليلاً مزيفاً متطابقاً.
-                    // الآن: نعرض فقط النقاط المؤكدة من الـ AI، ونُخفي الأخرى.
-                    const strengthsArr = Array.isArray(comp.strengths)
-                        ? comp.strengths.filter(s => typeof s === 'string' && s.trim() !== '')
-                        : [];
-                    const weaknessesArr = Array.isArray(comp.weaknesses)
-                        ? comp.weaknesses.filter(w => typeof w === 'string' && w.trim() !== '')
-                        : [];
-
-                    const strengthsHtml = strengthsArr.length > 0
-                        ? strengthsArr.slice(0, 3).map(s =>
-                            `<div class="trait-item trait-strength">${sanitize(s)}</div>`
-                          ).join('')
-                        : `<div class="trait-item trait-strength" style="color:var(--text-gray);font-style:italic;">— لم يحدد الوكيل نقاط قوة محددة —</div>`;
-                    const weaknessesHtml = weaknessesArr.length > 0
-                        ? weaknessesArr.slice(0, 3).map(w =>
-                            `<div class="trait-item trait-weakness">${sanitize(w)}</div>`
-                          ).join('')
-                        : `<div class="trait-item trait-weakness" style="color:var(--text-gray);font-style:italic;">— لم يحدد الوكيل نقاط ضعف محددة —</div>`;
-
-                    // attack_plan: لو ما عندنا خطة هجوم، نقولها صراحة بدلاً من نص عام
-                    const attackPlanText = (typeof comp.attack_plan === 'string' && comp.attack_plan.trim() !== '')
-                        ? comp.attack_plan
-                        : 'لم يُرجع الوكيل خطة هجوم محددة لهذا المنافس.';
-
-                    html += `
-              <div class="comp-card">
-                <div class="cc-header">
-                  <div class="cc-info">
-                    <h3>${sanitize(comp.name || 'منافس')}</h3>
-                    <p><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> ${sanitize(
-                        comp.url || 'غير متوفر'
-                    )}</p>
-                  </div>
-                  <div class="cc-rank">${ranks[i] || '#'}</div>
-                </div>
-
-                <div class="traits-list">
-                  <div class="trait-group">
-                    <span class="trait-title">نقاط تفوقه (Strengths)</span>
-                    ${strengthsHtml}
-                  </div>
-                  <div class="trait-group" style="margin-top:8px;">
-                    <span class="trait-title">نقاط ضعفه (Vulnerabilities)</span>
-                    ${weaknessesHtml}
-                  </div>
-                </div>
-
-                <div class="attack-plan">
-                  <div class="ap-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> خطة الهجوم</div>
-                  <div class="ap-desc">${sanitize(attackPlanText)}</div>
-                </div>
-              </div>
-            `;
+            if (grid && Array.isArray(data.competitor_radar) && data.competitor_radar.length > 0) {
+                grid.innerHTML = '';
+                data.competitor_radar.forEach((comp, idx) => {
+                    const card = renderCompetitorCard(comp, idx + 1);
+                    grid.appendChild(card);
                 });
-                grid.innerHTML = html;
-            } else if (grid) {
-                // ── إصلاح: استخدام missingDataHtml بدل رسالة الـ Apify ──
-                grid.innerHTML = missingDataHtml(
-                    'بيانات المنافسين غير متوفرة',
-                    'لم يُرجع تحليل الذكاء الاصطناعي بيانات منافسين كافية لهذا التقرير. أعد تشغيل التحليل أو راجع لوحة الإدارة.'
-                );
             }
 
-            const arsenalGrid = document.getElementById('arsenalGrid');
-            if (arsenalGrid && data.execution_arsenal && data.execution_arsenal.length > 0) {
-                let arsenalHtml = '';
-                data.execution_arsenal.forEach(item => {
-                    arsenalHtml += `
-              <div class="arsenal-item">
-                <div class="arsenal-icon">${sanitize(item.icon || '🔥')}</div>
-                <div class="arsenal-title">${sanitize(item.title || '')}</div>
-                <div class="arsenal-desc">${sanitize(item.desc || '')}</div>
-              </div>
-            `;
-                });
-                arsenalGrid.innerHTML = arsenalHtml;
-            } else if (arsenalGrid) {
-                // ── إصلاح: إضافة else لمنع ترسانة فارغة بدون رسالة ──
-                arsenalGrid.innerHTML = missingDataHtml(
-                    'ترسانة التفوق غير متوفرة',
-                    'لم يُرجع الوكيل تكتيكات تفوق محددة لهذا التقرير. تظهر هذه الترسانة عندما يرصد التحليل فجوات سوقية صريحة (market_gaps).'
-                );
+            // ── Blue Ocean ──
+            const blueOceanGrid = document.getElementById('blueOceanGrid');
+            if (blueOceanGrid && Array.isArray(summary.blue_ocean_opportunities)) {
+                blueOceanGrid.innerHTML = summary.blue_ocean_opportunities.map(opp => `
+                    <div class="opportunity-card">
+                        <div class="opp-icon">${opp.type === 'platform_gap' ? '🚀' : opp.type === 'ads_gap' ? '📢' : '💡'}</div>
+                        <div class="opp-content">${sanitize(opp.description)}</div>
+                    </div>
+                `).join('');
             }
 
-            const summaryText = document.getElementById('marketSummaryText');
-            if (summaryText && data.market_summary) {
-                // sanitizeRelaxed يسمح بـ <strong> الذي يضيفه الجسر في result.php،
-                // ويزيل أي script/iframe وغيرها (أي محتوى خطر من الـ AI).
-                summaryText.innerHTML = sanitizeRelaxed(data.market_summary);
-            } else if (summaryText) {
-                // ── إصلاح: حذف النص الـ hardcoded ("استراتيجية المحيط الأزرق...") ──
-                // كان يُعرض دائماً حتى لو AI لم يُرجع market_summary، مما يُضلل العميل
-                // بأنه تحليل حقيقي. الآن نقول الحقيقة: البيانات غير متوفرة.
-                summaryText.textContent =
-                    'لم يُرجع تحليل الذكاء الاصطناعي تشخيصاً صريحاً للفجوة السوقية لهذا التقرير. تظهر هذه الاستراتيجية عندما يرصد الوكيل blue_ocean_opportunity أو positioning_statement.';
-                summaryText.style.color = 'var(--text-gray)';
-                summaryText.style.fontStyle = 'italic';
+            // ── Top Actions ──
+            const actionsList = document.getElementById('topActionsList');
+            if (actionsList && Array.isArray(summary.top_3_actions)) {
+                actionsList.innerHTML = summary.top_3_actions.map((act, i) => `
+                    <div class="action-item priority-${act.priority || 'medium'}">
+                        <div class="action-num">${i + 1}</div>
+                        <div class="action-body">
+                            <h4>${sanitize(act.action)}</h4>
+                            <p>${sanitize(act.description)}</p>
+                            ${act.kpi ? `<div class="action-kpi">📊 ${sanitize(act.kpi)}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
             }
         }
         } catch (__pageErr) {
