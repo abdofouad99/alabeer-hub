@@ -1899,7 +1899,14 @@ function scrapeTwitter(string $url, string $token, array $cfg): array {
         }
 
         // TW-2 FIX: بناء input مخصص لكل actor بدلاً من schema موحّد (بعض actors تفشل 400 مع حقول غير معروفة)
-        if (str_contains($actorId, 'tweet-scraper') || str_contains($actorId, 'apidojo')) {
+        // ── إصلاح Twitter: دعم actor nfp1fpt5gUlBwPcor (searchTerms-based) كـ actor أساسي
+        if (str_contains($actorId, 'nfp1fpt5')) {
+            $input = json_encode([
+                'searchTerms' => ['from:' . $username],
+                'sort'        => 'Latest',
+                'maxItems'    => $maxTweets,
+            ], JSON_PRESERVE_ZERO_FRACTION | JSON_NUMERIC_CHECK | JSON_UNESCAPED_UNICODE);
+        } elseif (str_contains($actorId, 'tweet-scraper') || str_contains($actorId, 'apidojo')) {
             $input = json_encode([
                 'startUrls'        => [$profileUrlTwitter, $profileUrlX],
                 'maxItems'         => $maxTweets,
