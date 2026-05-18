@@ -108,7 +108,9 @@ if (empty($adsData) || count($adsData) < 5) {
     $apifyToken = function_exists('getValidApifyToken') ? getValidApifyToken($cfg) : '';
     if ($apifyToken && ($fbUrl || $pageId)) {
         $searchParam = $pageId ? "ID:{$pageId}" : ($fbUrl ?: $pageName);
-        $result = apifyFetchAdsEnhanced($apifyToken, $cfg, $searchParam, $clientName);
+        // ── ADS-A3 FIX: مرّر بيانات Facebook المحفوظة لاستخدامها كـ fallback خلفي
+        $fbDataForAds = $scanResult['facebook'] ?? [];
+        $result = apifyFetchAdsEnhanced($apifyToken, $cfg, $searchParam, $clientName, $fbDataForAds);
         if (!empty($result['ads'])) {
             $adsData = $result['ads'];
             $entityData = $result['entity'] ?? [];
@@ -258,12 +260,13 @@ function fetchAdsFromMetaAPI(string $pageIdOrName, array $cfg): array {
 /**
  * المصدر الثاني: Apify محسّن
  */
-function apifyFetchAdsEnhanced(string $token, array $cfg, string $searchParam, string $clientName): array {
+function apifyFetchAdsEnhanced(string $token, array $cfg, string $searchParam, string $clientName, array $fbData = []): array {
     if (!function_exists('scrapeAdsLibrary')) {
         return ['ads' => [], 'entity' => []];
     }
 
-    $result = scrapeAdsLibrary($searchParam, $token, $cfg, 'ALL', []);
+    // ── ADS-A3 FIX: تمرير بيانات Facebook المحفوظة كـ fallback خلفي
+    $result = scrapeAdsLibrary($searchParam, $token, $cfg, 'ALL', $fbData);
 
     if (!($result['success'] ?? false)) {
         return ['ads' => [], 'entity' => []];
