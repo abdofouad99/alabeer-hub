@@ -175,6 +175,33 @@ document.addEventListener("DOMContentLoaded", () => {
       if (document.getElementById('igPosts')) document.getElementById('igPosts').textContent = igPostsRaw || '—';
       const engagement = i.engagement_rate ?? i.avg_engagement;
       if (document.getElementById('igEng')) document.getElementById('igEng').textContent = engagement != null ? engagement + '%' : '—';
+
+      // ── igBadge: ديناميكي حسب is_verified + is_business + جودة الحساب ──
+      // قبل الإصلاح: igBadge يبقى "—" أبدياً لأن لا يوجد كود يحدّثه.
+      // الآن: نعرض أعلى مؤشر ثقة متاح (موثّق > بزنس > عادي > تعذّر الجلب).
+      const igBadge = document.getElementById('igBadge');
+      if (igBadge) {
+        const igOk = (i.success === true) || i.followers != null || i.username;
+        if (!igOk) {
+          igBadge.textContent = 'تعذّر الجلب';
+          igBadge.style.background = 'rgba(245,158,11,0.2)';
+          igBadge.style.color = '#f59e0b';
+          igBadge.title = i.error || 'لم يتم جلب البيانات';
+        } else if (i.is_verified) {
+          igBadge.textContent = 'موثّق ✔️';
+          igBadge.style.background = 'rgba(16,185,129,0.2)';
+          igBadge.style.color = '#10b981';
+        } else if (i.is_business) {
+          igBadge.textContent = 'حساب أعمال';
+          igBadge.style.background = 'rgba(59,130,246,0.2)';
+          igBadge.style.color = '#3b82f6';
+        } else {
+          igBadge.textContent = 'عادي';
+          igBadge.style.background = 'rgba(100,116,139,0.2)';
+          igBadge.style.color = '#94a3b8';
+        }
+      }
+
       const igSignals = document.getElementById('igSignals');
       if (igSignals) {
         const list = [
@@ -224,6 +251,45 @@ document.addEventListener("DOMContentLoaded", () => {
         if (document.getElementById('ttFollowers')) document.getElementById('ttFollowers').textContent = formatNum(t.followers);
         if (document.getElementById('ttLikes')) document.getElementById('ttLikes').textContent = formatNum(t.likes);
         if (document.getElementById('ttVideos')) document.getElementById('ttVideos').textContent = formatNum(t.video_count);
+
+        // ── ttBadge: ديناميكي بدلاً من "نشط" hardcoded في HTML ──
+        // قبل الإصلاح: ttBadge في HTML مكتوب يدوياً "نشط" ولا يتغيّر أبداً.
+        // الآن: نقرأ success + followers + last_post_days لتحديد الحالة الفعلية.
+        const ttBadge = document.getElementById('ttBadge');
+        if (ttBadge) {
+          // ttOk: نقبل أيضاً username-only (تطابقاً مع IG) لتفادي bias بين البطاقتين
+          const ttOk = (t.success === true) || t.followers != null || !!t.username;
+          // ⚠️ التحقق الصريح من last_post_days: Number(null) === 0 وكان يتجاوز
+          //    الفحص > 60 ويُعطي "نشط" خاطئة. الآن نشترط أن تكون قيمة فعلية.
+          const lastPostDays = (t.last_post_days != null && t.last_post_days !== '')
+            ? Number(t.last_post_days)
+            : null;
+          if (!ttOk) {
+            ttBadge.textContent = 'تعذّر الجلب';
+            ttBadge.style.background = 'rgba(245,158,11,0.2)';
+            ttBadge.style.color = '#f59e0b';
+            ttBadge.title = t.error || 'لم يتم جلب البيانات';
+          } else if (t.is_verified) {
+            ttBadge.textContent = 'موثّق ✔️';
+            ttBadge.style.background = 'rgba(16,185,129,0.2)';
+            ttBadge.style.color = '#10b981';
+          } else if (lastPostDays != null && !isNaN(lastPostDays) && lastPostDays > 60) {
+            ttBadge.textContent = 'خامل';
+            ttBadge.style.background = 'rgba(245,158,11,0.2)';
+            ttBadge.style.color = '#f59e0b';
+            ttBadge.title = `آخر منشور قبل ${lastPostDays} يوم`;
+          } else if (lastPostDays != null && !isNaN(lastPostDays)) {
+            // معلومة فعلية + ضمن 60 يوم → نشط حقيقي
+            ttBadge.textContent = 'نشط';
+            ttBadge.style.background = 'rgba(16,185,129,0.2)';
+            ttBadge.style.color = '#10b981';
+          } else {
+            // last_post_days غير معروف → لا نكذب، نعرض حالة غير محددة
+            ttBadge.textContent = 'عادي';
+            ttBadge.style.background = 'rgba(100,116,139,0.2)';
+            ttBadge.style.color = '#94a3b8';
+          }
+        }
       }
     }
 
