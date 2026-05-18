@@ -805,7 +805,7 @@ function fetchAdsLibrary(string $pageNameOrId, string $token): array {
     $endpoint = "https://graph.facebook.com/v19.0/ads_archive"
         . "?search_terms=" . urlencode($pageNameOrId)
         . "&ad_reached_countries=['SA','AE','KW','QA','BH','OM','EG','YE']"
-        . "&ad_active_status=ACTIVE"
+        . "&ad_active_status=ALL"
         . "&limit=50"
         . "&fields=id,ad_creation_time,ad_creative_body,page_name,spend"
         . "&access_token=" . urlencode($token);
