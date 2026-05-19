@@ -115,9 +115,8 @@ function _rankClientInMarket(array $competitors, array $clientData): array {
     }
 
     $positions = ['1st' => 'الأول', '2nd' => 'الثاني', '3rd' => 'الثالث', '4th' => 'الرابع', '5th' => 'الخامس', '6th' => 'الأخير'];
-    $positionKey = match($rank) {
-        1 => '1st', 2 => '2nd', 3 => '3rd', 4 => '4th', 5 => '5th', default => '6th'
-    };
+    $rankMap = [1 => '1st', 2 => '2nd', 3 => '3rd', 4 => '4th', 5 => '5th'];
+    $positionKey = $rankMap[$rank] ?? '6th';
 
     return [
         'rank'            => $rank,

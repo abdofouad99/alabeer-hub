@@ -788,8 +788,10 @@ function callGeminiAgent(
     string $userMessage,
     int $maxTokens = 65536
 ): array {
+    global $config;
     // Use OpenAI as the actual provider (function name kept for backward compatibility)
-    $model = getenv('OPENAI_MODEL') ?: 'gpt-4o-mini';
+    $model = $config['apis']['openai_model'] ?? getenv('OPENAI_MODEL') ?: 'gpt-4o-mini';
+    $timeout = (int)($config['apis']['openai_timeout'] ?? getenv('OPENAI_TIMEOUT') ?: 120);
     
     $url = "https://api.openai.com/v1/chat/completions";
 
@@ -813,7 +815,7 @@ function callGeminiAgent(
             'Content-Type: application/json',
             "Authorization: Bearer {$apiKey}"
         ],
-        CURLOPT_TIMEOUT        => 180,   // 3 minutes per agent
+        CURLOPT_TIMEOUT        => $timeout,
         CURLOPT_SSL_VERIFYPEER => false,
     ]);
 

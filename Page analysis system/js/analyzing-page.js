@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Timing
   var startTime   = Date.now();
-  var MAX_WAIT_MS = 10 * 60 * 1000; // 10 دقائق
+  var MAX_WAIT_MS = 120 * 60 * 1000; // ساعتان (مفتوح فعلياً)
   var POLL_MS     = 8000;           // كل 8 ثوانٍ
 
   var pollTimer       = null;
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Timeout guard
       if (Date.now() - startTime > MAX_WAIT_MS) {
         clearInterval(pollTimer);
-        showError('انتهت مهلة التحليل (10 دقائق). التقرير الأولي قد يكون جاهزاً — <a href="report.html?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || '') + '" style="color:#f58e1a">اضغط هنا للاطلاع عليه</a>');
+        showError('انتهت مهلة التحليل (120 دقيقة). التقرير الأولي قد يكون جاهزاً — <a href="report.html?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || '') + '" style="color:#f58e1a">اضغط هنا للاطلاع عليه</a>');
         return;
       }
 

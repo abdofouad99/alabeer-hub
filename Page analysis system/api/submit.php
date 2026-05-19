@@ -15,7 +15,7 @@ ob_start();                         // التقط كل إخراج عشوائي
 ini_set('display_errors', 0);      // لا تطبع أخطاء PHP في الاستجابة
 ini_set('log_errors', 1);          // سجّلها في error_log فقط
 error_reporting(E_ALL);            // لا تخفي الأخطاء — فقط لا تعرضها
-set_time_limit(600);               // 10 دقائق — لاستيعاب موديلات الذكاء الاصطناعي العملاقة وبطء Apify
+set_time_limit(0);                 // بدون حد أقصى — لعدم تقييد عملية التحليل وبطء Apify
 ignore_user_abort(true);           // لا تتوقف إذا أغلق المتصفح الاتصال
 
 setCors();

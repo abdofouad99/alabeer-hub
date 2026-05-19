@@ -447,24 +447,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const token = urlParams.get('token') || sessionStorage.getItem('last_assessment_token') || '';
+
     document
         .querySelectorAll('.nav-menu a, .btn-upgrade, .btn-primary, .btn-pkg, .back-btn')
         .forEach(link => {
             const href = link.getAttribute('href');
             if (href && !href.startsWith('#') && !href.startsWith('http')) {
-                if (href.includes('id=' + id)) return;
-                const separator = href.includes('?') ? '&' : '?';
-                link.setAttribute('href', href + separator + 'id=' + id);
+                const urlParts = href.split('?');
+                const base = urlParts[0];
+                const params = new URLSearchParams(urlParts[1] || '');
+                params.set('id', id);
+                if (token) {
+                    params.set('token', token);
+                }
+                link.setAttribute('href', base + '?' + params.toString());
             }
         });
 
     // ── 2. جلب البيانات الحقيقية فقط ─────────────────────────
-    const token = urlParams.get('token') || sessionStorage.getItem('last_assessment_token');
-
-    fetch(`api/result.php?id=${id}&token=${token || ''}`)
+    fetch(`api/result.php?id=${id}&token=${token}`)
         .then(res => {
-            if (!res.ok) throw new Error('Server error: ' + res.status);
-            return res.json();
+            return res.json().then(data => {
+                if (!res.ok) {
+                    throw new Error(data.error || 'Server error: ' + res.status);
+                }
+                return data;
+            }).catch(err => {
+                if (!res.ok) {
+                    throw new Error('Server error: ' + res.status);
+                }
+                throw err;
+            });
         })
         .then(data => {
             if (data.error) {
@@ -550,10 +564,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 iconDiv.textContent = '🔌';
                 const h2 = document.createElement('h2');
                 h2.style.cssText = 'color:#ef4444;font-size:20px;font-weight:900;';
-                h2.textContent = 'تعذّر الاتصال بالخادم';
+                h2.textContent = e.message && e.message.includes('Server error') ? 'تعذّر الاتصال بالخادم' : 'فشل تحميل البيانات';
                 const p = document.createElement('p');
                 p.style.cssText = 'color:#94a3b8;margin-top:10px;';
-                p.textContent = 'تحقق من اتصالك بالإنترنت ثم أعد تحديث الصفحة';
+                p.textContent = e.message || 'تحقق من اتصالك بالإنترنت ثم أعد تحديث الصفحة';
                 const btn = document.createElement('button');
                 btn.style.cssText =
                     'margin-top:20px;padding:12px 28px;background:#f58e1a;color:#fff;border:none;border-radius:12px;cursor:pointer;';
