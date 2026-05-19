@@ -77,17 +77,17 @@ function fetchCompetitorGoogleReviews(
         $reviewsList = $item['reviews'] ?? null;
         if (is_array($reviewsList)) {
             foreach ($reviewsList as $r) {
-                $normalized = _normalizeGoogleReview($r);
+                $normalized = _compNormalizeGoogleReview($r);
                 if ($normalized) $reviews[] = $normalized;
             }
         } else {
-            $normalized = _normalizeGoogleReview($item);
+            $normalized = _compNormalizeGoogleReview($item);
             if ($normalized) $reviews[] = $normalized;
         }
     }
 
     // ── حساب summary ──
-    $summary = _summarizeReviews($reviews);
+    $summary = _compSummarizeReviews($reviews);
 
     logInfo('Google Reviews fetch complete', [
         'count'      => count($reviews),
@@ -101,7 +101,7 @@ function fetchCompetitorGoogleReviews(
     ];
 }
 
-function _normalizeGoogleReview(array $r): ?array {
+function _compNormalizeGoogleReview(array $r): ?array {
     $rating = $r['rating'] ?? $r['stars'] ?? null;
     $text   = $r['text'] ?? $r['snippet'] ?? '';
 
@@ -116,7 +116,7 @@ function _normalizeGoogleReview(array $r): ?array {
     ];
 }
 
-function _summarizeReviews(array $reviews): array {
+function _compSummarizeReviews(array $reviews): array {
     $count = count($reviews);
     if ($count === 0) {
         return ['avg_rating' => null, 'total' => 0, 'by_stars' => [], 'sentiment' => null];
