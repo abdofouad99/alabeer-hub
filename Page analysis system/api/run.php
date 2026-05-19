@@ -6,6 +6,7 @@
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/analyze.php';
+require_once __DIR__ . '/customer/middleware.php';
 
 ignore_user_abort(true);
 set_time_limit(0);
@@ -37,7 +38,10 @@ $token = trim((string)($_GET['token'] ?? ''));
 if (!$id) {
     jsonError('معرّف غير صالح');
 }
-if ($token === '') {
+
+// ── التحقق من الوصول: token أو session للعميل ──────────────
+$customerId = getCurrentCustomerId();
+if ($token === '' && $customerId === null) {
     jsonError('لم يُعثر على التقييم', 404);
 }
 
@@ -46,9 +50,14 @@ if ($token === '') {
 
 $db = getDB();
 
-// ── فحص token قبل تشغيل التحليل (منع استهلاك موارد بـ IDOR) ──
-$stmt = $db->prepare("SELECT id FROM assessments WHERE id = ? AND report_token = ? LIMIT 1");
-$stmt->execute([$id, $token]);
+// ── فحص الوصول قبل تشغيل التحليل (منع استهلاك موارد بـ IDOR) ──
+if ($token !== '') {
+    $stmt = $db->prepare("SELECT id FROM assessments WHERE id = ? AND report_token = ? LIMIT 1");
+    $stmt->execute([$id, $token]);
+} else {
+    $stmt = $db->prepare("SELECT id FROM assessments WHERE id = ? AND customer_id = ? LIMIT 1");
+    $stmt->execute([$id, $customerId]);
+}
 if (!$stmt->fetch()) {
     jsonError('لم يُعثر على التقييم', 404);
 }

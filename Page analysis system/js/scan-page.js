@@ -55,15 +55,116 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // ─────────────────────────────────────────────────
+  // ── منطق الحساب: فحص الإيميل اللحظي + تطابق كلمة المرور
+  // ─────────────────────────────────────────────────
+  var emailInput            = document.getElementById('email');
+  var passwordInput         = document.getElementById('password');
+  var passwordConfirmInput  = document.getElementById('passwordConfirm');
+  var passwordConfirmWrap   = document.getElementById('passwordConfirmWrap');
+  var emailExistsNotice     = document.getElementById('emailExistsNotice');
+  var accountModeHint       = document.getElementById('accountModeHint');
+  var passwordMatchHint     = document.getElementById('passwordMatchHint');
+
+  // 'register' = إيميل جديد، 'login' = إيميل موجود
+  var accountMode = 'register';
+
+  function isValidEmail(em) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+  }
+
+  function setAccountMode(mode) {
+    accountMode = mode;
+    if (mode === 'login') {
+      if (emailExistsNotice) emailExistsNotice.style.display = 'block';
+      if (passwordConfirmWrap) passwordConfirmWrap.style.display = 'none';
+      if (passwordConfirmInput) {
+        passwordConfirmInput.required = false;
+        passwordConfirmInput.value = '';
+      }
+      if (accountModeHint) accountModeHint.textContent = 'أدخل كلمة المرور الحالية';
+      if (passwordInput) passwordInput.setAttribute('autocomplete', 'current-password');
+    } else {
+      if (emailExistsNotice) emailExistsNotice.style.display = 'none';
+      if (passwordConfirmWrap) passwordConfirmWrap.style.display = '';
+      if (passwordConfirmInput) passwordConfirmInput.required = true;
+      if (accountModeHint) accountModeHint.textContent = 'اختر كلمة مرور قوية';
+      if (passwordInput) passwordInput.setAttribute('autocomplete', 'new-password');
+    }
+  }
+
+  // فحص الإيميل لحظياً مع debounce
+  var emailCheckTimer = null;
+  function scheduleEmailCheck() {
+    if (emailCheckTimer) clearTimeout(emailCheckTimer);
+    emailCheckTimer = setTimeout(checkEmailExists, 500);
+  }
+
+  function checkEmailExists() {
+    if (!emailInput) return;
+    var em = (emailInput.value || '').trim().toLowerCase();
+    if (!isValidEmail(em)) {
+      setAccountMode('register');
+      return;
+    }
+    fetch('api/customer/auth.php?action=password-check', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: em })
+    })
+      .then(function(r) { return r.text(); })
+      .then(function(txt) {
+        var data = null;
+        try { data = JSON.parse(txt); } catch (e) {}
+        if (data && data.ok && data.data && data.data.exists === true) {
+          setAccountMode('login');
+        } else {
+          setAccountMode('register');
+        }
+      })
+      .catch(function() { /* ignore — keep current mode */ });
+  }
+
+  if (emailInput) {
+    emailInput.addEventListener('blur', checkEmailExists);
+    emailInput.addEventListener('input', scheduleEmailCheck);
+  }
+
+  // فحص تطابق كلمة المرور لحظياً
+  function checkPasswordMatch() {
+    if (!passwordInput || !passwordConfirmInput || !passwordMatchHint) return;
+    if (accountMode === 'login') return; // لا حاجة في وضع login
+    var p1 = passwordInput.value;
+    var p2 = passwordConfirmInput.value;
+    if (!p2) {
+      passwordMatchHint.textContent = 'يجب أن تتطابق';
+      passwordMatchHint.style.color = '';
+      return;
+    }
+    if (p1 === p2) {
+      passwordMatchHint.textContent = '✓ متطابقة';
+      passwordMatchHint.style.color = '#10b981';
+    } else {
+      passwordMatchHint.textContent = '✕ غير متطابقة';
+      passwordMatchHint.style.color = '#ef4444';
+    }
+  }
+  if (passwordInput)        passwordInput.addEventListener('input', checkPasswordMatch);
+  if (passwordConfirmInput) passwordConfirmInput.addEventListener('input', checkPasswordMatch);
+
   // ── تقديم النموذج ──
   function handleScan(e) {
     e.preventDefault();
 
     var fullName = document.getElementById('full_name').value.trim();
     var phone    = document.getElementById('phone').value.trim();
-    var email    = document.getElementById('email').value.trim();
+    var email    = (document.getElementById('email').value || '').trim().toLowerCase();
     var country  = document.getElementById('country').value.trim();
     var city     = document.getElementById('city').value.trim();
+
+    var password         = (passwordInput        && passwordInput.value)        || '';
+    var passwordConfirm  = (passwordConfirmInput && passwordConfirmInput.value) || '';
 
     var web = document.getElementById('url-web').value.trim();
     var ig  = document.getElementById('url-ig').value.trim();
@@ -89,6 +190,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // التحقق
     if (!fullName) { alert('الرجاء إدخال اسمك الكريم.'); return; }
     if (!phone)    { alert('الرجاء إدخال رقم الواتساب.'); return; }
+    if (!email || !isValidEmail(email)) {
+      alert('الرجاء إدخال بريد إلكتروني صحيح.');
+      if (emailInput) emailInput.focus();
+      return;
+    }
+    if (!password || password.length < 8) {
+      alert('كلمة المرور يجب أن تكون 8 حروف على الأقل.');
+      if (passwordInput) passwordInput.focus();
+      return;
+    }
+    if (accountMode === 'register' && password !== passwordConfirm) {
+      alert('كلمتا المرور غير متطابقتين.');
+      if (passwordConfirmInput) passwordConfirmInput.focus();
+      return;
+    }
     if (!country)  { alert('الرجاء إدخال الدولة.'); return; }
     if (!city)     { alert('الرجاء إدخال المدينة.'); return; }
     if (!primaryUrl) { alert('الرجاء إدخال رابط منصة واحدة على الأقل.'); return; }
@@ -106,6 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
       full_name:       fullName,
       phone:           phone,
       email:           email,
+      password:        password,            // ← يُمرَّر إلى submit.php (يُحذف بعد إنشاء الحساب)
       url:             primaryUrl,
       website_url:     web,
       instagram_url:   ig,

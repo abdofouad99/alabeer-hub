@@ -9,6 +9,7 @@
 // ============================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/page-scan.php';
+require_once __DIR__ . '/customer/middleware.php';
 $cfg = require __DIR__ . '/config.php';
 setCors();
 
@@ -102,13 +103,26 @@ $__normalizeActionItemsForRender = static function(array $items): array {
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $token = trim((string)($_GET['token'] ?? ''));
 if (!$id) jsonError('معرّف التقييم غير صالح');
-if ($token === '') jsonError('لم يُعثر على التقييم', 404);
+
+// ── التحقق من الوصول: token أو session للعميل ──────────────
+$customerId = getCurrentCustomerId();
+if ($token === '' && $customerId === null) {
+    jsonError('لم يُعثر على التقييم', 404);
+}
 
 try {
 
 $db   = getDB();
-$stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? AND a.report_token = ? LIMIT 1");
-$stmt->execute([$id, $token]);
+
+if ($token !== '') {
+    // الوصول التقليدي بـ token (يعمل لجميع التقارير القديمة والجديدة)
+    $stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? AND a.report_token = ? LIMIT 1");
+    $stmt->execute([$id, $token]);
+} else {
+    // الوصول بـ session (التقارير المرتبطة بحساب العميل الحالي)
+    $stmt = $db->prepare("SELECT a.*, l.full_name, l.company_name, l.project_type, l.country, l.platform, l.website_url, l.facebook_url, l.instagram_url, l.tiktok_url, l.twitter_url, l.maps_url FROM assessments a LEFT JOIN leads l ON a.lead_id=l.id WHERE a.id = ? AND a.customer_id = ? LIMIT 1");
+    $stmt->execute([$id, $customerId]);
+}
 $row  = $stmt->fetch();
 
 if (!$row) jsonError('لم يُعثر على التقييم', 404);

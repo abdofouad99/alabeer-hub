@@ -146,28 +146,67 @@ document.addEventListener('DOMContentLoaded', function() {
     if (msg) msg.innerHTML = 'يتم الآن فحص: <small style="color:#94a3b8">' + decodeURIComponent(targetUrl) + '</small>';
 
     fetch('api/submit.php', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ lead: lead, answers: {} })
+      method:      'POST',
+      credentials: 'include',
+      headers:     { 'Content-Type': 'application/json' },
+      body:        JSON.stringify({ lead: lead, answers: {} })
     })
-    .then(function(resp) { return resp.json(); })
-    .then(function(data) {
+    .then(function(resp) {
+      return resp.json().then(function(data) {
+        return { status: resp.status, body: data };
+      });
+    })
+    .then(function(result) {
+      var data   = result.body || {};
+      var status = result.status;
+
+      // معالجة خطأ الحساب: إيميل موجود + كلمة مرور خاطئة (HTTP 401)
+      if (status === 401 && data.customer_exists) {
+        // امسح كلمة المرور من sessionStorage لمنع تسريبها
+        try {
+          var raw = sessionStorage.getItem('lead_data');
+          if (raw) {
+            var ld = JSON.parse(raw);
+            delete ld.password;
+            sessionStorage.setItem('lead_data', JSON.stringify(ld));
+          }
+        } catch(e) {}
+
+        showError(
+          (data.error || 'هذا البريد مسجَّل، الرجاء تسجيل الدخول لإكمال التحليل.') +
+          ' <a href="login.html" style="color:#f58e1a;font-weight:800">تسجيل الدخول ←</a>'
+        );
+        return;
+      }
+
       if (data.error) { showError(data.error); return; }
 
       assessmentId = data.assessment_id || data.id;
       if (!assessmentId) { showError('لم يتم إنشاء معرّف التقييم. حاول مجدداً.'); return; }
 
-      // Save id to sessionStorage for recovery
+      // Save id + token to sessionStorage for recovery
       sessionStorage.setItem('last_assessment_id', assessmentId);
       sessionStorage.setItem('last_assessment_token', data.token || '');
+
+      // ✅ Security: امسح كلمة المرور من sessionStorage بعد نجاح التسجيل
+      try {
+        var raw2 = sessionStorage.getItem('lead_data');
+        if (raw2) {
+          var ld2 = JSON.parse(raw2);
+          delete ld2.password;
+          sessionStorage.setItem('lead_data', JSON.stringify(ld2));
+        }
+      } catch(e) {}
 
       // If analysis already done (fast path)
       if (data.score != null && data.tier) {
         showPartialResult(data.score);
       }
 
-      // تشغيل التحليل في الخلفية
-      fetch('api/run.php?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || '')).catch(function(e) { console.log('Run triggered', e); });
+      // تشغيل التحليل في الخلفية (مع credentials لتمرير الجلسة لو وُجدت)
+      fetch('api/run.php?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || ''), {
+        credentials: 'include'
+      }).catch(function(e) { console.log('Run triggered', e); });
 
       // Phase 2: Start polling
       phase2_poll();
@@ -197,7 +236,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      fetch('api/status.php?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || ''))
+      fetch('api/status.php?id=' + assessmentId + '&token=' + encodeURIComponent(sessionStorage.getItem('last_assessment_token') || ''), {
+        credentials: 'include'
+      })
         .then(function(resp) { return resp.json(); })
         .then(function(data) {
           if (!data || data.error) return; // تجاهل الأخطاء المؤقتة

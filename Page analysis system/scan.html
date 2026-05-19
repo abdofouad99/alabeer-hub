@@ -168,10 +168,36 @@
           <input type="tel" id="phone" class="form-control" placeholder="05XXXXXXXX" required>
         </div>
         <div class="form-group span-2">
-          <label class="form-label">البريد الإلكتروني</label>
-          <input type="email" id="email" class="form-control" placeholder="example@email.com">
-          <small class="hint-text" style="display: block; margin-top: 8px; font-size: 12px; color: var(--text-muted);">بيانات التواصل الخاصة بك آمنة وسيتم استخدامها فقط لإرسال نتائج التحليل</small>
+          <label class="form-label">البريد الإلكتروني <span style="color:var(--primary)">*</span></label>
+          <input type="email" id="email" class="form-control" placeholder="example@email.com" required dir="ltr" autocomplete="email">
+          <small class="hint-text" style="display: block; margin-top: 8px; font-size: 12px; color: var(--text-muted);">بريدك آمن وسنستخدمه لحفظ تقاريرك والوصول إليها لاحقاً</small>
         </div>
+      </div>
+
+      <!-- ── إنشاء حساب (اختياري — لحفظ التقارير) ── -->
+      <div id="accountSection" style="margin: 24px 0 8px; padding: 22px; background: rgba(245,142,26,0.06); border: 1.5px dashed rgba(245,142,26,0.30); border-radius: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+          <span style="font-size: 22px;">🔒</span>
+          <strong style="font-size: 15px; color: var(--text-main);">احفظ تقاريرك في حسابك</strong>
+          <span id="accountModeHint" style="font-size: 12px; color: var(--text-muted); font-weight: 600; margin-right: auto;">اختر كلمة مرور قوية</span>
+        </div>
+
+        <div class="input-grid">
+          <div class="form-group">
+            <label class="form-label">كلمة المرور <span style="color:var(--primary)">*</span></label>
+            <input type="password" id="password" class="form-control" placeholder="8 حروف على الأقل" required minlength="8" autocomplete="new-password" dir="ltr">
+            <small class="hint-text" style="display: block; margin-top: 6px; font-size: 12px; color: var(--text-muted);">ستحتاجها لرؤية تقاريرك القادمة</small>
+          </div>
+          <div class="form-group" id="passwordConfirmWrap">
+            <label class="form-label">تأكيد كلمة المرور <span style="color:var(--primary)">*</span></label>
+            <input type="password" id="passwordConfirm" class="form-control" placeholder="أعد كتابة كلمة المرور" required minlength="8" autocomplete="new-password" dir="ltr">
+            <small id="passwordMatchHint" class="hint-text" style="display: block; margin-top: 6px; font-size: 12px; color: var(--text-muted);">يجب أن تتطابق</small>
+          </div>
+        </div>
+
+        <p id="emailExistsNotice" style="display:none; margin-top: 12px; padding: 10px 14px; background: rgba(59,130,246,0.10); border-radius: 10px; font-size: 13px; font-weight: 700; color: #1e40af;">
+          ℹ️ هذا البريد مسجَّل لديك سابقاً — أدخل كلمة المرور لإضافة تحليل جديد لحسابك.
+        </p>
       </div>
 
       <hr class="section-divider">
@@ -290,5 +316,6 @@
 
   <script src="js/scan-page.js?v=1.0"></script>
   <!-- v1.0: Inline script extracted to js/scan-page.js for CSP compliance -->
+  <script src="js/header-auth.js" defer></script>
 </body>
 </html>

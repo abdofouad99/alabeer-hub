@@ -5,6 +5,7 @@
 // ============================================================
 
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/customer/middleware.php';
 
 /** @var array $config */
 /** @var PDO $db */
@@ -114,6 +115,97 @@ foreach ($requiredFields as $field) {
     }
 }
 
+// ── منطق حساب العميل (Customer Account) ────────────────────
+// إذا أُدخل email + password → نُنشئ حساب جديد أو ندخل الموجود
+// (الإيميل بدون كلمة مرور = lead عابر بدون حساب — للتوافق مع التدفق القديم)
+$customerId = null;
+$leadEmail    = isset($leadData['email'])    ? trim((string) $leadData['email'])    : '';
+$leadPassword = isset($leadData['password']) ? (string)       $leadData['password'] : '';
+
+// تحقق إن كان العميل مسجَّل دخول مسبقاً (session) — أولوية للجلسة
+$sessionCustomerId = getCurrentCustomerId();
+if ($sessionCustomerId) {
+    $customerId = $sessionCustomerId;
+}
+
+// لو لا توجد جلسة، ولكن أُدخلت بيانات اعتماد → سجّل/أنشئ
+if ($customerId === null && $leadEmail !== '' && $leadPassword !== '') {
+    if (!filter_var($leadEmail, FILTER_VALIDATE_EMAIL) || strlen($leadEmail) > 190) {
+        ob_end_clean();
+        http_response_code(400);
+        echo json_encode(['error' => 'بريد إلكتروني غير صالح']);
+        exit;
+    }
+    if (strlen($leadPassword) < 8 || strlen($leadPassword) > 200) {
+        ob_end_clean();
+        http_response_code(400);
+        echo json_encode(['error' => 'كلمة المرور يجب أن تكون 8 حروف على الأقل']);
+        exit;
+    }
+
+    try {
+        $stmt = $db->prepare("SELECT id, password_hash FROM customers WHERE email = ? LIMIT 1");
+        $stmt->execute([$leadEmail]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            // إيميل موجود → فحص كلمة المرور
+            if (!password_verify($leadPassword, $existing['password_hash'])) {
+                logWarning('Customer login attempt with wrong password during submit', [
+                    'email' => $leadEmail,
+                    'ip'    => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                ]);
+                ob_end_clean();
+                http_response_code(401);
+                echo json_encode([
+                    'error'           => 'هذا البريد مسجَّل، الرجاء إدخال كلمة المرور الصحيحة',
+                    'customer_exists' => true,
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $customerId = (int) $existing['id'];
+            startCustomerSession($customerId, [
+                'email'     => $leadEmail,
+                'full_name' => $leadData['full_name'] ?? null,
+            ]);
+            logInfo('Existing customer signed in via submit', [
+                'customer_id' => $customerId,
+                'email'       => $leadEmail,
+            ]);
+        } else {
+            // إنشاء حساب جديد
+            $hash = password_hash($leadPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+            $ins  = $db->prepare("
+                INSERT INTO customers (email, password_hash, full_name, phone, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+            $ins->execute([
+                $leadEmail,
+                $hash,
+                $leadData['full_name'] ?? null,
+                $leadData['phone']     ?? null,
+            ]);
+            $customerId = (int) $db->lastInsertId();
+
+            startCustomerSession($customerId, [
+                'email'     => $leadEmail,
+                'full_name' => $leadData['full_name'] ?? null,
+            ]);
+            logInfo('New customer registered via submit', [
+                'customer_id' => $customerId,
+                'email'       => $leadEmail,
+            ]);
+        }
+    } catch (\Throwable $e) {
+        logError('Customer create/login during submit failed: ' . $e->getMessage());
+        // لا نُفشل عملية التحليل إذا فشل ربط الحساب — نتابع كزائر
+        $customerId = null;
+    }
+}
+
+// لا نمرّر password إلى INSERT في leads — هذا ليس عموداً في الجدول
+unset($leadData['password']);
+
 // التحقق من وجود رابط منصة واحد على الأقل
 $urlFields = ['website_url', 'facebook_url', 'instagram_url', 'tiktok_url', 'twitter_url', 'youtube_url'];
 $hasUrl = false;
@@ -172,6 +264,12 @@ foreach ($safeLeadFields as $f) {
 $insertCols[] = '`source`';
 $insertVals[] = 'growth_fingerprint';
 
+// ربط customer_id إن وُجد
+if ($customerId !== null) {
+    $insertCols[] = '`customer_id`';
+    $insertVals[] = (string) $customerId;
+}
+
 $placeholders = implode(',', array_fill(0, count($insertVals), '?'));
 $colsList     = implode(',', $insertCols);
 
@@ -182,25 +280,48 @@ try {
 } catch (\Throwable $e) {
     logError('Failed to insert lead with all fields: ' . $e->getMessage());
     // Fallback: insert بالحقول الأساسية فقط
-    $db->prepare("INSERT INTO leads (full_name, phone, project_type, country, city) VALUES (?,?,?,?,?)")
-       ->execute([
-           $leadData['full_name'],
-           $leadData['phone'],
-           $leadData['project_type'],
-           $leadData['country'],
-           $leadData['city'],
-       ]);
+    if ($customerId !== null) {
+        $db->prepare("INSERT INTO leads (full_name, phone, project_type, country, city, customer_id) VALUES (?,?,?,?,?,?)")
+           ->execute([
+               $leadData['full_name'],
+               $leadData['phone'],
+               $leadData['project_type'],
+               $leadData['country'],
+               $leadData['city'],
+               $customerId,
+           ]);
+    } else {
+        $db->prepare("INSERT INTO leads (full_name, phone, project_type, country, city) VALUES (?,?,?,?,?)")
+           ->execute([
+               $leadData['full_name'],
+               $leadData['phone'],
+               $leadData['project_type'],
+               $leadData['country'],
+               $leadData['city'],
+           ]);
+    }
     $leadId = (int)$db->lastInsertId();
 }
 
 // ── 2) INSERT assessment ──────────────────────────────────────
 $token = bin2hex(random_bytes(16));
 try {
-    $db->prepare("INSERT INTO assessments (lead_id, status, report_token) VALUES (?,?,?)")
-       ->execute([$leadId, 'submitted', $token]);
+    if ($customerId !== null) {
+        $db->prepare("INSERT INTO assessments (lead_id, customer_id, status, report_token) VALUES (?,?,?,?)")
+           ->execute([$leadId, $customerId, 'submitted', $token]);
+    } else {
+        $db->prepare("INSERT INTO assessments (lead_id, status, report_token) VALUES (?,?,?)")
+           ->execute([$leadId, 'submitted', $token]);
+    }
 } catch (\Throwable $e) {
-    $db->prepare("INSERT INTO assessments (lead_id, status) VALUES (?,?)")
-       ->execute([$leadId, 'submitted']);
+    // Fallback لو customer_id غير موجود في الـ schema بعد
+    try {
+        $db->prepare("INSERT INTO assessments (lead_id, status, report_token) VALUES (?,?,?)")
+           ->execute([$leadId, 'submitted', $token]);
+    } catch (\Throwable $e2) {
+        $db->prepare("INSERT INTO assessments (lead_id, status) VALUES (?,?)")
+           ->execute([$leadId, 'submitted']);
+    }
 }
 $assessmentId = (int)$db->lastInsertId();
 
@@ -237,6 +358,8 @@ echo json_encode([
     'score'         => null,
     'tier'          => null,
     'token'         => $token,
+    'customer_id'   => $customerId,
+    'authed'        => $customerId !== null,
 ], JSON_UNESCAPED_UNICODE);
 
 $size = ob_get_length();
