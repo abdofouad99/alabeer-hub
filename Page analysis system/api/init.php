@@ -21,6 +21,10 @@ $cache = getCache($config);
 // ── Migration: يشتغل مرة واحدة فقط (Lock File) ────────────
 require_once __DIR__ . '/migrate.php';
 
+// ── Migration v7.0: نظام حسابات العملاء (Lock File مستقل) ──
+// آمن للتشغيل المتكرر — كل migration له lock خاص داخلياً
+require_once __DIR__ . '/migrations/v7_customers.php';
+
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {

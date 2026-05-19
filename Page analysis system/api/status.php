@@ -5,6 +5,7 @@
 // يرجع: status, scan_step, score, tier, scan_error
 // ============================================================
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/customer/middleware.php';
 setCors();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -15,23 +16,40 @@ if (!$id) {
     echo json_encode(['error' => 'معرّف غير صالح']);
     exit;
 }
-if ($token === '') {
+
+// ── التحقق من الوصول: token أو session للعميل ──────────────
+$customerId = getCurrentCustomerId();
+if ($token === '' && $customerId === null) {
     http_response_code(404);
     echo json_encode(['error' => 'لم يُعثر على التقييم']);
     exit;
 }
 
 $db   = getDB();
-$stmt = $db->prepare("
-    SELECT a.id, a.status, a.score, a.tier, a.scan_status, a.scan_error,
-           a.scan_step,
-           l.full_name, l.company_name
-    FROM assessments a
-    LEFT JOIN leads l ON a.lead_id = l.id
-    WHERE a.id = ? AND a.report_token = ?
-    LIMIT 1
-");
-$stmt->execute([$id, $token]);
+
+if ($token !== '') {
+    $stmt = $db->prepare("
+        SELECT a.id, a.status, a.score, a.tier, a.scan_status, a.scan_error,
+               a.scan_step,
+               l.full_name, l.company_name
+        FROM assessments a
+        LEFT JOIN leads l ON a.lead_id = l.id
+        WHERE a.id = ? AND a.report_token = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$id, $token]);
+} else {
+    $stmt = $db->prepare("
+        SELECT a.id, a.status, a.score, a.tier, a.scan_status, a.scan_error,
+               a.scan_step,
+               l.full_name, l.company_name
+        FROM assessments a
+        LEFT JOIN leads l ON a.lead_id = l.id
+        WHERE a.id = ? AND a.customer_id = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$id, $customerId]);
+}
 $row = $stmt->fetch();
 
 if (!$row) {
