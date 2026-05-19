@@ -8,6 +8,7 @@ define('ANALYZE_LOADED', true);
 // ============================================================
 
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/diagnostics.php';
 
 function clamp(float $n, float $min, float $max): float {
     return max($min, min($max, $n));
@@ -609,6 +610,19 @@ function runAnalysis(int $assessmentId): array {
     require_once __DIR__ . '/apify-scraper.php';
     $updateStep(1); // step 1: بدء الفحص الأساسي
 
+    // ─── Diagnostics: إنشاء snapshot logger للفحص ──
+    Diag::init((int)$assessmentId);
+    Diag::snapshot('analyze.input', [
+        'assessment_id' => $assessmentId,
+        'primary_url'   => $primaryUrl,
+        'fb_url'        => $fbUrl,
+        'ig_url'        => $igUrl,
+        'web_url'       => $webUrl,
+        'tk_url'        => $tkUrl,
+        'tw_url'        => $twUrl,
+        'lead_id'       => $row['lead_id'] ?? null,
+    ]);
+
     // ─── 2) الفحص الأساسي الذكي ─────────────────────────────
     $cacheKey = 'scan_' . md5($primaryUrl);
     $scanResult = cacheGet($cacheKey);
@@ -676,7 +690,9 @@ function runAnalysis(int $assessmentId): array {
         try {
             $token = getValidApifyToken($cfg);
             if ($token) {
+                Diag::snapshot('facebook.scrape.input', ['url' => $detectedFbUrl]);
                 $r = scrapeFacebook($detectedFbUrl, $token, $cfg);
+                Diag::snapshot('facebook.scrape.result', $r);
                 if ($r['success'] ?? false) {
                     $apifyFb = $r;
                     // ادمج البيانات العميقة من Apify لتحل محل البيانات المبدئية
@@ -719,7 +735,9 @@ function runAnalysis(int $assessmentId): array {
         try {
             $token = getValidApifyToken($cfg);
             if ($token) {
+                Diag::snapshot('instagram.scrape.input', ['url' => $detectedIgUrl]);
                 $r = scrapeInstagram($detectedIgUrl, $token, $cfg);
+                Diag::snapshot('instagram.scrape.result', $r);
                 if ($r['success'] ?? false) {
                     $apifyIg = $r;
                     if (is_array($scanResult['instagram'] ?? null)) {
@@ -785,7 +803,9 @@ function runAnalysis(int $assessmentId): array {
                 $fbTopPost = $scanResult['facebook']['top_post'] ?? null;
                 $fbTopUrl  = $fbTopPost['url'] ?? $fbTopPost['postUrl'] ?? '';
                 if ($fbTopUrl) {
+                    Diag::snapshot('comments.fb.scrape.input', ['url' => $fbTopUrl, 'limit' => 50]);
                     $fbComments = scrapePostComments($fbTopUrl, 'facebook', $token, 50);
+                    Diag::snapshot('comments.fb.scrape.result', $fbComments);
                     if ($fbComments['success'] ?? false) {
                         $scanResult['facebook']['top_post_comments'] = $fbComments;
                         $saveScanProgress('facebook.top_post_comments', $fbComments);
@@ -796,7 +816,9 @@ function runAnalysis(int $assessmentId): array {
                 $igTopPost = $scanResult['instagram']['top_post'] ?? null;
                 $igTopUrl  = $igTopPost['url'] ?? $igTopPost['postUrl'] ?? '';
                 if ($igTopUrl) {
+                    Diag::snapshot('comments.ig.scrape.input', ['url' => $igTopUrl, 'limit' => 50]);
                     $igComments = scrapePostComments($igTopUrl, 'instagram', $token, 50);
+                    Diag::snapshot('comments.ig.scrape.result', $igComments);
                     if ($igComments['success'] ?? false) {
                         $scanResult['instagram']['top_post_comments'] = $igComments;
                         $saveScanProgress('instagram.top_post_comments', $igComments);
@@ -829,7 +851,9 @@ function runAnalysis(int $assessmentId): array {
             try {
                 $token = getValidApifyToken($cfg);
                 if ($token) {
+                    Diag::snapshot('maps.scrape.input', ['url' => $mapsUrl, 'limit' => 50]);
                     $mapsResult = scrapeGoogleMapsReviews($mapsUrl, $token, 50);
+                    Diag::snapshot('maps.scrape.result', $mapsResult);
                     if ($mapsResult['success'] ?? false) {
                         $scanResult['google_maps'] = $mapsResult;
                         $saveScanProgress('google_maps', $mapsResult);
@@ -957,7 +981,13 @@ function runAnalysis(int $assessmentId): array {
                     $searchParam = $adsPageId ? "ID:{$adsPageId}" : $adsQuery;
                     logInfo('Starting Ads Library scrape', ['query' => $searchParam]);
                     // نمرر بيانات Facebook إذا توفرت لاستخدام pageAdLibrary مباشرة
+                    Diag::snapshot('ads.scrape.input', [
+                        'search_param' => $searchParam,
+                        'country'      => $cfg['apis']['ads_default_country'] ?? 'SA',
+                        'has_fb_data'  => !empty($apifyFb),
+                    ]);
                     $r = scrapeAdsLibrary($searchParam, $token, $cfg, $cfg['apis']['ads_default_country'] ?? 'SA', $apifyFb ?? []);
+                    Diag::snapshot('ads.scrape.result', $r);
                     if ($r['success'] ?? false) {
                         logInfo('Ads Library scrape successful', ['query' => $searchParam, 'total_ads' => $r['total_ads'] ?? 0]);
                         $adsData = $r;
@@ -991,7 +1021,12 @@ function runAnalysis(int $assessmentId): array {
         try {
             $token = getValidApifyToken($cfg);
             if ($token) {
+                Diag::snapshot('competitors.scrape.input', [
+                    'company'  => $compName,
+                    'audience' => $compAudience,
+                ]);
                 $compResult = scrapeCompetitorsViaGoogle($compName, $compAudience, $token);
+                Diag::snapshot('competitors.scrape.result', $compResult);
                 if ($compResult['success'] ?? false) {
                     $compRadar = $compResult['competitors'];
                     $saveScanProgress('competitor_radar', $compRadar); // ✅ حفظ فوري
@@ -1208,6 +1243,14 @@ function runAnalysis(int $assessmentId): array {
         'score' => $finalScore,
         'tier' => $tier
     ]);
+
+    Diag::snapshot('analyze.scan_result.summary', [
+        'top_level_keys' => array_keys($scanResult ?? []),
+        'size_bytes'     => strlen(json_encode($scanResult ?? [], JSON_UNESCAPED_UNICODE)),
+        'final_score'    => $finalScore,
+        'tier'           => $tier,
+    ]);
+    Diag::flush($db);
 
     return [
         'ok'              => true,

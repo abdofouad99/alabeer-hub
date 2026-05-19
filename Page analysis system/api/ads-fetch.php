@@ -12,6 +12,7 @@ $cfg    = require __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/logger.php';     // ✅ تحميل دوال التسجيل
 require_once __DIR__ . '/apify-scraper.php';   // for getValidApifyToken()
+require_once __DIR__ . '/diagnostics.php';
 
 $envPath = __DIR__ . '/../.env';
 $env     = file_exists($envPath) ? parse_ini_file($envPath) : [];
@@ -27,6 +28,14 @@ if (!$scanId) {
     echo json_encode(['success'=>false,'error'=>'معرّف الفحص مطلوب']);
     exit;
 }
+
+Diag::init((int)$scanId);
+Diag::snapshot('ads_fetch.input', [
+    'scan_id' => $scanId,
+    'action'  => $action,
+    'force'   => $force,
+    'has_meta_token' => !empty($metaToken),
+]);
 
 // ── جلب بيانات العميل ────────────────────────────────────────
 try {
@@ -160,10 +169,17 @@ $adsLibrary = [
 
 try {
     $scanResult['ads_library'] = $adsLibrary;
+    Diag::snapshot('db.save.scan_result.full', [
+        'scan_id'          => $scanId,
+        'size_bytes'       => strlen(json_encode($scanResult, JSON_UNESCAPED_UNICODE)),
+        'top_keys'         => array_keys($scanResult),
+        'ads_library_keys' => is_array($scanResult['ads_library'] ?? null) ? array_keys($scanResult['ads_library']) : [],
+    ]);
     $pdo->prepare("UPDATE assessments SET scan_result=? WHERE id=?")
         ->execute([json_encode($scanResult, JSON_UNESCAPED_UNICODE), $scanId]);
 } catch (Exception $e) {
     error_log('[ads-fetch] DB: '.$e->getMessage());
+    Diag::error('db.save.scan_result.full', ['error' => $e->getMessage()]);
 }
 
 echo json_encode([
@@ -171,6 +187,7 @@ echo json_encode([
     'source'  => $source,
     'data'    => buildFrontendPayload($adsLibrary, $clientName),
 ], JSON_UNESCAPED_UNICODE);
+Diag::flush($pdo);
 exit;
 
 // ══════════════════════════════════════════════════════════════
@@ -442,6 +459,15 @@ function callOpenAIDeepAnalysis(string $key, array $cfg, array $ads, array $enti
         'max_tokens'  => 3000,
     ], JSON_UNESCAPED_UNICODE);
 
+    Diag::snapshot('ads.openai.deep.prompt', [
+        'model'             => $cfg['apis']['openai_model'] ?? 'gpt-4o-mini',
+        'ads_count'         => count($ads),
+        'prompt_length'     => strlen($prompt),
+        'ads_context_full'  => $adsContext,
+        'entity_context'    => $entityContext,
+        'website_context'   => $websiteCtx,
+    ]);
+
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
@@ -453,6 +479,12 @@ function callOpenAIDeepAnalysis(string $key, array $cfg, array $ads, array $enti
     $res  = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    Diag::snapshot('ads.openai.deep.response', [
+        'http_code'       => $code,
+        'response_length' => is_string($res) ? strlen($res) : 0,
+        'response_full'   => $res,
+    ]);
 
     if ($code !== 200) { error_log('[ads-fetch] OpenAI error '.$code.': '.$res); return ''; }
     $data = json_decode($res, true);
@@ -497,6 +529,15 @@ function callNvidiaDeepAnalysis(string $key, array $ads, array $entity, string $
         'max_tokens'  => 3000,
     ]);
 
+    Diag::snapshot('ads.nvidia.deep.prompt', [
+        'model'             => 'meta/llama-3.1-70b-instruct',
+        'ads_count'         => count($ads),
+        'prompt_length'     => strlen($prompt),
+        'ads_context_full'  => $adsContext,
+        'entity_context'    => $entityContext,
+        'website_context'   => $websiteCtx,
+    ]);
+
     $ch = curl_init('https://integrate.api.nvidia.com/v1/chat/completions');
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
@@ -508,6 +549,12 @@ function callNvidiaDeepAnalysis(string $key, array $ads, array $entity, string $
     $res  = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    Diag::snapshot('ads.nvidia.deep.response', [
+        'http_code'       => $code,
+        'response_length' => is_string($res) ? strlen($res) : 0,
+        'response_full'   => $res,
+    ]);
 
     if ($code !== 200) { error_log('[ads-fetch] NVIDIA error '.$code.': '.$res); return ''; }
     $data = json_decode($res, true);
@@ -525,6 +572,14 @@ function callGeminiDeepAnalysis(array $cfg, array $ads, array $entity, string $c
     $adsCtx  = implode("\n---\n", array_map(fn($ad,$i)=>"إعلان ".($i+1).": ".($ad['text']??''), $ads, array_keys($ads)));
     $prompt  = "حلل هذه الإعلانات لـ {$clientName} وأجب على 12 سؤال تسويقي: نوع الحملة، الهدف، الاتساق، رحلة العميل، الهدر، الميزانية، المنصة، التعديلات، الرسائل، الجمهور. اجعل الرد Markdown احترافياً.\nالإعلانات:\n{$adsCtx}";
 
+    Diag::snapshot('ads.gemini.deep.prompt', [
+        'model'             => $model,
+        'ads_count'         => count($ads),
+        'prompt_length'     => strlen($prompt),
+        'ads_context_full'  => $adsCtx,
+        'keys_count'        => count($keys),
+    ]);
+
     foreach ($keys as $key) {
         $url  = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$key}";
         $body = json_encode(['contents'=>[['parts'=>[['text'=>$prompt]]]],'generationConfig'=>['temperature'=>0.6,'maxOutputTokens'=>2000]]);
@@ -533,6 +588,11 @@ function callGeminiDeepAnalysis(array $cfg, array $ads, array $entity, string $c
         $res  = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        Diag::snapshot('ads.gemini.deep.response', [
+            'http_code'       => $code,
+            'response_length' => is_string($res) ? strlen($res) : 0,
+            'response_full'   => $res,
+        ]);
         if ($code === 200) {
             $d = json_decode($res, true);
             $t = $d['candidates'][0]['content']['parts'][0]['text'] ?? '';
@@ -589,7 +649,7 @@ function parseDeepReportToJson(string $report, array $ads, array $entity): array
         $pointers[] = ['type'=>'yellow','icon'=>'⚠️','title'=>'راجع التقرير الكامل','desc'=>'التحليل العميق متاح في قسم التقرير أدناه.'];
     }
 
-    return [
+    $deepParsed = [
         'score'  => $score,
         'status' => $score >= 70 ? '✅ أداء جيد' : ($score >= 45 ? '⚠️ يحتاج تحسين' : '❌ يحتاج تدخل عاجل'),
         'desc'   => "تم تحليل {$totalAds} إعلان ({$activeAds} نشط) لـ " . ($entity['page_name'] ?? 'العميل') . " عبر OpenAI.",
@@ -605,6 +665,14 @@ function parseDeepReportToJson(string $report, array $ads, array $entity): array
         ],
         'full_report' => $report,   // التقرير الكامل Markdown
     ];
+    Diag::snapshot('ads.deep.parsed', [
+        'extracted_score' => $score,
+        'campaign_type'   => $campaignType,
+        'pointers_count'  => count($pointers),
+        'steps_count'     => count($steps),
+        'report_length'   => strlen($report),
+    ]);
+    return $deepParsed;
 }
 
 function extractQuestion(string $report, int $q, int $next): string {
@@ -682,7 +750,7 @@ function fetchRealMetaMetrics(string $token, string $clientName): array {
  * بناء payload للـ Frontend
  */
 function buildFrontendPayload(array $lib, string $clientName): array {
-    return [
+    $payload = [
         'client_name'  => $clientName,
         'total_ads'    => $lib['total_ads']   ?? count($lib['ads']??[]),
         'active_ads'   => $lib['active_ads']  ?? 0,
@@ -692,4 +760,14 @@ function buildFrontendPayload(array $lib, string $clientName): array {
         'has_ads'      => !empty($lib['ads']),
         'fetched_at'   => $lib['fetched_at']  ?? '',
     ];
+    Diag::snapshot('frontend.payload.ads', [
+        'total_ads'         => $payload['total_ads'],
+        'active_ads'        => $payload['active_ads'],
+        'has_ads'           => $payload['has_ads'],
+        'has_full_report'   => !empty($payload['full_report']),
+        'has_ai'            => !empty($payload['ai']),
+        'top_keys'          => array_keys($payload),
+        'lib_top_keys'      => array_keys($lib),
+    ]);
+    return $payload;
 }
