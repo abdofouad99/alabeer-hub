@@ -16,6 +16,8 @@
  *   $result = runMultiAgentAnalysis($rawData, ['apiKey' => 'YOUR_KEY']);
  */
 
+require_once __DIR__ . '/diagnostics.php';
+
 // ─────────────────────────────────────────────────────────────
 // SECTION 1: SYSTEM PROMPTS
 // ─────────────────────────────────────────────────────────────
@@ -804,6 +806,14 @@ function callGeminiAgent(
         'response_format' => ['type' => 'json_object']
     ];
 
+    Diag::snapshot('gemini.agent.prompt', [
+        'model'                  => $model,
+        'system_prompt_length'   => strlen($systemPrompt),
+        'user_message_length'    => strlen($userMessage),
+        'max_tokens'             => $payload['max_tokens'],
+        'user_message_preview'   => mb_substr($userMessage, 0, 1000),
+    ]);
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
@@ -821,6 +831,14 @@ function callGeminiAgent(
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
     curl_close($ch);
+
+    Diag::snapshot('gemini.agent.response', [
+        'model'           => $model,
+        'http_code'       => $httpCode,
+        'response_length' => is_string($response) ? strlen($response) : 0,
+        'curl_error'      => $curlError ?: null,
+        'response_preview'=> is_string($response) ? mb_substr($response, 0, 2000) : null,
+    ]);
 
     if ($curlError) {
         throw new RuntimeException("OpenAI API cURL error: {$curlError}");
