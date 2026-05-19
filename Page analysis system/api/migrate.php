@@ -172,6 +172,7 @@ try {
         'scan_step'      => 'TINYINT(1) DEFAULT 0',
         'competitor_radar'=> 'JSON',
         'error'          => 'TEXT',
+        'diagnostics_log' => 'JSON',
     ];
     foreach ($wantAsmCols as $col => $def) {
         if (!in_array($col, $existAsmCols)) {
