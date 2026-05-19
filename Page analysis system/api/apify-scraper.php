@@ -6,6 +6,7 @@ define('APIFY_SCRAPER_LOADED', true);
 // api/apify-scraper.php — مكتبة دوال Apify (لا تُستدعى مباشرة)
 // ============================================================
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/diagnostics.php';
 
 // ← لا يوجد كود تنفيذي هنا — فقط دوال
 
@@ -253,6 +254,16 @@ function scrapeAdsLibrary(
         $activeCount = count(array_filter($ads, fn($a) => !empty($a['is_active'])));
 
         logInfo('Ads scrape successful', ['actor' => $actorId, 'total' => count($ads), 'active' => $activeCount]);
+
+        Diag::snapshot('ads.parsed', [
+            'actor_used'         => $actorId,
+            'total_parsed'       => count($ads),
+            'active_count'       => $activeCount,
+            'sample_ad'          => $ads[0] ?? null,
+            'first_raw_keys'     => is_array($items[0] ?? null) ? array_keys($items[0]) : [],
+            'first_snapshot_keys'=> isset($items[0]['snapshot']) && is_array($items[0]['snapshot'])
+                ? array_keys($items[0]['snapshot']) : [],
+        ]);
 
         return [
             'success'        => true,
@@ -552,9 +563,19 @@ function scrapeCompetitorsViaGoogle(string $companyName, string $targetAudience,
         }
     }
 
+    $finalCompetitors = array_slice($competitors, 0, 5);
+    Diag::snapshot('competitors.parsed', [
+        'query'           => $query,
+        'raw_item_count'  => is_array($result) ? count($result) : 0,
+        'parsed_count'    => count($competitors),
+        'returned_count'  => count($finalCompetitors),
+        'first_raw_keys'  => is_array($result[0] ?? null) ? array_keys($result[0]) : [],
+        'sample'          => $finalCompetitors[0] ?? null,
+    ]);
+
     return [
         'success' => true,
-        'competitors' => array_slice($competitors, 0, 5) // نأخذ أول 5
+        'competitors' => $finalCompetitors // نأخذ أول 5
     ];
 }
 
@@ -663,7 +684,7 @@ function scrapePostComments(string $postUrl, string $platform, string $token, in
         if ($isNeg) $negative++; elseif ($isPos) $positive++;
     }
     $total = max(count($items), 1);
-    return [
+    $commentsResult = [
         'success'        => true,
         'platform'       => $platform,
         'total_comments' => count($items),
@@ -673,6 +694,19 @@ function scrapePostComments(string $postUrl, string $platform, string $token, in
         'top_objections' => array_slice(array_unique($objections), 0, 5),
         'sample_phrases' => array_slice($phrases, 0, 10),
     ];
+    Diag::snapshot('comments.parsed', [
+        'platform'        => $platform,
+        'actor_id'        => $actorId,
+        'raw_item_count'  => is_array($items) ? count($items) : 0,
+        'parsed_total'    => $commentsResult['total_comments'],
+        'first_raw_keys'  => is_array($items[0] ?? null) ? array_keys($items[0]) : [],
+        'summary'         => [
+            'positive_pct' => $commentsResult['positive_pct'],
+            'negative_pct' => $commentsResult['negative_pct'],
+            'questions_pct'=> $commentsResult['questions_pct'],
+        ],
+    ]);
+    return $commentsResult;
 }
 
 // ============================================================
@@ -704,7 +738,7 @@ function scrapeGoogleMapsReviews(string $mapsUrl, string $token, int $maxReviews
             if ($stars >= 4) $pos[] = mb_substr($text, 0, 80);
         }
     }
-    return [
+    $mapsResult = [
         'success'       => true,
         'total_reviews' => count($items),
         'avg_rating'    => $ratings ? round(array_sum($ratings)/count($ratings),1) : null,
@@ -712,6 +746,14 @@ function scrapeGoogleMapsReviews(string $mapsUrl, string $token, int $maxReviews
         'negative'      => array_slice($neg, 0, 5),
         'samples'       => array_slice($texts, 0, 10),
     ];
+    Diag::snapshot('maps.parsed', [
+        'actor_id'        => $actorId,
+        'raw_item_count'  => is_array($items) ? count($items) : 0,
+        'parsed_total'    => $mapsResult['total_reviews'],
+        'avg_rating'      => $mapsResult['avg_rating'],
+        'first_raw_keys'  => is_array($items[0] ?? null) ? array_keys($items[0]) : [],
+    ]);
+    return $mapsResult;
 }
 
 // ── Apify Internal Helpers ────────────────────────────────────
@@ -732,6 +774,14 @@ function _apifyStartRun(string $actorId, string $inputJson, string $token): ?str
     $res = json_decode($body, true);
     curl_close($ch);
 
+    $runId = $res['data']['id'] ?? null;
+    Diag::snapshot('apify.run.start', [
+        'actor_id'   => $actorId,
+        'http_code'  => $code,
+        'run_id'     => $runId,
+        'input_size' => strlen($inputJson),
+    ]);
+
     if ($code !== 201 && $code !== 200) {
         logError("Apify Start Run Failed", [
             "actor" => $actorId,
@@ -742,7 +792,7 @@ function _apifyStartRun(string $actorId, string $inputJson, string $token): ?str
         return null;
     }
 
-    return $res['data']['id'] ?? null;
+    return $runId;
 }
 
 function _apifyWaitAndFetch(string $runId, string $token, int $maxWait, int $datasetLimit = 100): ?array {
@@ -763,12 +813,41 @@ function _apifyWaitAndFetch(string $runId, string $token, int $maxWait, int $dat
                 curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false]);
                 $items = json_decode(curl_exec($ch), true);
                 curl_close($ch);
-                return $items ?: [];
+                $itemsArr = $items ?: [];
+                Diag::snapshot('apify.run.fetch', [
+                    'run_id'           => $runId,
+                    'duration_sec'     => time() - $start,
+                    'final_status'     => $status,
+                    'item_count'       => is_array($itemsArr) ? count($itemsArr) : 0,
+                    'first_item_keys'  => is_array($itemsArr[0] ?? null) ? array_keys($itemsArr[0]) : [],
+                ]);
+                return $itemsArr;
             }
+            Diag::snapshot('apify.run.fetch', [
+                'run_id'       => $runId,
+                'duration_sec' => time() - $start,
+                'final_status' => $status,
+                'item_count'   => 0,
+                'note'         => 'no defaultDatasetId',
+            ]);
             return [];
         }
-        if (in_array($status, ['FAILED','ABORTED','TIMED-OUT'])) return null;
+        if (in_array($status, ['FAILED','ABORTED','TIMED-OUT'])) {
+            Diag::snapshot('apify.run.fetch', [
+                'run_id'       => $runId,
+                'duration_sec' => time() - $start,
+                'final_status' => $status,
+                'item_count'   => 0,
+            ]);
+            return null;
+        }
     }
+    Diag::snapshot('apify.run.fetch', [
+        'run_id'       => $runId,
+        'duration_sec' => time() - $start,
+        'final_status' => 'TIMEOUT_LOCAL',
+        'item_count'   => 0,
+    ]);
     return null;
 }
 

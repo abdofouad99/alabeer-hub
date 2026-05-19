@@ -16,6 +16,7 @@
 if (!function_exists('logInfo')) {
     require_once __DIR__ . '/logger.php';
 }
+require_once __DIR__ . '/diagnostics.php';
 
 // ============================================================
 // 1) Hashtags + Mentions Extraction
@@ -766,9 +767,25 @@ function scrapeIGStoriesAndHighlights(string $username, string $token, array $cf
         'resultsLimit' => 50,
     ]);
     $runId = _apifyStartRun($actorId, $input, $token);
-    if (!$runId) return ['success' => false, 'reason' => 'فشل تشغيل Stories actor'];
+    if (!$runId) {
+        Diag::snapshot('instagram.stories.scrape.result', [
+            'username' => $username,
+            'actor_id' => $actorId,
+            'success'  => false,
+            'reason'   => 'فشل تشغيل Stories actor',
+        ]);
+        return ['success' => false, 'reason' => 'فشل تشغيل Stories actor'];
+    }
     $items = _apifyWaitAndFetch($runId, $token, 90);
-    if (!is_array($items)) return ['success' => false, 'reason' => 'انتهت مهلة Stories actor'];
+    if (!is_array($items)) {
+        Diag::snapshot('instagram.stories.scrape.result', [
+            'username' => $username,
+            'actor_id' => $actorId,
+            'success'  => false,
+            'reason'   => 'انتهت مهلة Stories actor',
+        ]);
+        return ['success' => false, 'reason' => 'انتهت مهلة Stories actor'];
+    }
 
     $stories = []; $highlights = [];
     foreach ($items as $it) {
@@ -790,11 +807,20 @@ function scrapeIGStoriesAndHighlights(string $username, string $token, array $cf
             $stories[] = $entry;
         }
     }
-    return [
+    $igStoriesResult = [
         'success'          => true,
         'stories_count'    => count($stories),
         'highlights_count' => count($highlights),
         'stories'          => array_slice($stories, 0, 30),
         'highlights'       => array_slice($highlights, 0, 30),
     ];
+    Diag::snapshot('instagram.stories.scrape.result', [
+        'username'         => $username,
+        'actor_id'         => $actorId,
+        'success'          => true,
+        'stories_count'    => $igStoriesResult['stories_count'],
+        'highlights_count' => $igStoriesResult['highlights_count'],
+        'raw_item_count'   => count($items),
+    ]);
+    return $igStoriesResult;
 }}

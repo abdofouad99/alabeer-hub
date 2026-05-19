@@ -8,6 +8,7 @@ define('AI_ANALYZE_LOADED', true);
 // Body: { "assessment_id": 123 } OR { "data": {...} }
 // ============================================================
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/diagnostics.php';
 if (file_exists(__DIR__ . '/gemini-agents.php')) {
     require_once __DIR__ . '/gemini-agents.php';
 }
@@ -564,38 +565,51 @@ function callAIProvider(string $provider, array $data, array $cfg): array
 {
     $prompt = buildPrompt($data);
 
+    Diag::snapshot('ai.provider.input', [
+        'provider'  => $provider,
+        'data_keys' => is_array($data) ? array_keys($data) : [],
+        'prompt_length' => strlen($prompt),
+    ]);
+
     if ($provider !== 'openai') {
         throw new \Exception("AI provider disabled: {$provider}");
     }
 
     switch ($provider) {
         case 'pekpik':
-            return callPekpik($prompt, $data, $cfg);
+            $result = callPekpik($prompt, $data, $cfg); break;
         case 'gemini':
-            return callGemini($prompt, $data, $cfg);
+            $result = callGemini($prompt, $data, $cfg); break;
         case 'groq':
-            return callGroq($prompt, $data, $cfg);
+            $result = callGroq($prompt, $data, $cfg); break;
         case 'deepseek':
-            return callDeepSeek($prompt, $data, $cfg);
+            $result = callDeepSeek($prompt, $data, $cfg); break;
         case 'openai':
-            return callOpenAI($prompt, $data, $cfg);
+            $result = callOpenAI($prompt, $data, $cfg); break;
         case 'nvidia':
-            return callNvidia($prompt, $data, $cfg);
+            $result = callNvidia($prompt, $data, $cfg); break;
         case 'qwen':
-            return callQwen($prompt, $data, $cfg);
+            $result = callQwen($prompt, $data, $cfg); break;
         case 'gptoss':
-            return callGPTOSS($prompt, $data, $cfg);
+            $result = callGPTOSS($prompt, $data, $cfg); break;
         case 'nemotron':
-            return callNemotron($prompt, $data, $cfg);       // NVIDIA 253B
+            $result = callNemotron($prompt, $data, $cfg); break;       // NVIDIA 253B
         case 'deepseek_r1':
-            return callDeepSeekR1Nvidia($prompt, $data, $cfg); // DeepSeek R1 671B
+            $result = callDeepSeekR1Nvidia($prompt, $data, $cfg); break; // DeepSeek R1 671B
         case 'qwen3_235b':
-            return callQwen3_235B($prompt, $data, $cfg);     // Qwen3 235B
+            $result = callQwen3_235B($prompt, $data, $cfg); break;     // Qwen3 235B
         case 'llama_405b':
-            return callLlama405B($prompt, $data, $cfg);      // Llama 3.1 405B
+            $result = callLlama405B($prompt, $data, $cfg); break;      // Llama 3.1 405B
         default:
             throw new \Exception("Unknown provider: {$provider}");
     }
+
+    Diag::snapshot('ai.provider.result', [
+        'provider'    => $provider,
+        'success'     => !empty($result),
+        'result_keys' => is_array($result) ? array_keys($result) : [],
+    ]);
+    return $result;
 }
 
 // ── Pekpik (OpenAI-Compatible) ────────────────────────────────
@@ -691,6 +705,13 @@ function callGemini(string $prompt, array $data, array $cfg): array
         $prompt = mb_substr($prompt, 0, $maxChars) . "\n\n... [تم اختصار البيانات لحدود النموذج]";
     }
 
+    Diag::snapshot('ai.gemini.prompt', [
+        'model'          => $model,
+        'keys_count'     => count($keys),
+        'prompt_length'  => strlen($prompt),
+        'prompt_preview' => mb_substr($prompt, 0, 1000),
+    ]);
+
     // حاول كل مفتاح
     foreach ($keys as $key) {
         if (!$key || strpos($key, 'YOUR') !== false) continue;
@@ -721,6 +742,12 @@ function callGemini(string $prompt, array $data, array $cfg): array
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        Diag::snapshot('ai.gemini.response', [
+            'http_code'       => $httpCode,
+            'response_length' => is_string($response) ? strlen($response) : 0,
+            'response_preview'=> is_string($response) ? mb_substr($response, 0, 2000) : null,
+        ]);
 
         if (!$response || $httpCode === 429) {
             logError("Gemini Rate Limit/No Response", ['httpCode' => $httpCode, 'response' => $response]);
@@ -868,6 +895,12 @@ function callOpenAI(string $prompt, array $data, array $cfg): array
         'response_format' => ['type' => 'json_object'],
     ]);
 
+    Diag::snapshot('ai.openai.prompt', [
+        'model'          => $model,
+        'prompt_length'  => strlen($prompt),
+        'prompt_preview' => mb_substr($prompt, 0, 1000),
+    ]);
+
     $timeout = (int)($cfg['apis']['openai_timeout'] ?? 120);
     $connectTimeout = (int)($cfg['apis']['openai_connect_timeout'] ?? 15);
 
@@ -891,6 +924,13 @@ function callOpenAI(string $prompt, array $data, array $cfg): array
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErr  = curl_error($ch);
     curl_close($ch);
+
+    Diag::snapshot('ai.openai.response', [
+        'http_code'        => $httpCode,
+        'response_length'  => is_string($response) ? strlen($response) : 0,
+        'response_preview' => is_string($response) ? mb_substr($response, 0, 2000) : null,
+        'curl_error'       => $curlErr ?: null,
+    ]);
 
     if ($curlErr) throw new \Exception("OpenAI cURL error: {$curlErr}");
     if ($httpCode >= 400) {
@@ -969,6 +1009,12 @@ function callNvidia(string $prompt, array $data, array $cfg): array
         'stream'      => false
     ]);
 
+    Diag::snapshot('ai.nvidia.prompt', [
+        'model'          => $model,
+        'prompt_length'  => strlen($prompt),
+        'prompt_preview' => mb_substr($prompt, 0, 1000),
+    ]);
+
     $ch = curl_init('https://integrate.api.nvidia.com/v1/chat/completions');
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
@@ -986,6 +1032,12 @@ function callNvidia(string $prompt, array $data, array $cfg): array
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    Diag::snapshot('ai.nvidia.response', [
+        'http_code'        => $httpCode,
+        'response_length'  => is_string($response) ? strlen($response) : 0,
+        'response_preview' => is_string($response) ? mb_substr($response, 0, 2000) : null,
+    ]);
 
     if (!$response || $httpCode >= 400) throw new \Exception("NVIDIA failed: {$httpCode}");
 
